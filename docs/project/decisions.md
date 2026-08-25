@@ -24,6 +24,10 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 | D-016 | Environ 60 agents sont des profils logiques. | Modèles partagés, registry, permissions, mémoire et outils par profil ; pas 60 copies en RAM. |
 | D-017 | Le RAG porte la connaissance évolutive. | Les nouvelles recherches ne déclenchent pas automatiquement un réentraînement des poids. |
 | D-018 | La génération d'images est ultérieure. | Hors périmètre V1 ; aucun compromis V1 n'est fait pour elle. |
+| D-019 | La V1 est d'abord un assistant personnel pour le propriétaire du projet. | Une seule session interactive est la cible initiale ; au-delà, le système met en file ou refuse jusqu'au benchmark de capacité. |
+| D-020 | Les trois usages V1 prioritaires sont : organisation personnelle, développement logiciel et conseil d'infrastructure locale. | Corpus, RAG, profils logiques et évaluations sont conçus en priorité pour ces usages. Les scénarios, limites et critères sont versionnés dans `docs/project/v1-use-cases.md`. |
+| D-021 | L'assistant doit être force de proposition, sans autonomie de modification. | Il explicite hypothèses, sources, risques, options et vérifications ; toute action durable, sortie de données ou modification d'infrastructure exige une confirmation humaine. |
+| D-022 | La connaissance de l'infrastructure locale est fournie par des inventaires et documents approuvés. | Aucune découverte réseau, exécution de commande, accès aux secrets ou modification de l'infrastructure n'est permise par défaut. |
 
 ## Orientations provisoires
 
@@ -37,7 +41,6 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 
 ## Décisions ouvertes majeures
 
-- cas d'usage prioritaires et critères d'acceptation de la V1 ;
 - langues et proportions du corpus, code source, logs et vocabulaire métier ;
 - droit ou interdiction d'utiliser un moteur d'embeddings RAG et un reranker pré-entraînés, distincts de CORE ;
 - pile logicielle des services, base relationnelle, index vectoriel et file de tâches ;
