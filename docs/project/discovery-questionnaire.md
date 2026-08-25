@@ -2,13 +2,27 @@
 
 Ce questionnaire ne répète pas les informations déjà confirmées. Il sert à fermer les inconnues avant de figer l'architecture ou de déployer un service. Les réponses doivent être ajoutées par lots à une issue de découverte puis reportées dans le registre des décisions.
 
-## Priorité 0 — critères de succès
+## Priorité 0 — critères de succès — réponses confirmées le 2026-08-25
 
-1. Quels sont les trois premiers cas d'usage concrets de la V1, par ordre de priorité ?
-2. Qui utilisera la V1 et combien d'utilisateurs simultanés sont attendus ?
-3. Quelle qualité minimale doit être démontrée pour chacun de ces cas d'usage ?
-4. La V1 doit-elle uniquement répondre avec des citations, ou aussi planifier/exécuter des outils internes ?
-5. Quelles actions doivent toujours nécessiter une validation humaine ?
+Le détail des scénarios, des jeux de tests et des critères mesurables est consigné dans [les usages V1](v1-use-cases.md).
+
+| Question | Réponse confirmée |
+|---|---|
+| Trois usages V1, par priorité | 1. Organisation personnelle ; 2. assistance au développement logiciel ; 3. conseil sur l'infrastructure locale. |
+| Utilisateurs et concurrence | Le propriétaire du projet est le premier utilisateur. La cible initiale est une session interactive à la fois ; les traitements de fond sont bornés et mis en file. Toute cible multi-utilisateur attend un benchmark de capacité et une décision dédiée. |
+| Qualité minimale | Chaque usage possède des scénarios synthétiques et expurgés, un barème, des seuils de réussite et des règles de refus documentés dans `v1-use-cases.md`. Une réponse sans source, qui invente un fait d'infrastructure, ou qui déclenche une action non confirmée échoue. |
+| Réponse, planification et outils | La V1 peut analyser, citer, synthétiser et proposer un plan. Elle ne modifie ni tâches, ni fichiers, ni services, ni réseau, ni données validées sans confirmation humaine explicite. Les outils internes éventuels restent à définir par contrat et moindre privilège. |
+| Actions à confirmer | Toute écriture durable, promotion de connaissance, modification de configuration ou d'infrastructure, exécution de commande, accès à un secret, export de données, publication, achat ou appel externe. |
+| Propriétaire des décisions | Le propriétaire du projet approuve architecture, sécurité, données, critères d'évaluation et mise en production. Une revue indépendante est requise avant un déploiement sensible, conformément à `SECURITY.md`. |
+
+### Inconnues critiques restantes et moment de décision
+
+| Inconnue | Responsable | À fermer avant |
+|---|---|---|
+| Inventaires du ML350, du Synology et du réseau | Propriétaire du projet — issues #2, #3 et #4 | Gates G0/A1 |
+| Sources, licences, langues, tokenizer et moteur d'embeddings RAG | Propriétaire du projet — issue #7 | Gate G3 |
+| Périmètre exact des outils, confirmations et identités internes | Propriétaire du projet | ADR d'architecture puis gate A4/G7 |
+| Jeux d'évaluation, seuils définitifs et critères d'arrêt | Propriétaire du projet — issue #9 | Gates G3 à G8 |
 
 ## Corpus et tokenizer
 
