@@ -1,6 +1,6 @@
 # Sovereign Local AI
 
-Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du projet. La V1 vise un modèle de langage créé localement dans la classe 50–100 millions de paramètres, un RAG traçable, des agents logiques, deux frontières MCP séparées et une alimentation en connaissances externes sans donner d'accès Internet à l'IA interne.
+Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du projet. La V1 vise un modèle de langage créé localement dans la classe 50–100 millions de paramètres, un RAG traçable, des agents logiques et une séparation stricte entre ingestion externe et connaissances internes, sans donner d'accès Internet à l'IA interne. Deux services MCP distincts constituent l'option candidate actuelle, encore soumise à audit.
 
 > État : **phase 0 — découverte et validation de l'architecture**. Ce dépôt pose les contraintes, les contrats et les gates de décision. Il ne prétend pas encore fournir une plateforme de production.
 
@@ -19,7 +19,7 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
 
 Le registre complet se trouve dans [docs/project/decisions.md](docs/project/decisions.md).
 
-## Architecture de principe
+## Architecture de principe candidate
 
 ```text
 Internet / fournisseurs externes
@@ -58,12 +58,20 @@ L'option Research Gateway est la direction recommandée pour l'étude, car elle 
 
 ## Cible CORE-80M
 
-Le premier candidat vérifiable est un Transformer decoder-only de **81 444 480 paramètres entraînables** : vocabulaire 32 000, dimension 640, 12 blocs, 10 têtes, MLP SwiGLU 1 792, RoPE, RMSNorm, embeddings et tête de sortie liés, sans biais.
+Le premier candidat vérifiable est un Transformer decoder-only de **81 444 480 paramètres entraînables** : vocabulaire 32 000, dimension 640, 12 blocs, 10 têtes, MLP SwiGLU 1 792, RoPE, RMSNorm, matrice d'embedding de tokens et tête de sortie liées, sans biais.
 
-Ce nombre est exact pour cette définition, mais l'architecture est encore un candidat. Le tokenizer, les langues, la longueur de contexte, le dataset et la politique d'embeddings doivent être décidés après l'audit. Voir [docs/model/core-80m.md](docs/model/core-80m.md) et vérifier le calcul avec :
+Ce nombre est exact pour cette définition, mais l'architecture est encore un candidat. Le tokenizer, les langues, la longueur de contexte, le dataset et la politique du moteur d'embeddings du RAG doivent être décidés après l'audit. Voir [docs/model/core-80m.md](docs/model/core-80m.md) et vérifier le calcul avec :
+
+Sous Windows :
 
 ```powershell
-python tools/count_core_parameters.py
+py -3 -B tools/count_core_parameters.py
+```
+
+Sous Linux :
+
+```bash
+python3 -B tools/count_core_parameters.py
 ```
 
 ## Structure du dépôt
@@ -97,7 +105,7 @@ python tools/count_core_parameters.py
 4. Mesurer le ML350 : CPU, RAM, NUMA, disque, threads et tokens/seconde sur un mini-modèle.
 5. Produire les ADR et figer une pile minimale avant toute implémentation de production.
 
-Le projet n'adopte pas encore de base vectorielle, de framework Web, de système de queue, de protocole de partage NAS ou de modèle d'embeddings. Les options devront être comparées sur les contraintes réelles, puis consignées dans le registre.
+Le projet n'adopte pas encore de base vectorielle, de framework Web, de système de queue, de protocole de partage NAS ou de moteur d'embeddings pour le RAG. Les options devront être comparées sur les contraintes réelles, puis consignées dans le registre.
 
 ## Principes de sécurité
 
@@ -114,7 +122,7 @@ Consulter [SECURITY.md](SECURITY.md) et [docs/security/threat-model.md](docs/sec
 
 ## Roadmap
 
-La progression suit des gates mesurables : découverte, architecture approuvée, laboratoire isolé, ingestion sûre, knowledge/RAG, mini-modèle, benchmark CPU, entraînement CORE-80M, orchestration, interface interne, puis durcissement. La génération d'images et le DL380p sont hors périmètre V1.
+La progression suit des gates mesurables : découverte, architecture sécurisée, ingestion contrôlée, corpus/tokenizer/RAG, mini-modèle et benchmark CPU/NUMA, pilote de montée en échelle, entraînement CORE-80M, Knowledge/RAG/MCP interne, puis profils d'agents et durcissement. La génération d'images et le DL380p sont hors périmètre V1.
 
 Voir [docs/ROADMAP.md](docs/ROADMAP.md).
 

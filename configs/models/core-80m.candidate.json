@@ -1,0 +1,41 @@
+{
+  "schema_version": "0.1.0",
+  "status": "candidate",
+  "name": "CORE-80M",
+  "architecture": {
+    "family": "decoder_only_transformer",
+    "attention_variant": "standard_mha",
+    "vocabulary_size": 32000,
+    "hidden_size": 640,
+    "num_hidden_layers": 12,
+    "num_attention_heads": 10,
+    "head_dimension": 64,
+    "intermediate_size": 1792,
+    "activation": "swiglu",
+    "position_encoding": "rope",
+    "normalization": "rmsnorm",
+    "tie_word_embeddings": true,
+    "use_bias": false
+  },
+  "parameter_count": {
+    "token_embeddings": 20480000,
+    "attention_per_layer": 1638400,
+    "mlp_per_layer": 3440640,
+    "norms_per_layer": 1280,
+    "transformer_blocks": 60963840,
+    "final_norm": 640,
+    "output_head": 0,
+    "total_trainable": 81444480
+  },
+  "unresolved": [
+    "tokenizer_type",
+    "normalization_rules",
+    "special_tokens",
+    "context_length",
+    "initialization",
+    "precision_policy",
+    "training_corpus",
+    "evaluation_suite"
+  ]
+}
+

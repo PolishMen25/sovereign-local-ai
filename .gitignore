@@ -1,0 +1,42 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Data, models and training artifacts
+/data/
+/datasets/
+/artifacts/
+/checkpoints/
+/models/
+/runs/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.gguf
+
+# IDE and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local reports
+coverage.xml
+htmlcov/
+*.log
+
