@@ -33,11 +33,11 @@
   synchronisation durable. Le catalogue synthétique y est copié avec empreinte
   identique ; aucune donnée sensible n’y est placée avant validation du
   chiffrement, des snapshots et de la restauration.
-- Un second partage chiffré a été validé avec des ACL contrôlées. Seuls
+- Un coffre final créé directement chiffré a été validé avec des ACL contrôlées. Seuls
   l'arborescence et le catalogue synthétiques y ont été copiés ; empreinte et
   restauration isolée concordent. Le partage précédent reste intact et la
-  gestion définitive de la clé ainsi que le snapshot restent des gates avant
-  toute donnée sensible.
+  snapshot initial et la bascule explicite restent des gates avant toute donnée
+  sensible.
 - Aucun secret ni paramètre d’accès n’est versionné dans ce dépôt.
 
 La création de services persistants, l’ouverture de flux et l’allocation de
