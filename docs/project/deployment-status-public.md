@@ -11,6 +11,13 @@
   conservation durable sur le stockage souverain.
 - Le collecteur de conversations reste en écriture seule ; les originaux sont
   conservés en `RAW` et aucune promotion automatique n’est effectuée.
+- Le serveur MCP Knowledge local répond au handshake JSON-RPC sur le nœud
+  principal, en transport `stdio`, sans accès réseau ni capacité d’écriture.
+- Le relais HTTPS public répond sur son endpoint de santé ; la file locale de
+  synchronisation est vide après reprise.
+- Le registre préparatoire des agents contient 60 profils logiques distincts,
+  tous désactivés (`draft`) et limités à la proposition ; aucun modèle n'est
+  dupliqué par profil.
 - Aucun secret ni paramètre d’accès n’est versionné dans ce dépôt.
 
 La création de services persistants, l’ouverture de flux et l’allocation de

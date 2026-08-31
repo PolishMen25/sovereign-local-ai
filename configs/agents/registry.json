@@ -1,0 +1,1677 @@
+{
+  "schema_version": "agent-profile-registry.v1",
+  "registry_version": "0.1.0",
+  "profiles": [
+    {
+      "id": "coordination",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "coordination",
+      "display_name": "coordination",
+      "mission": "Coordination générale des demandes et des dépendances",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-coordination.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "task_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "coordination",
+      "display_name": "task planner",
+      "mission": "Décomposition d’un objectif en tâches vérifiables",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-task_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "priority_router",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "coordination",
+      "display_name": "priority router",
+      "mission": "Classement des demandes selon urgence et impact",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-priority_router.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "context_curator",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "coordination",
+      "display_name": "context curator",
+      "mission": "Sélection du contexte autorisé pour une requête",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-context_curator.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "session_manager",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "coordination",
+      "display_name": "session manager",
+      "mission": "Suivi de l’état et des limites d’une session",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-session_manager.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "followup_tracker",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "coordination",
+      "display_name": "followup tracker",
+      "mission": "Repérage des suivis et informations manquantes",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-followup_tracker.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "code_explorer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "code explorer",
+      "mission": "Cartographie d’un dépôt et de ses points d’entrée",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-code_explorer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "code_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "code reviewer",
+      "mission": "Relecture ciblée et signalement des risques",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-code_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "test_designer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "test designer",
+      "mission": "Conception de tests nominaux et négatifs",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-test_designer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "bug_diagnostician",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "bug diagnostician",
+      "mission": "Diagnostic à partir de preuves fournies",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-bug_diagnostician.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "refactor_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "refactor planner",
+      "mission": "Planification de refactorings réversibles",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-refactor_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "api_designer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "api designer",
+      "mission": "Conception de contrats d’API stricts",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-api_designer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "documentation_writer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "documentation writer",
+      "mission": "Rédaction de documentation technique traçable",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-documentation_writer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "release_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "release planner",
+      "mission": "Préparation d’une release et de son retour arrière",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-release_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "dependency_auditor",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "dependency auditor",
+      "mission": "Audit des dépendances et de leur provenance",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-dependency_auditor.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "performance_analyst",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "development",
+      "display_name": "performance analyst",
+      "mission": "Analyse de mesures de performance reproductibles",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-performance_analyst.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "data_curator",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "data curator",
+      "mission": "Organisation de jeux de données approuvés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-data_curator.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "schema_designer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "schema designer",
+      "mission": "Conception de schémas versionnés et bornés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-schema_designer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "provenance_guardian",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "provenance guardian",
+      "mission": "Contrôle de la provenance de bout en bout",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-provenance_guardian.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "ingestion_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "ingestion planner",
+      "mission": "Planification d’une ingestion par étapes",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-ingestion_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "redaction_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "redaction reviewer",
+      "mission": "Revue de l’expurgation des données sensibles",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-redaction_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "dataset_profiler",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "dataset profiler",
+      "mission": "Profilage statistique d’un jeu de données",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-dataset_profiler.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "deduplication_analyst",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "deduplication analyst",
+      "mission": "Analyse de doublons et de collisions",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-deduplication_analyst.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "metadata_librarian",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "data",
+      "display_name": "metadata librarian",
+      "mission": "Normalisation des métadonnées documentaires",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-metadata_librarian.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "tokenizer_engineer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "tokenizer engineer",
+      "mission": "Évaluation du tokenizer et de son vocabulaire",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-tokenizer_engineer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "corpus_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "corpus planner",
+      "mission": "Planification du corpus et de ses licences",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-corpus_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "mini_benchmark",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "mini benchmark",
+      "mission": "Conception d’un benchmark miniature reproductible",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-mini_benchmark.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "training_scheduler",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "training scheduler",
+      "mission": "Planification des étapes d’entraînement CPU",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-training_scheduler.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "checkpoint_manager",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "checkpoint manager",
+      "mission": "Politique de checkpoints et de reprise",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-checkpoint_manager.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "cpu_optimizer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "cpu optimizer",
+      "mission": "Analyse des réglages CPU et de la mémoire",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-cpu_optimizer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "numa_analyst",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "numa analyst",
+      "mission": "Analyse des effets NUMA sur les mesures",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-numa_analyst.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "experiment_tracker",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "training",
+      "display_name": "experiment tracker",
+      "mission": "Structuration des expériences et comparaisons",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-experiment_tracker.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "eval_designer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "eval designer",
+      "mission": "Conception de scénarios d’évaluation synthétiques",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-eval_designer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "quality_analyst",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "quality analyst",
+      "mission": "Mesure de qualité selon des critères déclarés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-quality_analyst.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "safety_evaluator",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "safety evaluator",
+      "mission": "Évaluation des refus et frontières de sécurité",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-safety_evaluator.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "regression_detector",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "regression detector",
+      "mission": "Détection des régressions entre versions",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-regression_detector.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "factuality_checker",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "factuality checker",
+      "mission": "Contrôle de cohérence factuelle avec les sources",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-factuality_checker.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "citation_auditor",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "citation auditor",
+      "mission": "Vérification des citations et de la provenance",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-citation_auditor.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "adversarial_tester",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "evaluation",
+      "display_name": "adversarial tester",
+      "mission": "Tests adversariaux sans accès aux secrets",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-adversarial_tester.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "threat_modeler",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "threat modeler",
+      "mission": "Mise à jour du modèle de menace",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-threat_modeler.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "access_policy_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "access policy reviewer",
+      "mission": "Revue des identités et permissions minimales",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-access_policy_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "secret_hygiene",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "secret hygiene",
+      "mission": "Détection et prévention des secrets dans les artefacts",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-secret_hygiene.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "network_boundary_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "network boundary reviewer",
+      "mission": "Revue des frontières réseau et flux autorisés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-network_boundary_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "mcp_security_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "mcp security reviewer",
+      "mission": "Audit des contrats et capacités MCP",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-mcp_security_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "incident_analyst",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "incident analyst",
+      "mission": "Analyse structurée d’un incident documenté",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-incident_analyst.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "backup_security_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "security",
+      "display_name": "backup security reviewer",
+      "mission": "Revue de protection et restauration des sauvegardes",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-backup_security_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "proxmox_observer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "proxmox observer",
+      "mission": "Lecture d’inventaires Proxmox approuvés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-proxmox_observer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "synology_observer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "synology observer",
+      "mission": "Lecture d’inventaires Synology approuvés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-synology_observer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "storage_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "storage planner",
+      "mission": "Planification de placement de stockage réversible",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-storage_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "capacity_forecaster",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "capacity forecaster",
+      "mission": "Projection de capacité à partir de mesures",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-capacity_forecaster.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "backup_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "backup planner",
+      "mission": "Planification de sauvegardes et RPO/RTO",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-backup_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "recovery_drill_planner",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "recovery drill planner",
+      "mission": "Préparation de tests de restauration",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-recovery_drill_planner.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "service_health_observer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "service health observer",
+      "mission": "Analyse d’états de service fournis",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-service_health_observer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "change_manager",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "operations",
+      "display_name": "change manager",
+      "mission": "Préparation d’un changement et de son rollback",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-change_manager.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "source_triager",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "research",
+      "display_name": "source triager",
+      "mission": "Classement de sources externes en zone dédiée",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [],
+      "data_scopes": [
+        "research.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-source_triager.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "source_comparator",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "research",
+      "display_name": "source comparator",
+      "mission": "Comparaison de sources et niveaux de confiance",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [],
+      "data_scopes": [
+        "research.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-source_comparator.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "literature_summarizer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "research",
+      "display_name": "literature summarizer",
+      "mission": "Synthèse de documents déjà importés et validés",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [],
+      "data_scopes": [
+        "research.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-literature_summarizer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "decision_recorder",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "governance",
+      "display_name": "decision recorder",
+      "mission": "Tenue du registre des décisions et statuts",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-decision_recorder.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "privacy_reviewer",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "governance",
+      "display_name": "privacy reviewer",
+      "mission": "Revue de minimisation et de conservation",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-privacy_reviewer.v1",
+      "owner": "project-owner"
+    },
+    {
+      "id": "roadmap_steward",
+      "version": "0.1.0",
+      "status": "draft",
+      "family": "governance",
+      "display_name": "roadmap steward",
+      "mission": "Mise à jour de la feuille de route et des gates",
+      "capabilities": [
+        "analysis.propose"
+      ],
+      "tool_allowlist": [
+        "knowledge.search_validated"
+      ],
+      "data_scopes": [
+        "project.provided",
+        "knowledge.validated"
+      ],
+      "memory_policy": {
+        "scope": "session",
+        "retention": "session_only",
+        "writes": false
+      },
+      "action_policy": "proposal_only",
+      "human_confirmation": "required_for_any_external_or_durable_effect",
+      "output_schema": "local-assistant-response.v1",
+      "eval_suite": "agent-roadmap_steward.v1",
+      "owner": "project-owner"
+    }
+  ]
+}

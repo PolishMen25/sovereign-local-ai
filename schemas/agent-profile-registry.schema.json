@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-local-ai.invalid/schemas/agent-profile-registry.v1.json",
+  "title": "Sovereign Local AI logical agent registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_version",
+    "profiles"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "agent-profile-registry.v1"
+    },
+    "registry_version": {
+      "type": "string",
+      "pattern": "^0\\.[0-9]+\\.[0-9]+$"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "family",
+          "display_name",
+          "mission",
+          "capabilities",
+          "tool_allowlist",
+          "data_scopes",
+          "memory_policy",
+          "action_policy",
+          "human_confirmation",
+          "output_schema",
+          "eval_suite",
+          "owner"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{2,63}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "enabled",
+              "disabled",
+              "retired"
+            ]
+          },
+          "family": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,31}$"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "mission": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 240
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.-]{2,63}$"
+            }
+          },
+          "tool_allowlist": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.-]{2,63}$"
+            }
+          },
+          "data_scopes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.-]{2,63}$"
+            }
+          },
+          "memory_policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "retention",
+              "writes"
+            ],
+            "properties": {
+              "scope": {
+                "enum": [
+                  "none",
+                  "session",
+                  "project",
+                  "approved_knowledge"
+                ]
+              },
+              "retention": {
+                "enum": [
+                  "none",
+                  "session_only",
+                  "project_policy",
+                  "approved_policy"
+                ]
+              },
+              "writes": {
+                "const": false
+              }
+            }
+          },
+          "action_policy": {
+            "const": "proposal_only"
+          },
+          "human_confirmation": {
+            "const": "required_for_any_external_or_durable_effect"
+          },
+          "output_schema": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]{2,63}$"
+          },
+          "eval_suite": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]{2,63}$"
+          },
+          "owner": {
+            "const": "project-owner"
+          }
+        }
+      }
+    }
+  }
+}

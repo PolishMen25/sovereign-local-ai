@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-local-ai.invalid/schemas/local-chat-response.v1.json",
+  "title": "Local assistant chat response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "profile_id", "status", "answer", "citations", "proposals"],
+  "properties": {
+    "schema_version": { "const": "local-assistant-response.v1" },
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
+    "profile_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$" },
+    "status": { "enum": ["completed", "needs_confirmation", "refused", "queued", "error"] },
+    "answer": { "type": "string", "maxLength": 120000 },
+    "citations": {
+      "type": "array", "maxItems": 20,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["provenance_id", "label"],
+        "properties": {
+          "provenance_id": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,160}$" },
+          "label": { "type": "string", "maxLength": 240 }
+        }
+      }
+    },
+    "proposals": {
+      "type": "array", "maxItems": 10,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["proposal_id", "summary", "requires_confirmation"],
+        "properties": {
+          "proposal_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
+          "summary": { "type": "string", "maxLength": 1000 },
+          "requires_confirmation": { "const": true }
+        }
+      }
+    }
+  }
+}

@@ -51,7 +51,14 @@ Chaque profil devrait déclarer au minimum :
 - suite d'évaluation et seuils de qualité ;
 - propriétaire fonctionnel et historique des changements.
 
-Le format exact du registre reste ouvert. Il devra être lisible, validable par schéma, révisable et compatible avec les contrôles automatisés.
+Le registre initial est maintenant matérialisé dans
+[`configs/agents/registry.json`](../../configs/agents/registry.json) et validé
+par [`schemas/agent-profile-registry.schema.json`](../../schemas/agent-profile-registry.schema.json).
+Il contient 60 profils logiques en statut `draft` : ils partagent le modèle,
+n'écrivent pas en mémoire et restent en mode proposition tant que les gates
+d'architecture, d'évaluation et d'identité ne sont pas franchis. Toute
+activation devra être un changement versionné accompagné de tests et d'une
+revue humaine.
 
 ### Orchestrateur
 

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-local-ai.invalid/schemas/local-chat-request.v1.json",
+  "title": "Local assistant chat request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "message"],
+  "properties": {
+    "schema_version": { "const": "local-chat-request.v1" },
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
+    "conversation_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
+    "profile_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$" },
+    "message": { "type": "string", "minLength": 1, "maxLength": 12000 },
+    "context_refs": {
+      "type": "array", "maxItems": 20, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,160}$" }
+    }
+  }
+}
