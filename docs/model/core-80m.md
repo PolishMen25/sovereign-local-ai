@@ -4,6 +4,10 @@
 
 CORE-80M est un **candidat d'architecture calculable**, pas une spécification figée ni une promesse de performance. Il matérialise la cible actuelle d'un modèle de langage dense de 50 à 100 millions de paramètres, exécutable localement sur CPU.
 
+**CORE-80M n'est pas entraîné.** Aucun poids CORE-80M utilisable, tokenizer
+final, moteur de génération ou interface de questions-réponses n'existe
+actuellement.
+
 Le projet vise à créer le modèle principal, son tokenizer, son pipeline et tous ses poids — y compris sa matrice d'embedding de tokens — dans ce projet et à les entraîner de zéro. Une décision différente reste ouverte uniquement pour le **moteur d'embeddings du RAG** et un éventuel reranker, qui sont des composants séparés de CORE-80M.
 
 Toute modification des dimensions, des couches, des normalisations ou du partage de poids impose de recalculer et de tester le nombre de paramètres.
@@ -101,7 +105,9 @@ Le nom « CORE-80M » est donc une désignation arrondie ; ce candidat précis c
 ## Contraintes d'exécution et d'entraînement
 
 - Le chemin de référence est **CPU-only**. Une disponibilité éventuelle de GPU ne doit pas devenir une dépendance implicite.
-- La cible déclarée reste un ML350 bi-socket avec 2 × Xeon E5-2699 v4, soit 44 cœurs physiques / 88 threads et 88 Go de RAM. Une mesure Proxmox du 2026-08-31 expose toutefois 2 × Xeon E5-2698 v4, 40 cœurs physiques / 80 CPU logiques, deux nœuds NUMA et 78 GiB visibles. Cette divergence est ouverte et doit être résolue avant tout dimensionnement ou extrapolation.
+- La cible est un ML350 bi-socket CPU-only. L'inventaire mesuré diffère de la
+  fiche initialement déclarée ; les détails restent dans l'inventaire interne
+  et toute extrapolation doit utiliser la mesure réelle.
 - L'affinité des processus et des threads, l'allocation mémoire locale à chaque socket et le coût des accès inter-sockets doivent être mesurés. « Deux sockets » ne signifie pas automatiquement « deux fois plus rapide ».
 - Les mesures doivent distinguer au minimum un socket et deux sockets, puis relever le débit en tokens/s, le temps par étape, la mémoire de pointe, l'utilisation CPU, les défauts NUMA, le temps d'entrée/sortie et le temps de sauvegarde/reprise.
 - La mémoire nécessaire ne se limite pas aux poids : gradients, états de l'optimiseur, activations, tampons, chargeur de données et checkpoints doivent entrer dans le bilan.
@@ -116,13 +122,27 @@ SwiGLU, RoPE, RMSNorm et embeddings liés avec `1 328 256` paramètres exacts.
 Le harness borné `tools/train_core_mini.py` est également versionné : il refuse
 un runtime non CPU, produit des séquences synthétiques déterministes, entraîne,
 sauvegarde atomiquement et permet la reprise d'un checkpoint. Ses validations
-structurelles participent à une suite locale de 47 tests réussis.
+structurelles participent à une suite locale de 51 tests réussis.
 
 Le bundle candidat PyTorch `2.13.0+cpu` pour CPython `3.13` a été acquis et
-vérifié après transfert hors ligne, mais reste non installé. Il ne constitue
-donc ni des poids entraînés ni une preuve de débit : le cycle complet sur le
-ML350, le tokenizer, le corpus, la précision et le format définitif de
+vérifié après transfert hors ligne, puis installé dans un venv dédié sans index
+réseau. Le cycle entraînement → checkpoint → reprise a réussi sur le ML350 avec
+4 étapes synthétiques. Ce test ne constitue ni des poids utiles ni une preuve
+de débit pour CORE-80M : tokenizer, corpus, précision et format définitif de
 checkpoint restent soumis au protocole de benchmark.
+
+### Mesure NUMA préliminaire du 2026-08-31
+
+Un premier passage comparable a utilisé CORE-MINI avec une chauffe explicite,
+les mêmes données synthétiques et plusieurs placements CPU. L'outil
+`tools/summarize_training_metrics.py` vérifie les étapes, pertes et temps avant
+de calculer le débit. Le placement utilisant le plus de sockets ou de threads
+n'est pas automatiquement le plus rapide pour ce petit modèle.
+
+Ce résultat est **préliminaire** : les chiffres détaillés restent dans le
+journal technique interne. Il faut des répétitions, une charge plus grande, la
+dispersion inter-exécutions, la mémoire de pointe et les compteurs NUMA avant de
+retenir un placement ou d'extrapoler vers CORE-80M.
 
 Le benchmark doit :
 

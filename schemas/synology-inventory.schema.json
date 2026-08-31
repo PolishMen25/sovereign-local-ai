@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/synology-inventory/0.1.0/schema.json",
+  "title": "Inventaire expurgé d'un Synology",
+  "description": "Contrat de découverte. Il exclut explicitement les adresses, noms de partages, identités, numéros de série, chemins et secrets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "asset_class",
+    "observed_at",
+    "storage",
+    "network",
+    "controls"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "asset_class": { "const": "synology-rs3617xs-plus" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dsm_version", "memory_gib", "volumes", "arrays"],
+      "properties": {
+        "dsm_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "memory_gib": { "type": "integer", "minimum": 1, "maximum": 1024 },
+        "volumes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/volume" }
+        },
+        "arrays": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/array" }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active_physical_interfaces", "virtual_networking_present", "vpn_tunnel_present"],
+      "properties": {
+        "active_physical_interfaces": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "virtual_networking_present": { "type": "boolean" },
+        "vpn_tunnel_present": { "type": "boolean" }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["smart", "scrubbing", "snapshots", "restore_test", "acl_review"],
+      "properties": {
+        "smart": { "$ref": "#/$defs/controlStatus" },
+        "scrubbing": { "$ref": "#/$defs/controlStatus" },
+        "snapshots": { "$ref": "#/$defs/controlStatus" },
+        "restore_test": { "$ref": "#/$defs/controlStatus" },
+        "acl_review": { "$ref": "#/$defs/controlStatus" }
+      }
+    }
+  },
+  "$defs": {
+    "volume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filesystem", "total_gib", "used_gib", "available_gib"],
+      "properties": {
+        "filesystem": { "enum": ["btrfs", "ext4", "other"] },
+        "total_gib": { "type": "integer", "minimum": 1 },
+        "used_gib": { "type": "integer", "minimum": 0 },
+        "available_gib": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "array": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "raid_level", "expected_members", "active_members", "status"],
+      "properties": {
+        "purpose": { "enum": ["data", "system", "ssd"] },
+        "raid_level": { "enum": ["raid1", "raid5", "raid6", "other"] },
+        "expected_members": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "active_members": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "status": { "enum": ["healthy", "attention", "unknown"] }
+      }
+    },
+    "controlStatus": { "enum": ["verified", "present", "unknown", "not_configured"] }
+  }
+}

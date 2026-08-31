@@ -1,48 +1,53 @@
 # État public du déploiement
 
-> Résumé expurgé destiné au dépôt GitHub. Les détails d’adressage, de stockage,
-> de comptes et de chemins d’administration restent dans l’inventaire privé.
+Dernière vérification : 2026-08-31.
 
-## 2026-08-31
+La source de vérité détaillée est la page
+[Capacités réellement disponibles](current-capabilities.md). Ce résumé reste
+volontairement au niveau des composants et n'expose ni adresse privée, ni
+compte, ni secret, ni chemin d'administration.
 
-- Le socle du projet a été synchronisé sur les deux nœuds Proxmox actifs.
-- Les contrôles automatisés du dépôt passent sur les environnements Linux.
-- La stratégie hybride est appliquée comme cible : calcul local temporaire et
-  conservation durable sur le stockage souverain.
-- Le collecteur de conversations reste en écriture seule ; les originaux sont
-  conservés en `RAW` et aucune promotion automatique n’est effectuée.
-- Le serveur MCP Knowledge local répond au handshake JSON-RPC sur le nœud
-  principal, en transport `stdio`, sans accès réseau ni capacité d’écriture.
-- Le relais HTTPS public répond sur son endpoint de santé ; la file locale de
-  synchronisation est vide après reprise.
-- Le registre préparatoire des agents contient 60 profils logiques distincts,
-  tous désactivés (`draft`) et limités à la proposition ; aucun modèle n'est
-  dupliqué par profil.
-- Un premier harness CPU borné est exécuté sur le nœud de calcul ; il fournit
-  un relevé reproductible de l’hôte, mais pas encore une mesure de tokens/s.
-  L’identité matérielle déclarée et celle mesurée doivent être réconciliées.
-- Le bundle candidat PyTorch `2.13.0+cpu` pour CPython `3.13` a été acquis
-  depuis l'index CPU officiel, verrouillé sur 10 wheels, transféré hors ligne
-  puis vérifié par empreinte. L'archive de `202 498 560` octets porte le
-  SHA-256 `a67b0b10163c914f45bb62a5a59c386d46b766211bdbf33bf4df4dd267ba8fc7`.
-  Il est installé dans un environnement Python isolé, sans index réseau et sans
-  modification du Python système. Le runtime vérifié est CPU-only : ni CUDA ni
-  ROCm ne sont présents.
-- Le harness CORE-MINI CPU, checkpoint et reprise est versionné. La suite
-  locale élargie compte 48 tests réussis. Un entraînement synthétique borné de
-  4 étapes a été exécuté sur le nœud de calcul et la reprise sécurisée depuis
-  l'étape 2 a produit un checkpoint à l'étape 4. Ce résultat valide le chemin
-  fonctionnel, pas encore les performances ni le passage à CORE-80M.
-- Un partage SMB dédié et un compte de service sans shell sont en place pour la
-  synchronisation durable. Le catalogue synthétique y est copié avec empreinte
-  identique ; aucune donnée sensible n’y est placée avant validation du
-  chiffrement, des snapshots et de la restauration.
-- Un coffre final créé directement chiffré a été validé avec des ACL contrôlées. Seuls
-  l'arborescence et le catalogue synthétiques y ont été copiés ; empreinte et
-  restauration isolée concordent. Le partage précédent reste intact et la
-  snapshot initial et la bascule explicite restent des gates avant toute donnée
-  sensible.
-- Aucun secret ni paramètre d’accès n’est versionné dans ce dépôt.
+## État essentiel
 
-La création de services persistants, l’ouverture de flux et l’allocation de
-stockage font l’objet de changements séparés, réversibles et audités.
+- **Chat local : non disponible.** Aucun chemin question → réponse générée
+  n'est encore relié.
+- **CORE-MINI : harness d'entraînement fonctionnel.** Entraînement synthétique,
+  checkpoint et reprise sont validés ; le checkpoint n'a aucun savoir
+  linguistique.
+- **CORE-80M : conception seulement.** L'architecture et son comptage sont
+  versionnés, mais aucun tokenizer final, corpus approuvé ou poids utilisable
+  n'existe.
+- **MCP Knowledge : prototype local fonctionnel.** Il expose en `stdio` un état
+  et une recherche lexicale bornée dans trois notices synthétiques avec
+  provenance. Ce n'est pas un RAG vectoriel ni une IA générative.
+- **Interface Web : coquille de sécurité.** Elle est testable en boucle locale,
+  mais n'est pas démarrée par défaut et `/v1/chat` renvoie toujours HTTP `503`.
+- **Agents : configuration seulement.** Les 60 profils sont tous `draft` et
+  aucun agent n'est actif.
+- **Orchestrateur et autorisations : préparation seulement.** Les validateurs
+  fail-closed existent, mais aucun modèle, outil, compte utilisateur ou RBAC
+  réel n'est branché.
+- **Collector : ingress write-only actif.** Son endpoint HTTPS de santé répond ;
+  une entrée acceptée reste `RAW` et n'est jamais promue automatiquement.
+- **Stockage : coffre chiffré monté.** Seules des données synthétiques ont servi
+  aux validations actuelles ; elles ne constituent pas la mémoire du modèle.
+
+## Preuves techniques actuelles
+
+- PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
+- CUDA et ROCm ne font pas partie du runtime ;
+- 51 tests passent sur Linux ;
+- le cycle CORE-MINI entraînement → checkpoint → reprise réussit ;
+- le MCP Knowledge répond et retourne des résultats synthétiques avec
+  `provenance_id` ;
+- un premier benchmark NUMA existe, mais il reste préliminaire et ne permet pas
+  d'extrapoler CORE-80M.
+
+## Non revendiqué
+
+Le projet ne revendique pas encore : modèle conversationnel, qualité
+linguistique, RAG sémantique, agents autonomes, interface utilisateur finale,
+authentification de production, service IA persistant, gate réseau achevé ou
+entraînement CORE-80M.
+
+Aucun secret ni paramètre d'accès n'est versionné dans le dépôt.

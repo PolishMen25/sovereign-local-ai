@@ -4,13 +4,17 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
 
 > État : **phase 0 — découverte et validation de l'architecture**. Ce dépôt pose les contraintes, les contrats et les gates de décision. Il ne prétend pas encore fournir une plateforme de production.
 
+> **Utilisation actuelle : il n'existe pas encore de chatbot ni de modèle
+> linguistique utilisable.** CORE-MINI valide seulement l'entraînement CPU et
+> les checkpoints. Voir la matrice [Capacités réellement disponibles](docs/project/current-capabilities.md).
+
 ## Invariants déjà décidés
 
 - aucun GPU, CUDA, ROCm ou TPU dans le chemin V1 ;
-- calcul principal sur le **HPE ProLiant ML350 Gen9** : 2 × Xeon E5-2699 v4, 44 cœurs physiques / 88 threads, 88 Go de RAM, environ 12 To, sous Proxmox ;
+- calcul principal sur le **HPE ProLiant ML350 Gen9**, CPU-only, sous Proxmox ; l'inventaire mesuré et les divergences avec la fiche initiale restent suivis séparément ;
 - **Synology RS3617xs+** : stockage long terme, archives, datasets, modèles validés, checkpoints importants, connaissances et sauvegardes — pas d'entraînement principal ;
 - **DL380p Gen8 exclu de la V1** ;
-- la zone **IA-CORE n'a aucun accès Internet direct**, blocage imposé au niveau réseau et pas seulement par l'application ;
+- la future zone **IA-CORE ne doit avoir aucun accès Internet direct** ; le blocage réseau et son test négatif restent un gate obligatoire, distinct des refus applicatifs déjà codés ;
 - toute donnée externe est non fiable et entre par un collecteur, une quarantaine, une validation, puis un import contrôlé ;
 - une recherche brute n'est jamais automatiquement une connaissance validée ;
 - les originaux RAW et leur provenance sont conservés ;
@@ -19,7 +23,10 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
 
 Le registre complet se trouve dans [docs/project/decisions.md](docs/project/decisions.md).
 
-## Architecture de principe candidate
+## Architecture cible candidate — pas l'état actuel
+
+Le schéma suivant décrit la destination. Les blocs ne sont pas tous déployés ou
+reliés ; la page des capacités indique l'état réel de chacun.
 
 ```text
 Internet / fournisseurs externes
@@ -105,7 +112,11 @@ python3 -B tools/count_core_parameters.py
 4. Mesurer le ML350 : CPU, RAM, NUMA, disque, threads et tokens/seconde sur un mini-modèle.
 5. Produire les ADR et figer une pile minimale avant toute implémentation de production.
 
-Le projet n'adopte pas encore de base vectorielle, de framework Web, de système de queue, de protocole de partage NAS ou de moteur d'embeddings pour le RAG. Les options devront être comparées sur les contraintes réelles, puis consignées dans le registre.
+Le projet n'adopte pas encore de base vectorielle, de framework Web définitif,
+de système de queue ou de moteur d'embeddings pour le RAG. SMB est utilisé pour
+les essais de stockage actuels ; son rôle définitif reste soumis à décision.
+Les options devront être comparées sur les contraintes réelles, puis consignées
+dans le registre.
 
 ## Principes de sécurité
 
@@ -122,11 +133,13 @@ Consulter [SECURITY.md](SECURITY.md) et [docs/security/threat-model.md](docs/sec
 
 ## Roadmap
 
-La progression suit des gates mesurables : découverte, architecture sécurisée, ingestion contrôlée, corpus/tokenizer/RAG, mini-modèle et benchmark CPU/NUMA, pilote de montée en échelle, entraînement CORE-80M, Knowledge/RAG/MCP interne, puis profils d'agents et durcissement. La génération d'images et le DL380p sont hors périmètre V1.
+La progression suit des gates mesurables : découverte, architecture sécurisée, ingestion contrôlée, corpus/tokenizer/RAG, mini-modèle et benchmark CPU/NUMA, pilote de montée en échelle, entraînement CORE-80M, Knowledge/RAG/MCP interne, puis profils d'agents et durcissement. Des prototypes de jalons ultérieurs peuvent exister sans que leur gate soit franchi. La génération d'images et le DL380p sont hors périmètre V1.
 
 Voir [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licence
 
-Aucune licence n'est ajoutée tant que le propriétaire n'a pas choisi les droits de réutilisation. Le dépôt étant privé, l'absence de licence doit rester explicite et sera traitée pendant la découverte.
+Aucune licence n'est ajoutée tant que le propriétaire n'a pas choisi les droits
+de réutilisation. L'absence de licence signifie qu'aucun droit de réutilisation
+n'est accordé implicitement ; ce choix reste à traiter pendant la découverte.
 

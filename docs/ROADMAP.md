@@ -8,6 +8,11 @@ Aucune durée d'entraînement du modèle cible n'est annoncée avant le benchmar
 
 Les gates `G0–G8` de ce document pilotent le projet. Les gates `A0–A8` du document d'architecture vérifient séparément l'aptitude opérationnelle et la sécurité.
 
+> Des prototypes appartenant à des jalons ultérieurs sont déjà présents pour
+> réduire les risques techniques. Leur présence ne signifie pas que le jalon ou
+> son gate est terminé. En particulier, le chat, CORE-80M, le RAG sémantique et
+> les agents restent non disponibles.
+
 ## Périmètre V1
 
 La V1 couvre une chaîne locale CPU-only : ingestion contrôlée, gouvernance des données, modèle principal créé de zéro, entraînement reproductible, évaluation, inférence locale, RAG traçable, accès MCP interne et premiers profils d'agents logiques.
@@ -164,7 +169,7 @@ Livrables :
 
 1. **Clore le questionnaire de découverte et prioriser trois usages V1.**
 2. **Inventorier le ML350/Proxmox, la topologie NUMA et le stockage actif.**
-3. **Inventorier le RS3617xs+ : DSM, volumes, ACL, snapshots, réseau et restauration.**
+3. **Inventorier le RS3617xs+ : DSM, volumes, ACL, snapshots, réseau et restauration** ([protocole d'inventaire](architecture/synology-rs3617xs-inventory.md)).
 4. **Cartographier le réseau et définir les tests prouvant l'isolement d'IA-CORE.**
 5. **Rédiger l'ADR Research Gateway contre dépôt direct sur le Collector.**
 6. **Spécifier la validation sémantique et les schémas de lignée/événements.**

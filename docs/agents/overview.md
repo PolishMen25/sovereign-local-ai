@@ -52,8 +52,11 @@ Chaque profil devrait déclarer au minimum :
 - propriétaire fonctionnel et historique des changements.
 
 Le registre initial est maintenant matérialisé dans
-[`configs/agents/registry.json`](../../configs/agents/registry.json) et validé
-par [`schemas/agent-profile-registry.schema.json`](../../schemas/agent-profile-registry.schema.json).
+[`configs/agents/registry.json`](../../configs/agents/registry.json). Un schéma
+complet est versionné dans
+[`schemas/agent-profile-registry.schema.json`](../../schemas/agent-profile-registry.schema.json),
+mais le chargeur actuel n'en applique qu'un sous-ensemble fail-closed ; la
+validation JSON Schema complète reste à intégrer.
 Il contient 60 profils logiques en statut `draft` : ils partagent le modèle,
 n'écrivent pas en mémoire et restent en mode proposition tant que les gates
 d'architecture, d'évaluation et d'identité ne sont pas franchis. Toute
@@ -62,7 +65,11 @@ revue humaine.
 
 ### Orchestrateur
 
-L'orchestrateur sélectionne le profil, assemble uniquement le contexte autorisé, applique les limites de ressources, met les requêtes en file d'attente et valide le résultat. Il ne doit pas accorder un outil ou une donnée simplement parce qu'un texte généré le réclame.
+La cible d'orchestrateur sélectionnera le profil, assemblera uniquement le
+contexte autorisé, appliquera les limites de ressources, mettra les requêtes en
+file d'attente et validera le résultat. Le code actuel prépare seulement une
+enveloppe et n'appelle aucun modèle ou outil. La cible ne devra jamais accorder
+un outil ou une donnée simplement parce qu'un texte généré le réclame.
 
 Sur CPU, l'ordonnancement doit protéger la latence et la mémoire : limite de concurrence, priorité explicite, annulation, délais maximums et contre-pression. Les réglages seront dérivés des benchmarks du ML350 bi-socket NUMA.
 

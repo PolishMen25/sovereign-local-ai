@@ -1,13 +1,29 @@
 # MCP Collector et MCP Knowledge
 
-Statut : proposition initiale, à confirmer après l’audit de l’infrastructure, des flux autorisés et du modèle de menace.
+Statut : architecture candidate avec deux prototypes étroits. Le Collector
+write-only est exposé derrière un relais HTTPS ; le MCP Knowledge actuel est
+uniquement `stdio`. Le choix final des frontières reste à confirmer par ADR.
+
+## État du prototype actuel
+
+- le Collector accepte des exports strictement validés en `RAW` et ne fournit
+  aucune lecture interne ;
+- le MCP Knowledge expose seulement `knowledge_status` et `search_validated` ;
+- `search_validated` effectue une recherche lexicale dans les titres et résumés
+  d'un catalogue JSONL borné, avec `provenance_id` ;
+- le catalogue actif de démonstration contient trois notices synthétiques ;
+- aucun index vectoriel, moteur d'embeddings, lecture documentaire complète,
+  modèle génératif ou raccordement à l'interface Web n'est disponible.
 
 ## Option structurante candidate
 
 Le candidat actuel expose deux frontières MCP distinctes. Il doit être comparé aux variantes compatibles avec les mêmes invariants pendant l'audit. Quelle que soit l'implémentation retenue, l'ingestion externe et la consultation interne ne partagent ni processus, ni identité de service, ni droits sur les données.
 
 1. **MCP Collector (externe)** : point d’entrée minimal et en écriture seule. Il reçoit des paquets de recherche, les contrôle superficiellement, les dépose dans la zone d’ingestion et renvoie uniquement un accusé de réception non sensible.
-2. **MCP Knowledge (interne)** : service de consultation et d’exploitation des connaissances validées. Il n’est jamais publié sur Internet et n’est joignable que depuis le réseau local ou une enclave explicitement approuvée.
+2. **MCP Knowledge (interne)** : le prototype actuel est lancé à la demande en
+   `stdio`, sans port réseau. Une éventuelle exposition à des clients internes
+   demanderait une décision et des contrôles supplémentaires ; Internet reste
+   interdit.
 
 Le Collector ne possède aucun droit de lecture sur le stockage RAW, les index, les documents validés, les conversations, les journaux internes ou le MCP Knowledge. Il ne propose aucune opération de liste, recherche, lecture, modification, suppression ou suivi différé. Une réponse synchrone limitée à un identifiant de soumission, un horodatage et un résultat d’acceptation technique ne constitue pas un accès en lecture aux données internes.
 
@@ -68,7 +84,11 @@ Les transitions d’état sont des événements append-only. Elles ne réécrive
 
 ## Frontière du MCP Knowledge
 
-Le MCP Knowledge peut fournir des fonctions de recherche, de lecture ciblée, de comparaison de sources et de traçabilité. Toutes ses réponses doivent conserver les identifiants de provenance et distinguer clairement texte source, résumé et inférence.
+La cible future du MCP Knowledge pourra fournir recherche, lecture ciblée,
+comparaison de sources et traçabilité. Le prototype fournit seulement l'état et
+la recherche lexicale de résumés. Toutes les capacités futures devront conserver
+les identifiants de provenance et distinguer clairement texte source, résumé et
+inférence.
 
 Contraintes obligatoires :
 

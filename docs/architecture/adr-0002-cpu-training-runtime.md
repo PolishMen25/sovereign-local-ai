@@ -5,10 +5,11 @@
 
 ## Contexte
 
-CORE-MINI-1M et CORE-80M sont des architectures créées dans le projet. Aucun
-poids, tokenizer ni checkpoint n’existe encore. Le chemin doit fonctionner sur
-CPU x86-64 bi-socket NUMA, sans CUDA, sans télémétrie et sans téléchargement
-depuis IA-CORE.
+CORE-MINI-1M et CORE-80M sont des architectures créées dans le projet. Des
+checkpoints synthétiques de validation CORE-MINI existent, mais aucun poids
+linguistique utile ni tokenizer final n'est disponible. Le chemin doit
+fonctionner sur CPU x86-64 bi-socket NUMA, sans CUDA, sans télémétrie et sans
+téléchargement depuis IA-CORE.
 
 ## Options
 
@@ -54,23 +55,29 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
   `configs/runtime/pytorch-2.13.0-cpu-cp313-linux-x86_64.lock.json` décrit
   exactement 10 wheels et applique une liste de marqueurs d'accélérateurs
   interdits.
-- **CONFIRMÉ** — L'archive hors ligne mesure `202 498 560` octets et porte le
-  SHA-256 `a67b0b10163c914f45bb62a5a59c386d46b766211bdbf33bf4df4dd267ba8fc7`.
-  Son empreinte a été vérifiée après transfert vers le nœud de calcul.
+- **CONFIRMÉ** — L'archive hors ligne a été vérifiée contre le manifeste
+  versionné avant et après son transfert vers le nœud de calcul. Les empreintes
+  détaillées restent dans le lock et le journal technique.
 - **CONFIRMÉ** — Le bundle est installé dans un venv dédié avec résolution
   strictement hors ligne depuis le wheelhouse verrouillé. Python système reste
   inchangé. Le runtime observé est PyTorch `2.13.0+cpu` sous Python `3.13.5`,
   sans CUDA ni ROCm.
 - **CONFIRMÉ** — Le harness CORE-MINI est versionné et ses validations
-  structurelles participent à une suite locale de 48 tests réussis.
+  structurelles participent à une suite locale de 51 tests réussis.
 - **CONFIRMÉ** — Le cycle réel entraînement → checkpoint → reprise a réussi sur
   le ML350 avec 4 étapes synthétiques bornées. La reprise emploie
   `weights_only=True`; le contrat ne conserve que des types sûrs et le
   checkpoint final de l'étape 4 est identifié par SHA-256.
+- **CONFIRMÉ** — Un premier passage NUMA comparable a été exécuté. Il montre
+  que davantage de sockets ou de threads n'accélère pas automatiquement ce
+  petit workload. La mesure n'a qu'une répétition ; les résultats détaillés
+  restent dans le journal technique interne et ne suffisent pas à choisir le
+  placement de CORE-80M.
 
 Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
-le benchmark NUMA ni la restauration des artefacts depuis le stockage durable.
-Le statut de l'ADR reste donc **PROPOSÉ**.
+le benchmark NUMA complet avec répétitions et charges plus grandes, ni la
+restauration des artefacts depuis le stockage durable. Le statut de l'ADR reste
+donc **PROPOSÉ**.
 
 ## Gates avant approbation
 

@@ -1,7 +1,8 @@
 # Catalogue RAG de préparation
 
 `catalogue.synthetic.jsonl` est un catalogue **synthétique** de trois notices,
-préparé uniquement pour tester le MCP Knowledge et l’interface. Il ne contient
+préparé uniquement pour tester le MCP Knowledge. L’interface Web n'est pas
+encore reliée à ce catalogue. Il ne contient
 ni conversation réelle, ni secret, ni chemin d’infrastructure.
 
 Chaque ligne conserve un `document_id`, un résumé borné et un

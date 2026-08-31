@@ -17,7 +17,8 @@ from typing import Any
 MAX_BODY_BYTES = 1_048_576
 INDEX_HTML = """<!doctype html><meta charset='utf-8'><title>Sovereign Local AI</title>
 <main><h1>Sovereign Local AI</h1><p>Interface locale en préparation.</p>
-<p>Le moteur d'inférence sera disponible après installation et validation des poids locaux.</p></main>"""
+<p>Le chat n'est pas disponible : tokenizer, poids linguistiques, moteur de génération
+et raccordement à l'interface restent à construire.</p></main>"""
 
 
 def authorize(header: str | None, expected: str) -> bool:

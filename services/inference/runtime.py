@@ -18,6 +18,7 @@ class RuntimeStatus:
     backend: str
     model_name: str
     weights_present: bool
+    generation_available: bool
     network: str = "disabled"
 
 
@@ -35,10 +36,15 @@ class LocalInferenceRuntime:
     def status(self) -> RuntimeStatus:
         present = self.weights_path.is_file()
         return RuntimeStatus(
-            state="ready" if present else "awaiting_local_weights",
+            state=(
+                "weights_detected_runtime_disabled"
+                if present
+                else "awaiting_local_weights"
+            ),
             backend="cpu_only",
             model_name=self.model_name,
             weights_present=present,
+            generation_available=False,
         )
 
     def generate(self, prompt: str, *, max_new_tokens: int = 128) -> dict[str, Any]:

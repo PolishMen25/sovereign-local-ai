@@ -1,6 +1,10 @@
-# Orchestrateur IA-CORE
+# Préparation de l'orchestrateur IA-CORE
 
-Registre et ordonnanceur des agents logiques. Il choisit un profil, applique ses permissions, appelle les outils internes autorisés et partage un petit nombre de moteurs de modèle.
+La cible future choisira un profil, appliquera ses permissions, appellera les
+outils internes autorisés et partagera un petit nombre de moteurs de modèle.
+Aujourd'hui, le code charge le registre et prépare une enveloppe de requête en
+refusant les profils inconnus, invalides ou désactivés. Il n'appelle aucun
+modèle, outil, réseau, fichier ou secret.
 
 Il ne crée pas une copie du modèle par agent et ne dispose d'aucun outil générique lui permettant de contourner les frontières réseau ou données.
 

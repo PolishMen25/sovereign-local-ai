@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.1.0",
+  "asset_class": "synology-rs3617xs-plus",
+  "observed_at": "2026-08-31T12:00:00Z",
+  "storage": {
+    "dsm_version": "7.4.1",
+    "memory_gib": 31,
+    "volumes": [
+      {
+        "filesystem": "btrfs",
+        "total_gib": 100,
+        "used_gib": 20,
+        "available_gib": 80
+      }
+    ],
+    "arrays": [
+      {
+        "purpose": "data",
+        "raid_level": "raid6",
+        "expected_members": 11,
+        "active_members": 11,
+        "status": "healthy"
+      }
+    ]
+  },
+  "network": {
+    "active_physical_interfaces": 3,
+    "virtual_networking_present": true,
+    "vpn_tunnel_present": true
+  },
+  "controls": {
+    "smart": "unknown",
+    "scrubbing": "unknown",
+    "snapshots": "unknown",
+    "restore_test": "unknown",
+    "acl_review": "unknown"
+  }
+}
