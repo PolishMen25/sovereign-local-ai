@@ -28,6 +28,7 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 | D-020 | Les trois usages V1 prioritaires sont : organisation personnelle, développement logiciel et conseil d'infrastructure locale. | Corpus, RAG, profils logiques et évaluations sont conçus en priorité pour ces usages. Les scénarios, limites et critères sont versionnés dans `docs/project/v1-use-cases.md`. |
 | D-021 | L'assistant doit être force de proposition, sans autonomie de modification. | Il explicite hypothèses, sources, risques, options et vérifications ; toute action durable, sortie de données ou modification d'infrastructure exige une confirmation humaine. |
 | D-022 | La connaissance de l'infrastructure locale est fournie par des inventaires et documents approuvés. | Aucune découverte réseau, exécution de commande, accès aux secrets ou modification de l'infrastructure n'est permise par défaut. |
+| D-023 | Le stockage V1 suit une stratégie hybride : capacité locale Proxmox pour le calcul actif et le temporaire ; Synology RS3617xs+ pour RAW, connaissances, modèles, checkpoints retenus et sauvegardes. | Le stockage local n'est pas la copie durable unique ; les flux vers le Synology restent restreints, mesurés et sauvegardés. Aucun disque n'est initialisé sans procédure approuvée. |
 
 ## Orientations provisoires
 

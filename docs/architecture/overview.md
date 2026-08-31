@@ -11,6 +11,7 @@ Décisions acquises :
 - calcul principal sur un HPE ML350 Gen9 : 2 × Xeon E5-2699 v4, 44 cœurs / 88 threads, 88 Go de RAM et environ 12 To de stockage ;
 - virtualisation sur Proxmox ;
 - stockage durable de la V1 assuré par un Synology RS3617xs+ doté de 32 Go de RAM et d'environ 7 To libres ;
+- stratégie de stockage hybride acceptée : stockage local Proxmox pour le calcul actif et le temporaire, Synology pour RAW, connaissances, modèles conservés et sauvegardes (D-023) ;
 - fonctionnement CPU-only pour la V1 ;
 - IA-CORE sans accès Internet au niveau réseau ;
 - chaîne de collecte externe et Collector séparés d'IA-CORE dans une zone DMZ ;
