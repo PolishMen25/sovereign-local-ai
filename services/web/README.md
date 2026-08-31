@@ -21,3 +21,8 @@ transmis par le navigateur. Le framework, l'authentification, l'hébergement et
 le port restent à décider par ADR ; aucun serveur web n'est démarré par ce
 contrat.
 
+Le prototype `app.py` peut être lancé uniquement pour un essai local avec un
+jeton injecté hors dépôt (`SOVEREIGN_WEB_TOKEN`) ; il force une écoute loopback
+et refuse tout profil d'agent encore en `draft`. Il ne constitue pas une
+exposition de production.
+

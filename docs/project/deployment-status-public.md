@@ -21,6 +21,10 @@
 - Un premier harness CPU borné est exécuté sur le nœud de calcul ; il fournit
   un relevé reproductible de l’hôte, mais pas encore une mesure de tokens/s.
   L’identité matérielle déclarée et celle mesurée doivent être réconciliées.
+- Un partage SMB dédié et un compte de service sans shell sont en place pour la
+  synchronisation durable. Le catalogue synthétique y est copié avec empreinte
+  identique ; aucune donnée sensible n’y est placée avant validation du
+  chiffrement, des snapshots et de la restauration.
 - Aucun secret ni paramètre d’accès n’est versionné dans ce dépôt.
 
 La création de services persistants, l’ouverture de flux et l’allocation de

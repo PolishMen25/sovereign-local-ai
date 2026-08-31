@@ -101,7 +101,7 @@ Le nom « CORE-80M » est donc une désignation arrondie ; ce candidat précis c
 ## Contraintes d'exécution et d'entraînement
 
 - Le chemin de référence est **CPU-only**. Une disponibilité éventuelle de GPU ne doit pas devenir une dépendance implicite.
-- La machine d'entraînement confirmée est le ML350 bi-socket avec 2 × Xeon E5-2699 v4, soit 44 cœurs physiques / 88 threads et 88 Go de RAM. La répartition des DIMM par nœud NUMA, les instructions réellement exposées à l'invité, les ressources réservées à Proxmox et le stockage actif doivent encore être inventoriés avant tout dimensionnement.
+- La cible déclarée reste un ML350 bi-socket avec 2 × Xeon E5-2699 v4, soit 44 cœurs physiques / 88 threads et 88 Go de RAM. Une mesure Proxmox du 2026-08-31 expose toutefois 2 × Xeon E5-2698 v4, 40 cœurs physiques / 80 CPU logiques, deux nœuds NUMA et 78 GiB visibles. Cette divergence est ouverte et doit être résolue avant tout dimensionnement ou extrapolation.
 - L'affinité des processus et des threads, l'allocation mémoire locale à chaque socket et le coût des accès inter-sockets doivent être mesurés. « Deux sockets » ne signifie pas automatiquement « deux fois plus rapide ».
 - Les mesures doivent distinguer au minimum un socket et deux sockets, puis relever le débit en tokens/s, le temps par étape, la mémoire de pointe, l'utilisation CPU, les défauts NUMA, le temps d'entrée/sortie et le temps de sauvegarde/reprise.
 - La mémoire nécessaire ne se limite pas aux poids : gradients, états de l'optimiseur, activations, tampons, chargeur de données et checkpoints doivent entrer dans le bilan.
@@ -109,6 +109,13 @@ Le nom « CORE-80M » est donc une désignation arrondie ; ce candidat précis c
 ## Benchmark miniature obligatoire
 
 Avant toute estimation de durée, de coût ou de faisabilité du CORE-80M, un mini-modèle doit être entraîné avec le **même chemin logiciel** que le candidat : tokenizer et séquences représentatifs, mêmes opérateurs, même précision, même optimiseur envisagé, checkpoint et reprise inclus.
+
+Le candidat de validation est maintenant versionné dans
+`configs/models/core-mini.candidate.json`. Il reprend decoder-only, MHA,
+SwiGLU, RoPE, RMSNorm et embeddings liés avec `1 328 256` paramètres exacts.
+Il ne constitue pas encore des poids entraînés : le framework CPU, le
+tokenizer, le corpus synthétique, la précision et le format de checkpoint
+restent soumis au protocole de benchmark.
 
 Le benchmark doit :
 

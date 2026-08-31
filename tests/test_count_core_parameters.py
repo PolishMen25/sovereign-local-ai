@@ -20,6 +20,14 @@ class ParameterCountTests(unittest.TestCase):
         self.assertEqual(result["total_trainable"], 81_444_480)
         self.assertEqual(result, document["parameter_count"])
 
+    def test_mini_candidate_total_is_exact(self) -> None:
+        path = MODULE_PATH.parents[1] / "configs" / "models" / "core-mini.candidate.json"
+        document = MODULE.load_candidate_document(path)
+        config = MODULE.CoreConfig.from_document(document)
+        result = MODULE.count_parameters(config)
+        self.assertEqual(result["total_trainable"], 1_328_256)
+        self.assertEqual(result, document["parameter_count"])
+
     def test_head_dimensions_must_cover_hidden_size(self) -> None:
         document = MODULE.load_candidate_document()
         config = MODULE.CoreConfig.from_document(document)

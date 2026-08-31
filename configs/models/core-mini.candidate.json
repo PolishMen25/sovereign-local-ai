@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.1.0",
+  "status": "candidate",
+  "name": "CORE-MINI-1M",
+  "purpose": "validate_cpu_training_and_checkpoint_path_before_core_80m",
+  "architecture": {
+    "family": "decoder_only_transformer",
+    "attention_variant": "standard_mha",
+    "vocabulary_size": 4096,
+    "hidden_size": 128,
+    "num_hidden_layers": 4,
+    "num_attention_heads": 4,
+    "head_dimension": 32,
+    "intermediate_size": 352,
+    "activation": "swiglu",
+    "position_encoding": "rope",
+    "normalization": "rmsnorm",
+    "tie_word_embeddings": true,
+    "use_bias": false
+  },
+  "parameter_count": {
+    "token_embeddings": 524288,
+    "attention_per_layer": 65536,
+    "mlp_per_layer": 135168,
+    "norms_per_layer": 256,
+    "transformer_blocks": 803840,
+    "final_norm": 128,
+    "output_head": 0,
+    "total_trainable": 1328256
+  },
+  "execution": {
+    "device": "cpu",
+    "internet": "disabled",
+    "precision": "pending_benchmark",
+    "training_framework": "pending_adr"
+  }
+}
