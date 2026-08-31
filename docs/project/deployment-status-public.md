@@ -21,10 +21,21 @@
 - Un premier harness CPU borné est exécuté sur le nœud de calcul ; il fournit
   un relevé reproductible de l’hôte, mais pas encore une mesure de tokens/s.
   L’identité matérielle déclarée et celle mesurée doivent être réconciliées.
+- Le bundle candidat PyTorch `2.13.0+cpu` pour CPython `3.13` a été acquis
+  depuis l'index CPU officiel, verrouillé sur 10 wheels, transféré hors ligne
+  puis vérifié par empreinte. L'archive de `202 498 560` octets porte le
+  SHA-256 `6a4fbffcbd0fbaee63d9f6d4a23ca088a383589d2bf972a8150bff1efac9dc25` ;
+  elle n'est pas installée.
+- Le harness CORE-MINI CPU, checkpoint et reprise est versionné. La suite
+  locale élargie compte 47 tests réussis ; aucun entraînement miniature réel
+  n'est encore présenté comme accompli.
 - Un partage SMB dédié et un compte de service sans shell sont en place pour la
   synchronisation durable. Le catalogue synthétique y est copié avec empreinte
   identique ; aucune donnée sensible n’y est placée avant validation du
   chiffrement, des snapshots et de la restauration.
+- Un second partage de préparation a été créé vide avec des ACL contrôlées.
+  Son activation chiffrée a échoué sans migration : le partage précédent reste
+  intact et le diagnostic DSM demeure un gate avant toute donnée sensible.
 - Aucun secret ni paramètre d’accès n’est versionné dans ce dépôt.
 
 La création de services persistants, l’ouverture de flux et l’allocation de

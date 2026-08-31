@@ -63,6 +63,8 @@ class CoreConfig:
             raise ValueError("hidden_size must be divisible by num_attention_heads")
         if self.hidden_size != self.num_attention_heads * self.head_dimension:
             raise ValueError("hidden_size must equal heads multiplied by head_dimension")
+        if self.head_dimension % 2 != 0:
+            raise ValueError("head_dimension must be even for rotary positions")
 
 
 def load_candidate_document(path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:

@@ -43,6 +43,19 @@ class ParameterCountTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.count_parameters(invalid)
 
+    def test_rope_head_dimension_must_be_even(self) -> None:
+        invalid = MODULE.CoreConfig(
+            vocabulary_size=128,
+            hidden_size=9,
+            num_hidden_layers=1,
+            num_attention_heads=3,
+            head_dimension=3,
+            intermediate_size=16,
+            tie_word_embeddings=True,
+        )
+        with self.assertRaisesRegex(ValueError, "even"):
+            MODULE.count_parameters(invalid)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -113,9 +113,16 @@ Avant toute estimation de durée, de coût ou de faisabilité du CORE-80M, un mi
 Le candidat de validation est maintenant versionné dans
 `configs/models/core-mini.candidate.json`. Il reprend decoder-only, MHA,
 SwiGLU, RoPE, RMSNorm et embeddings liés avec `1 328 256` paramètres exacts.
-Il ne constitue pas encore des poids entraînés : le framework CPU, le
-tokenizer, le corpus synthétique, la précision et le format de checkpoint
-restent soumis au protocole de benchmark.
+Le harness borné `tools/train_core_mini.py` est également versionné : il refuse
+un runtime non CPU, produit des séquences synthétiques déterministes, entraîne,
+sauvegarde atomiquement et permet la reprise d'un checkpoint. Ses validations
+structurelles participent à une suite locale de 47 tests réussis.
+
+Le bundle candidat PyTorch `2.13.0+cpu` pour CPython `3.13` a été acquis et
+vérifié après transfert hors ligne, mais reste non installé. Il ne constitue
+donc ni des poids entraînés ni une preuve de débit : le cycle complet sur le
+ML350, le tokenizer, le corpus, la précision et le format définitif de
+checkpoint restent soumis au protocole de benchmark.
 
 Le benchmark doit :
 

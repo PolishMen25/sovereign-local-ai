@@ -1,0 +1,111 @@
+{
+  "schema_version": "0.1.0",
+  "status": "acquired_not_installed",
+  "acquired_at": "2026-08-31T21:25:00+02:00",
+  "source_index": "https://download.pytorch.org/whl/cpu",
+  "target": {
+    "host_role": "ml350_training_candidate",
+    "os": "linux",
+    "architecture": "x86_64",
+    "python": "3.13",
+    "abi": "cp313",
+    "minimum_glibc": "2.28",
+    "observed_glibc": "2.41"
+  },
+  "policy": {
+    "cpu_only": true,
+    "offline_install_only": true,
+    "forbidden_filename_markers": [
+      "cuda",
+      "cu11",
+      "cu12",
+      "cu13",
+      "nvidia",
+      "rocm",
+      "triton"
+    ]
+  },
+  "packages": [
+    {
+      "filename": "filelock-3.32.3-py3-none-any.whl",
+      "name": "filelock",
+      "version": "3.32.3",
+      "bytes": 98901,
+      "sha256": "7f0ca4bcc0e181c60dbbd8aa9ab5b120ebb99e4e064e83636340056f833a1f09",
+      "license_expression": "MIT"
+    },
+    {
+      "filename": "fsspec-2026.7.0-py3-none-any.whl",
+      "name": "fsspec",
+      "version": "2026.7.0",
+      "bytes": 206583,
+      "sha256": "b57ddbafedfaef7018c1ecab32aa200a9d7ca26b77965f64e48b70061249d279",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "filename": "jinja2-3.1.6-py3-none-any.whl",
+      "name": "Jinja2",
+      "version": "3.1.6",
+      "bytes": 134899,
+      "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "license_expression": null
+    },
+    {
+      "filename": "markupsafe-3.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "name": "MarkupSafe",
+      "version": "3.0.3",
+      "bytes": 22980,
+      "sha256": "ccfcd093f13f0f0b7fdd0f198b90053bf7b2f02a3927a30e63f3ccc9df56b676",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "filename": "mpmath-1.3.0-py3-none-any.whl",
+      "name": "mpmath",
+      "version": "1.3.0",
+      "bytes": 536198,
+      "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "license_expression": "BSD"
+    },
+    {
+      "filename": "networkx-3.6.1-py3-none-any.whl",
+      "name": "networkx",
+      "version": "3.6.1",
+      "bytes": 2068504,
+      "sha256": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "filename": "setuptools-78.1.0-py3-none-any.whl",
+      "name": "setuptools",
+      "version": "78.1.0",
+      "bytes": 1256108,
+      "sha256": "3e386e96793c8702ae83d17b853fb93d3e09ef82ec62722e61da5cd22376dcd8",
+      "license_expression": null
+    },
+    {
+      "filename": "sympy-1.14.0-py3-none-any.whl",
+      "name": "sympy",
+      "version": "1.14.0",
+      "bytes": 6299353,
+      "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+      "license_expression": "BSD"
+    },
+    {
+      "filename": "torch-2.13.0+cpu-cp313-cp313-manylinux_2_28_x86_64.whl",
+      "name": "torch",
+      "version": "2.13.0+cpu",
+      "bytes": 191815667,
+      "sha256": "3fbf9c9d1f3c10c2d59d04aca426dee9ccc6ceb32d255c61e93acc3b4f75fae6",
+      "published_sha256_verified": true,
+      "license_expression": "Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT"
+    },
+    {
+      "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "bytes": 45571,
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "license_expression": "PSF-2.0"
+    }
+  ]
+}
