@@ -24,11 +24,15 @@
 - Le bundle candidat PyTorch `2.13.0+cpu` pour CPython `3.13` a été acquis
   depuis l'index CPU officiel, verrouillé sur 10 wheels, transféré hors ligne
   puis vérifié par empreinte. L'archive de `202 498 560` octets porte le
-  SHA-256 `a67b0b10163c914f45bb62a5a59c386d46b766211bdbf33bf4df4dd267ba8fc7` ;
-  elle n'est pas installée.
+  SHA-256 `a67b0b10163c914f45bb62a5a59c386d46b766211bdbf33bf4df4dd267ba8fc7`.
+  Il est installé dans un environnement Python isolé, sans index réseau et sans
+  modification du Python système. Le runtime vérifié est CPU-only : ni CUDA ni
+  ROCm ne sont présents.
 - Le harness CORE-MINI CPU, checkpoint et reprise est versionné. La suite
-  locale élargie compte 47 tests réussis ; aucun entraînement miniature réel
-  n'est encore présenté comme accompli.
+  locale élargie compte 48 tests réussis. Un entraînement synthétique borné de
+  4 étapes a été exécuté sur le nœud de calcul et la reprise sécurisée depuis
+  l'étape 2 a produit un checkpoint à l'étape 4. Ce résultat valide le chemin
+  fonctionnel, pas encore les performances ni le passage à CORE-80M.
 - Un partage SMB dédié et un compte de service sans shell sont en place pour la
   synchronisation durable. Le catalogue synthétique y est copié avec empreinte
   identique ; aucune donnée sensible n’y est placée avant validation du

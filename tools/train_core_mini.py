@@ -195,7 +195,9 @@ def training_contract(args: argparse.Namespace, config_hash: str, torch: Any) ->
     return {
         "schema_version": "0.1.0",
         "config_sha256": config_hash,
-        "torch": torch.__version__,
+        # TorchVersion is a str subclass in recent PyTorch releases.  Persist a
+        # plain str so checkpoints remain loadable with weights_only=True.
+        "torch": str(torch.__version__),
         "device": "cpu",
         "dtype": "float32",
         "optimizer": "AdamW",
@@ -316,7 +318,7 @@ def main() -> int:
             "optimizer": optimizer.state_dict(),
             "run": {
                 "device": "cpu",
-                "torch": torch.__version__,
+                "torch": contract["torch"],
                 "python": platform.python_version(),
                 "platform": platform.platform(),
                 "threads": args.threads,

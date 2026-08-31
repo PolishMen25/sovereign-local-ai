@@ -1,9 +1,11 @@
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 
 from tools.train_core_mini import (
     load_and_validate_document,
     synthetic_token_rows,
+    training_contract,
     validate_run_limits,
 )
 
@@ -46,6 +48,24 @@ class CoreMiniHarnessTests(unittest.TestCase):
             validate_run_limits(steps=1, batch_size=0, sequence_length=2)
         with self.assertRaisesRegex(ValueError, "sequence_length"):
             validate_run_limits(steps=1, batch_size=1, sequence_length=1)
+
+    def test_training_contract_normalizes_torch_version_to_plain_string(self) -> None:
+        class TorchVersion(str):
+            pass
+
+        args = SimpleNamespace(
+            learning_rate=3e-4,
+            batch_size=2,
+            sequence_length=32,
+            seed=7,
+            threads=1,
+        )
+        torch = SimpleNamespace(__version__=TorchVersion("2.13.0+cpu"))
+
+        contract = training_contract(args, "a" * 64, torch)
+
+        self.assertIs(type(contract["torch"]), str)
+        self.assertEqual(contract["torch"], "2.13.0+cpu")
 
 
 if __name__ == "__main__":

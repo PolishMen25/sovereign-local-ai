@@ -57,16 +57,20 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
 - **CONFIRMÉ** — L'archive hors ligne mesure `202 498 560` octets et porte le
   SHA-256 `a67b0b10163c914f45bb62a5a59c386d46b766211bdbf33bf4df4dd267ba8fc7`.
   Son empreinte a été vérifiée après transfert vers le nœud de calcul.
-- **CONFIRMÉ** — Le bundle n'est pas installé. L'acquisition et le transfert ne
-  valent ni approbation de cet ADR, ni autorisation d'entraînement long.
+- **CONFIRMÉ** — Le bundle est installé dans un venv dédié avec résolution
+  strictement hors ligne depuis le wheelhouse verrouillé. Python système reste
+  inchangé. Le runtime observé est PyTorch `2.13.0+cpu` sous Python `3.13.5`,
+  sans CUDA ni ROCm.
 - **CONFIRMÉ** — Le harness CORE-MINI est versionné et ses validations
-  structurelles participent à une suite locale de 47 tests réussis. PyTorch
-  n'étant pas installé sur la cible, le cycle réel entraînement → checkpoint →
-  reprise reste à mesurer.
+  structurelles participent à une suite locale de 48 tests réussis.
+- **CONFIRMÉ** — Le cycle réel entraînement → checkpoint → reprise a réussi sur
+  le ML350 avec 4 étapes synthétiques bornées. La reprise emploie
+  `weights_only=True`; le contrat ne conserve que des types sûrs et le
+  checkpoint final de l'étape 4 est identifié par SHA-256.
 
-Ces observations ne ferment pas le contrôle complet des licences, le test
-d'absence de télémétrie à l'exécution, le benchmark NUMA ni la restauration des
-artefacts. Le statut de l'ADR reste donc **PROPOSÉ**.
+Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
+le benchmark NUMA ni la restauration des artefacts depuis le stockage durable.
+Le statut de l'ADR reste donc **PROPOSÉ**.
 
 ## Gates avant approbation
 
@@ -79,5 +83,5 @@ artefacts. Le statut de l'ADR reste donc **PROPOSÉ**.
 5. comparer un socket/deux sockets, affinité, mémoire et débit ;
 6. restaurer les artefacts depuis le Synology et reproduire le résultat.
 
-Cette proposition n’autorise pas encore l’installation d’un framework ni
-l’entraînement long de CORE-80M.
+L'installation bornée du framework et le smoke test CORE-MINI sont réalisés.
+Cette proposition n'autorise pas encore l'entraînement long de CORE-80M.
