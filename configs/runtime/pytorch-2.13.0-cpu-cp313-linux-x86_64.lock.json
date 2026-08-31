@@ -48,7 +48,8 @@
       "version": "3.1.6",
       "bytes": 134899,
       "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
-      "license_expression": null
+      "license_expression": "BSD-3-Clause",
+      "license_verified_from_wheel": true
     },
     {
       "filename": "markupsafe-3.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
@@ -80,7 +81,8 @@
       "version": "78.1.0",
       "bytes": 1256108,
       "sha256": "3e386e96793c8702ae83d17b853fb93d3e09ef82ec62722e61da5cd22376dcd8",
-      "license_expression": null
+      "license_expression": "MIT",
+      "license_verified_from_wheel": true
     },
     {
       "filename": "sympy-1.14.0-py3-none-any.whl",

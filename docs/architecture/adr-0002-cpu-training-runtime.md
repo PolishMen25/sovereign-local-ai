@@ -55,7 +55,7 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
   exactement 10 wheels et applique une liste de marqueurs d'accélérateurs
   interdits.
 - **CONFIRMÉ** — L'archive hors ligne mesure `202 498 560` octets et porte le
-  SHA-256 `6a4fbffcbd0fbaee63d9f6d4a23ca088a383589d2bf972a8150bff1efac9dc25`.
+  SHA-256 `a67b0b10163c914f45bb62a5a59c386d46b766211bdbf33bf4df4dd267ba8fc7`.
   Son empreinte a été vérifiée après transfert vers le nœud de calcul.
 - **CONFIRMÉ** — Le bundle n'est pas installé. L'acquisition et le transfert ne
   valent ni approbation de cet ADR, ni autorisation d'entraînement long.
