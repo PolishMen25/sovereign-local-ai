@@ -1,0 +1,3 @@
+{"document_id":"synthetic-architecture-001","title":"Architecture V1","summary":"La V1 reste CPU-only et sépare IA-CORE, collecte externe, quarantaine et stockage durable.","provenance_id":"synthetic-fixture-architecture-v1"}
+{"document_id":"synthetic-storage-001","title":"Stockage hybride","summary":"Le calcul actif utilise le stockage local Proxmox ; RAW, connaissances validées, modèles retenus et sauvegardes résident sur le Synology.","provenance_id":"synthetic-fixture-storage-v1"}
+{"document_id":"synthetic-agents-001","title":"Profils logiques","summary":"Les agents sont des profils spécialisés partageant un modèle, avec permissions minimales et confirmation humaine pour tout effet durable.","provenance_id":"synthetic-fixture-agents-v1"}

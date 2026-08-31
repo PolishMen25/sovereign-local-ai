@@ -9,6 +9,7 @@ Ce dossier réserve les contextes fonctionnels sans choisir encore leur langage,
 | `quarantine` | DMZ/sas | Valider, analyser, nettoyer et préparer une promotion. | Déclarer seule une information vraie. |
 | `knowledge` | IA privée | Servir documents validés, provenance et recherche interne. | Être exposé à Internet. |
 | `orchestrator` | IA-CORE | Router les tâches vers agents, modèles et outils permis. | Contourner les permissions des agents. |
+| `inference` | IA-CORE | Encapsuler le moteur CORE CPU-only et son statut local. | Fallback cloud/GPU ou téléchargement automatique. |
 | `web` | réseau interne | Fournir l'interface utilisateur et l'authentification. | Devenir un proxy Internet pour IA-CORE. |
 
 Chaque sous-dossier contient seulement un contrat de responsabilité. L'implémentation commence après les ADR de pile, réseau, stockage et identité.

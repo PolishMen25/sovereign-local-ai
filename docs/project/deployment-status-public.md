@@ -18,6 +18,9 @@
 - Le registre préparatoire des agents contient 60 profils logiques distincts,
   tous désactivés (`draft`) et limités à la proposition ; aucun modèle n'est
   dupliqué par profil.
+- Un premier harness CPU borné est exécuté sur le nœud de calcul ; il fournit
+  un relevé reproductible de l’hôte, mais pas encore une mesure de tokens/s.
+  L’identité matérielle déclarée et celle mesurée doivent être réconciliées.
 - Aucun secret ni paramètre d’accès n’est versionné dans ce dépôt.
 
 La création de services persistants, l’ouverture de flux et l’allocation de

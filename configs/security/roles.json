@@ -1,0 +1,24 @@
+{
+  "schema_version": "local-authz.v1",
+  "default_role": "read_only",
+  "roles": {
+    "owner": {
+      "description": "Utilisateur humain propriétaire, avec confirmation explicite des effets durables.",
+      "capabilities": ["chat.use", "knowledge.search_validated", "proposal.confirm"]
+    },
+    "read_only": {
+      "description": "Consultation sans écriture ni confirmation d'action.",
+      "capabilities": ["chat.use", "knowledge.search_validated"]
+    },
+    "auditor": {
+      "description": "Lecture des statuts et preuves d'audit sans contenu sensible superflu.",
+      "capabilities": ["chat.use", "audit.read"]
+    }
+  },
+  "invariants": {
+    "default_deny": true,
+    "credentials_outside_repository": true,
+    "external_network_from_core": false,
+    "durable_effect_requires_human_confirmation": true
+  }
+}
