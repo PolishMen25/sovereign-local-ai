@@ -1,7 +1,9 @@
 import importlib.util
+import os
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).parents[1] / "services" / "mcp-collector" / "conversation_http.py"
@@ -28,6 +30,13 @@ class ConversationHttpCollectorTests(unittest.TestCase):
     def test_oversized_body_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             MODULE.parse_submission(b"x" * (MODULE.MAX_BODY_BYTES + 1))
+
+    def test_non_loopback_host_refuses_to_start(self) -> None:
+        for host in ("0.0.0.0", "::", "192.168.0.105"):
+            with self.subTest(host=host):
+                with mock.patch.dict(os.environ, {"SOVEREIGN_COLLECTOR_HOST": host}):
+                    with self.assertRaisesRegex(SystemExit, "loopback-only"):
+                        MODULE.main()
 
 
 if __name__ == "__main__":
