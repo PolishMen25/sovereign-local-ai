@@ -32,7 +32,7 @@ class ConversationHttpCollectorTests(unittest.TestCase):
             MODULE.parse_submission(b"x" * (MODULE.MAX_BODY_BYTES + 1))
 
     def test_non_loopback_host_refuses_to_start(self) -> None:
-        for host in ("0.0.0.0", "::", "192.168.0.105"):
+        for host in ("0.0.0.0", "::", "192.0.2.10"):
             with self.subTest(host=host):
                 with mock.patch.dict(os.environ, {"SOVEREIGN_COLLECTOR_HOST": host}):
                     with self.assertRaisesRegex(SystemExit, "loopback-only"):
