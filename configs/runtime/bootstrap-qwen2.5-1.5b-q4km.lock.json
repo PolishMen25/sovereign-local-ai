@@ -1,0 +1,44 @@
+{
+  "schema_version": "bootstrap-model-lock.v1",
+  "status": "approved_cli_bootstrap",
+  "approved_at": "2026-09-01",
+  "purpose": "temporary_local_chat_while_core_is_trained",
+  "model": {
+    "name": "Qwen2.5-1.5B-Instruct-GGUF",
+    "publisher": "Qwen",
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+    "revision": "91cad51170dc346986eccefdc2dd33a9da36ead9",
+    "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "quantization": "Q4_K_M",
+    "byte_size": 1117320736,
+    "sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+    "license": "Apache-2.0",
+    "source_url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+  },
+  "runtime": {
+    "name": "llama.cpp",
+    "publisher": "ggml-org",
+    "release": "b10537",
+    "filename": "llama-b10537-bin-ubuntu-x64.tar.gz",
+    "byte_size": 16672620,
+    "sha256": "47963587b8e2eee2ecc2ac0884450b2f50c24b35bcff23d68c92694da1d1ac0f",
+    "license": "MIT",
+    "source_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b10537"
+  },
+  "local_cpu_dependency": {
+    "name": "libgomp.so.1",
+    "source": "verified_offline_pytorch_bundle",
+    "sha256": "78511033caddec6ccae8f4d62b94d56135f377c4cee33120e6d7df2ef499f69f"
+  },
+  "execution_policy": {
+    "device": "cpu",
+    "network_download_at_runtime": false,
+    "interface": "ssh_cli_only",
+    "persistent_service": false,
+    "tools_enabled": false,
+    "rag_enabled": false,
+    "conversation_logging": false,
+    "maximum_context_tokens": 4096,
+    "maximum_generated_tokens": 512
+  }
+}

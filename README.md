@@ -4,9 +4,11 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
 
 > État : **phase 0 — découverte et validation de l'architecture**. Ce dépôt pose les contraintes, les contrats et les gates de décision. Il ne prétend pas encore fournir une plateforme de production.
 
-> **Utilisation actuelle : il n'existe pas encore de chatbot ni de modèle
-> linguistique utilisable.** CORE-MINI valide seulement l'entraînement CPU et
-> les checkpoints. Voir la matrice [Capacités réellement disponibles](docs/project/current-capabilities.md).
+> **Utilisation actuelle : un chat tiers BOOTSTRAP fonctionne localement en
+> CLI CPU.** Il fournit des réponses réelles pendant la construction de CORE,
+> mais n'est ni CORE-MINI ni CORE-80M. CORE-MINI valide toujours le chemin
+> d'entraînement et CORE-80M n'a pas encore de poids linguistiques. Voir la
+> matrice [Capacités réellement disponibles](docs/project/current-capabilities.md).
 
 ## Invariants déjà décidés
 

@@ -7,14 +7,15 @@ Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
 
 ## Réponse courte
 
-Il n'est **pas encore possible de poser une question à un modèle local et
-d'obtenir une réponse générée**.
+Il est maintenant possible de poser une question à un modèle local depuis la
+CLI SSH et d'obtenir une réponse réellement générée. Ce chat utilise le modèle
+tiers temporaire **BOOTSTRAP**, pas CORE-80M.
 
 Le checkpoint CORE-MINI actuel prouve que l'entraînement CPU, la sauvegarde et
 la reprise fonctionnent. Il a appris sur des identifiants de tokens synthétiques
 et ne possède aucun savoir linguistique. CORE-80M n'est pas entraîné et aucun
 tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
-n'existe encore.
+n'existe encore pour CORE.
 
 Le MCP Knowledge est utilisable séparément comme recherche lexicale dans un
 petit catalogue synthétique. Il retourne des résumés et leur provenance ; il ne
@@ -25,10 +26,11 @@ génère pas une réponse d'IA.
 | Composant | État exact | Ce qui fonctionne | Limite actuelle |
 | --- | --- | --- | --- |
 | PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
+| Chat BOOTSTRAP | CLI locale fonctionnelle | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement en français sur CPU avec llama.cpp | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE |
 | CORE-MINI-1M | Harness validé | Modèle de 1 328 256 paramètres, entraînement synthétique, métriques, checkpoint atomique et reprise sécurisée | Aucun langage appris, aucune question possible |
 | CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental | Manifestes traçables, partitions isolées, Byte-BPE déterministe hors ligne et refus d'entraînement sans autorisation | Aucune source, licence, proportion linguistique ou tokenizer final approuvé |
-| Moteur d'inférence | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime n'est pas disponible | Aucun chargement de checkpoint ni génération de texte |
+| Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état et recherche lexicale bornée avec provenance | Trois notices synthétiques, pas de RAG vectoriel ni de réponse générée |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
 | Synology | Stockage préparé | Coffre chiffré monté et essais synthétiques de copie/restauration | Pas encore le corpus réel ni la mémoire conversationnelle validée du modèle |
@@ -39,10 +41,12 @@ génère pas une réponse d'IA.
 
 ## Vérifications confirmées
 
-- 63 tests passent sur le nœud de calcul Linux ;
+- 66 tests passent sur le nœud de calcul Linux ;
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
 - un checkpoint CORE-MINI a été produit puis repris avec le chargeur sécurisé ;
 - CORE-80M s'instancie en RAM CPU avec son nombre exact de paramètres ;
+- BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
+- un premier échange français a été généré localement, sans écoute réseau ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
   synthétiques ;
 - une recherche `stockage hybride` retourne des résumés avec `provenance_id` ;
@@ -55,6 +59,10 @@ zone IA-CORE, la qualité d'un modèle linguistique ou la disponibilité d'un
 service de production.
 
 ## Utilisable aujourd'hui
+
+Le chat BOOTSTRAP se lance dans une session SSH avec le lanceur décrit dans
+[le runbook CLI](../operations/bootstrap-chat-cli.md). La commande ouvre une
+conversation interactive réelle ; `/exit` ou `Ctrl+C` la termine.
 
 Depuis la racine du dépôt :
 
@@ -90,7 +98,7 @@ les outils suivants :
 - `knowledge_status {}` ;
 - `search_validated {"query": "stockage hybride"}`.
 
-## Pour rendre le chat utilisable
+## Pour rendre le chat CORE utilisable
 
 Il reste à réaliser, dans cet ordre :
 
@@ -103,6 +111,5 @@ Il reste à réaliser, dans cet ordre :
 6. valider l'isolation réseau, les droits, l'audit, les sauvegardes et la
    restauration avant tout service persistant.
 
-Tant que ces étapes ne sont pas franchies, une démonstration de chat qui
-répondrait grâce à un service distant ou à un autre modèle serait contraire au
-projet et ne doit pas être présentée comme CORE.
+BOOTSTRAP fournit le chat immédiat, mais ne franchit aucune de ces étapes et ne
+doit jamais être présenté comme CORE. Aucune inférence distante n'est utilisée.

@@ -29,6 +29,7 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 | D-021 | L'assistant doit être force de proposition, sans autonomie de modification. | Il explicite hypothèses, sources, risques, options et vérifications ; toute action durable, sortie de données ou modification d'infrastructure exige une confirmation humaine. |
 | D-022 | La connaissance de l'infrastructure locale est fournie par des inventaires et documents approuvés. | Aucune découverte réseau, exécution de commande, accès aux secrets ou modification de l'infrastructure n'est permise par défaut. |
 | D-023 | Le stockage V1 suit une stratégie hybride : capacité locale Proxmox pour le calcul actif et le temporaire ; Synology RS3617xs+ pour RAW, connaissances, modèles, checkpoints retenus et sauvegardes. | Le stockage local n'est pas la copie durable unique ; les flux vers le Synology restent restreints, mesurés et sauvegardés. Aucun disque n'est initialisé sans procédure approuvée. |
+| D-024 | Un modèle tiers Qwen2.5-1.5B-Instruct GGUF est autorisé comme chat BOOTSTRAP temporaire, distinct de CORE, en CLI locale CPU uniquement. | Acquisition et empreintes verrouillées ; aucun service persistant, outil, RAG ou téléchargement à l'exécution. Cette exception ne remplace pas CORE-80M et ne valide aucun gate d'entraînement. |
 
 ## Orientations provisoires
 

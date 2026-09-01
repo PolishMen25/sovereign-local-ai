@@ -1,6 +1,6 @@
 # État public du déploiement
 
-Dernière vérification : 2026-08-31.
+Dernière vérification : 2026-09-01.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md). Ce résumé reste
@@ -9,8 +9,9 @@ compte, ni secret, ni chemin d'administration.
 
 ## État essentiel
 
-- **Chat local : non disponible.** Aucun chemin question → réponse générée
-  n'est encore relié.
+- **Chat BOOTSTRAP : disponible en CLI locale.** Des poids GGUF vérifiés sont
+  chargés par llama.cpp sur CPU et produisent une vraie réponse en français.
+  Ce modèle tiers temporaire est explicitement distinct de CORE.
 - **CORE-MINI : harness d'entraînement fonctionnel.** Entraînement synthétique,
   checkpoint et reprise sont validés ; le checkpoint n'a aucun savoir
   linguistique.
@@ -36,7 +37,7 @@ compte, ni secret, ni chemin d'administration.
 
 - PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
 - CUDA et ROCm ne font pas partie du runtime ;
-- 63 tests passent sur Linux ;
+- 66 tests passent sur Linux ;
 - CORE-80M s'instancie en CPU avec son nombre candidat exact, sans poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise réussit ;
 - le MCP Knowledge répond et retourne des résultats synthétiques avec
@@ -47,7 +48,7 @@ compte, ni secret, ni chemin d'administration.
 ## Non revendiqué
 
 Le projet ne revendique pas encore : modèle conversationnel, qualité
-linguistique, RAG sémantique, agents autonomes, interface utilisateur finale,
+linguistique CORE, RAG sémantique, agents autonomes, interface utilisateur finale,
 authentification de production, service IA persistant, gate réseau achevé ou
 entraînement CORE-80M.
 
