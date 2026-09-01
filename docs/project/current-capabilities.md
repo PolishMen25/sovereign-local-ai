@@ -49,7 +49,7 @@ génère pas une réponse d'IA.
 ## Vérifications confirmées
 
 - 66 tests passent sur le nœud de calcul Linux ;
-- 150 tests réussissent dans la suite locale complète, élargie au mode
+- 160 tests réussissent dans la suite locale complète, élargie au mode
   `authorized-text` et à la reprise stricte ; un test PyTorch d'intégration est
   ignoré lorsque le bundle CPU vérifié est absent ; cette tranche n'est pas
   déclarée redéployée sur le nœud de calcul ;
@@ -78,6 +78,12 @@ génère pas une réponse d'IA.
   modèle et de l'optimiseur, y compris les strides, stockages et alias AdamW ;
   la reprise d'un ancien checkpoint réel n'a pas encore été prouvée, car la
   tentative distante a été interrompue par l'instabilité SSH ;
+- le summarizer de métriques `v2` valide strictement un journal synthétique ou
+  `authorized-text`, publie le SHA-256 exact de ses octets et calcule, après
+  chauffe, moyenne, médiane, minimum, maximum, écart-type de population, MAD et
+  débit ; il exige un journal commençant à l'étape 1, ne recompose pas une
+  reprise, n'agrège pas plusieurs runs et ne constitue pas une preuve de
+  benchmark NUMA complet ;
 - BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
 - un premier échange français a été généré localement, sans écoute réseau ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices

@@ -69,7 +69,12 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   stricts avant reprise, avec refus des strides, stockages et alias anormaux ;
 - vérificateur offline des checkpoints historiques construit sur ces mêmes
   primitives ;
-- suite locale actuelle : 150 tests réussissent et un test d'intégration
+- summarizer de métriques `core-mini-metrics-summary.v2` : journal strict et
+  borné, empreinte exacte des octets source, chauffe explicite, moyenne,
+  médiane, écart-type de population, MAD et débit ; cette capacité porte sur
+  un journal commençant à l'étape 1, ne recompose pas une reprise et ne ferme
+  pas le gate du benchmark NUMA ;
+- suite locale actuelle : 160 tests réussissent et un test d'intégration
   PyTorch est ignoré lorsque le bundle CPU vérifié est absent ;
 - Collector forcé sur loopback et relais Codex sans URL d'installation codée
   en dur ;

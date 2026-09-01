@@ -44,7 +44,7 @@ production.
 - PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
 - CUDA et ROCm ne font pas partie du runtime ;
 - 66 tests passent sur Linux ;
-- 150 tests réussissent dans la suite locale complète, désormais élargie au
+- 160 tests réussissent dans la suite locale complète, désormais élargie au
   mode `authorized-text` et au chargement strict ; un test d'intégration PyTorch
   est ignoré sur les postes qui ne possèdent pas le bundle CPU vérifié ;
 - CORE-80M s'instancie en CPU avec son nombre candidat exact, sans poids ;
@@ -71,8 +71,12 @@ production.
 - l'expéditeur du Collector refuse les redirections HTTP, valide les payloads
   en file et n'efface une entrée qu'après écriture atomique et vérification
   locale d'un reçu concordant ;
-- un premier benchmark NUMA existe, mais il reste préliminaire et ne permet pas
-  d'extrapoler CORE-80M.
+- le summarizer de métriques `v2` valide un journal borné et publie son SHA-256
+  exact ainsi que moyenne, médiane, écart-type de population, MAD et débit
+  après chauffe ;
+- le premier passage NUMA reste préliminaire : aucune agrégation de
+  répétitions, preuve d'affinité, mémoire de pointe ou série complète de
+  compteurs NUMA ne permet encore d'extrapoler CORE-80M.
 
 ## Non revendiqué
 

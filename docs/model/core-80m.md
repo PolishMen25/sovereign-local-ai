@@ -164,15 +164,30 @@ checkpoint restent soumis au protocole de benchmark.
 ### Mesure NUMA préliminaire du 2026-08-31
 
 Un premier passage comparable a utilisé CORE-MINI avec une chauffe explicite,
-les mêmes données synthétiques et plusieurs placements CPU. L'outil
-`tools/summarize_training_metrics.py` vérifie les étapes, pertes et temps avant
-de calculer le débit. Le placement utilisant le plus de sockets ou de threads
-n'est pas automatiquement le plus rapide pour ce petit modèle.
+les mêmes données synthétiques et plusieurs placements CPU. Le placement
+utilisant le plus de sockets ou de threads n'est pas automatiquement le plus
+rapide pour ce petit modèle.
 
-Ce résultat est **préliminaire** : les chiffres détaillés restent dans le
-journal technique interne. Il faut des répétitions, une charge plus grande, la
-dispersion inter-exécutions, la mémoire de pointe et les compteurs NUMA avant de
-retenir un placement ou d'extrapoler vers CORE-80M.
+`tools/summarize_training_metrics.py` produit désormais le contrat
+`core-mini-metrics-summary.v2` à partir d'un seul journal JSONL. Il refuse un
+fichier hors limites, un JSON non strict ou incomplet, des clés ou modes
+mélangés, des étapes non contiguës, un temps non croissant, une dérive du nombre
+de tokens et, en mode `authorized-text`, un changement de lignée ou d'empreinte
+du contrat. Après exclusion de la chauffe demandée, il publie le SHA-256 des
+octets exacts du journal, le total, la moyenne, la médiane, le minimum, le
+maximum, l'écart-type de population, l'écart absolu médian (MAD) des durées par
+étape et le débit global en tokens/s.
+
+Ce résumé décrit un seul journal ininterrompu commençant à l'étape 1. Il ne
+recompose pas un nouveau journal créé après reprise, n'agrège pas les
+répétitions, ne compare pas lui-même les placements un socket/deux sockets et
+ne prouve ni l'affinité, ni la mémoire de pointe, ni les compteurs NUMA. Sa
+sortie fichier est créée sans remplacer une cible existante ou le journal
+source. Le passage existant reste donc **préliminaire** : il faut plusieurs
+répétitions comparables, une charge plus grande, les métadonnées matérielles et
+les mesures système avant de retenir un placement ou d'extrapoler vers
+CORE-80M. Le SHA-256 identifie exactement l'entrée résumée ; il ne prouve pas à
+lui seul son authenticité ni le protocole matériel.
 
 Le benchmark doit :
 
