@@ -10,6 +10,8 @@ PROJECT_ROOT = Path(__file__).parents[1]
 class CliEntrypointTests(unittest.TestCase):
     def test_bounded_training_entrypoints_offer_help_when_run_as_files(self) -> None:
         scripts = (
+            "tools/core_mini_numa_child.py",
+            "tools/core_mini_numa_benchmark.py",
             "tools/summarize_training_metrics.py",
             "tools/train_byte_bpe.py",
             "tools/train_core_mini.py",

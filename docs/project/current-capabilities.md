@@ -17,6 +17,11 @@ et ne possède aucun savoir linguistique. CORE-80M n'est pas entraîné et aucun
 tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
 n'existe encore pour CORE.
 
+Un runner CPU/NUMA synthétique et fail-closed est maintenant implémenté pour
+produire une preuve répétée d'un placement externe. Il n'a pas encore produit
+de preuve conforme documentée sur le nœud CPU et ne compare pas deux
+placements ; il ne ferme donc pas le gate G4.
+
 CORE-MINI possède maintenant un second chemin, nommé explicitement
 `authorized-text`. La validation du bundle, la tokenisation, le contrat, le
 journal et la construction du checkpoint sont couverts par des tests unitaires
@@ -35,6 +40,7 @@ génère pas une réponse d'IA.
 | PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
 | Chat BOOTSTRAP | CLI locale fonctionnelle | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement en français sur CPU avec llama.cpp | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE |
 | CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; entraînement synthétique et checkpoint atomique ; modes explicitement séparés et contrôles stricts locaux | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité du checkpoint historique avec le nouveau chargeur à confirmer sur Linux |
+| Runner CORE-MINI NUMA | Implémenté, sans preuve matérielle conforme publiée | Contrat privé strict hors Git, archive source et runtime offline vérifiés, contrôle du placement externe et des sockets flux/datagrammes INET, attestations par phase, 3 à 10 répétitions fraîches et preuve publique minimisée | Linux et isolation externe requis ; un placement par preuve, aucun comparateur multi-placement, aucune mesure complète pour G4 |
 | CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
@@ -48,11 +54,6 @@ génère pas une réponse d'IA.
 
 ## Vérifications confirmées
 
-- 66 tests passent sur le nœud de calcul Linux ;
-- 160 tests réussissent dans la suite locale complète, élargie au mode
-  `authorized-text` et à la reprise stricte ; un test PyTorch d'intégration est
-  ignoré lorsque le bundle CPU vérifié est absent ; cette tranche n'est pas
-  déclarée redéployée sur le nœud de calcul ;
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
 - un checkpoint CORE-MINI a été produit puis repris sur Linux avec le chargeur
   borné antérieur ; sa compatibilité avec les nouveaux contrôles stricts reste
@@ -84,6 +85,18 @@ génère pas une réponse d'IA.
   débit ; il exige un journal commençant à l'étape 1, ne recompose pas une
   reprise, n'agrège pas plusieurs runs et ne constitue pas une preuve de
   benchmark NUMA complet ;
+- le runner NUMA exige un nouveau répertoire de run absolu, un contrat privé
+  strict hors Git, une session `session-<UUID v4>` et une archive Git source
+  canonique ; les répétitions, étapes, chauffe, lot, séquence,
+  threads, graine et délais sont bornés ;
+- avant tout run, il exige que les sockets flux et datagrammes des familles
+  `AF_INET` et `AF_INET6` soient déjà refusées, compare exactement affinité et
+  politique mémoire au contrat privé, puis confirme l'environnement CPU-only
+  dans un processus enfant ;
+- chaque répétition emploie des processus frais sans shell, relit le résumé
+  `v2`, reprend le checkpoint une étape avec le vérificateur offline et refuse
+  toute dérive d'empreinte, de placement ou de source ; la sortie publique ne
+  contient aucun hostname, détail CPU exact, commande ou chemin ;
 - BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
 - un premier échange français a été généré localement, sans écoute réseau ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
@@ -136,6 +149,13 @@ python -B -m tools.train_core_mini \
 ```
 
 Cette commande produit une preuve technique, pas un modèle auquel parler.
+
+Le runner NUMA est lui aussi un outil de preuve de phase 0, pas une commande
+d'activation. Sa CLI et ses préconditions sont décrites dans le
+[protocole CORE-MINI NUMA](../model/core-mini-numa-protocol.md). Les arguments
+obligatoires sont `--run-root`, `--placement-contract`,
+`--benchmark-session-id` et `--source-archive`. Une instance réelle du contrat
+de placement reste privée et ne doit jamais être ajoutée au dépôt.
 
 Le mode `authorized-text` est volontairement inutilisable sans les trois
 artefacts approuvés et concordants. Sa forme de commande est documentée dans

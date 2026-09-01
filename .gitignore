@@ -45,6 +45,7 @@ configs/codex/hooks.windows.json
 configs/codex/*.local.json
 
 # Bounded test workspaces (never fixtures)
+/.codex-test-tmp/
 /tmp*/
 /tests/tmp*/
 /tests/runtime-*/

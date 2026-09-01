@@ -16,7 +16,9 @@ compte, ni secret, ni chemin d'administration.
   checkpoint atomique sont validés. Le nouveau chargement strict et le mode
   explicite `authorized-text` sont implémentés et couverts par les tests locaux,
   mais aucun run `authorized-text` de bout en bout ni reprise du checkpoint
-  historique avec ces nouveaux contrôles n'est encore confirmé sur Linux.
+  historique avec ces nouveaux contrôles n'est encore confirmé sur Linux. Le
+  runner NUMA répété est implémenté, mais aucune preuve conforme produite par ce
+  runner n'est encore documentée sur le nœud CPU.
 - **CORE-80M : conception seulement.** L'architecture et son comptage sont
   versionnés, mais aucun tokenizer final, corpus approuvé ou poids utilisable
   n'existe.
@@ -43,10 +45,6 @@ production.
 
 - PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
 - CUDA et ROCm ne font pas partie du runtime ;
-- 66 tests passent sur Linux ;
-- 160 tests réussissent dans la suite locale complète, désormais élargie au
-  mode `authorized-text` et au chargement strict ; un test d'intégration PyTorch
-  est ignoré sur les postes qui ne possèdent pas le bundle CPU vérifié ;
 - CORE-80M s'instancie en CPU avec son nombre candidat exact, sans poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise a réussi sur Linux
   avec le chargeur borné antérieur ;
@@ -74,16 +72,26 @@ production.
 - le summarizer de métriques `v2` valide un journal borné et publie son SHA-256
   exact ainsi que moyenne, médiane, écart-type de population, MAD et débit
   après chauffe ;
-- le premier passage NUMA reste préliminaire : aucune agrégation de
-  répétitions, preuve d'affinité, mémoire de pointe ou série complète de
-  compteurs NUMA ne permet encore d'extrapoler CORE-80M.
+- le runner NUMA phase 0 exige un nouveau répertoire absolu, un contrat de
+  placement privé strict, une session UUID v4, une archive Git canonique et un
+  lock de runtime offline ; ses paramètres de charge et délais sont bornés ;
+- il refuse de démarrer si les sockets flux ou datagrammes des familles
+  `AF_INET` et `AF_INET6` restent disponibles, vérifie l'égalité exacte du
+  placement observé avec le contrat dans chaque phase enfant, puis exécute 3 à
+  10 répétitions en processus frais ; chaque résumé est relu et chaque
+  checkpoint est repris une étape sans modifier sa source ;
+- sa preuve publique ne contient ni hostname, ni modèle ou liste CPU, ni
+  commande ou chemin. Elle porte sur un seul placement ; aucune comparaison
+  multi-placement conforme, mesure mémoire ou série complète de compteurs NUMA
+  ne permet encore d'extrapoler CORE-80M.
 
 ## Non revendiqué
 
 Le projet ne revendique pas encore : entraînement sur un corpus réel approuvé,
 poids linguistiques CORE, modèle conversationnel CORE, RAG sémantique, agents
 autonomes, interface utilisateur finale, authentification de production,
-service IA persistant, gate réseau achevé ou entraînement CORE-80M.
+service IA persistant, gate réseau achevé, preuve NUMA multi-placement acceptée
+ou entraînement CORE-80M.
 
 Le contenu de ce jalon ne versionne aucun secret, identifiant privé ni adresse
 d'administration.

@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/core-mini-numa-evidence/0.1.0/schema.json",
+  "title": "Preuve répétée CORE-MINI pour un placement externe",
+  "description": "Contrat public strict pour une preuve synthétique d'un seul placement. Les détails de machine, commandes et chemins restent hors de l'artefact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "proof_id",
+    "created_at_utc",
+    "benchmark_session_id",
+    "canonicalization",
+    "placement",
+    "workload",
+    "workload_contract_sha256",
+    "repetitions",
+    "aggregate",
+    "evidence_scope"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "artifact_type": { "const": "single-placement-run-proof" },
+    "proof_id": { "$ref": "#/$defs/proofId" },
+    "created_at_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "benchmark_session_id": { "$ref": "#/$defs/sessionId" },
+    "canonicalization": { "const": "canonical-json-v1" },
+    "placement": { "$ref": "#/$defs/placement" },
+    "workload": { "$ref": "#/$defs/workload" },
+    "workload_contract_sha256": { "$ref": "#/$defs/sha256" },
+    "repetitions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/repetition" }
+    },
+    "aggregate": { "$ref": "#/$defs/aggregate" },
+    "evidence_scope": { "const": "repeated-single-placement-only" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proofId": {
+      "type": "string",
+      "pattern": "^proof-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^session-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "application",
+        "contract_commitment_sha256",
+        "verification"
+      ],
+      "properties": {
+        "label": { "enum": ["placement-a", "placement-b"] },
+        "application": { "const": "external" },
+        "contract_commitment_sha256": { "$ref": "#/$defs/sha256" },
+        "verification": { "const": "current-process-matched-private-contract" }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_name",
+        "data_mode",
+        "repetitions",
+        "source_revision",
+        "source_archive_sha256",
+        "source_tree_manifest_sha256",
+        "offline_runtime_lock_sha256",
+        "runtime_observation_sha256",
+        "environment_contract_sha256",
+        "model_config_sha256",
+        "steps",
+        "warmup_steps",
+        "batch_size",
+        "sequence_length",
+        "learning_rate",
+        "seed",
+        "threads"
+      ],
+      "properties": {
+        "model_name": { "const": "CORE-MINI-1M" },
+        "data_mode": { "const": "synthetic" },
+        "repetitions": { "type": "integer", "minimum": 3, "maximum": 10 },
+        "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "source_archive_sha256": { "$ref": "#/$defs/sha256" },
+        "source_tree_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "offline_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_observation_sha256": { "$ref": "#/$defs/sha256" },
+        "environment_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "model_config_sha256": { "$ref": "#/$defs/sha256" },
+        "steps": { "type": "integer", "minimum": 6, "maximum": 1000 },
+        "warmup_steps": { "type": "integer", "minimum": 1, "maximum": 997 },
+        "batch_size": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "sequence_length": { "type": "integer", "minimum": 2, "maximum": 512 },
+        "learning_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "seed": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        "threads": { "type": "integer", "minimum": 1, "maximum": 256 }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "mean_step",
+        "median_step",
+        "minimum_step",
+        "maximum_step",
+        "population_standard_deviation",
+        "median_absolute_deviation"
+      ],
+      "properties": {
+        "total": { "$ref": "#/$defs/positiveNumber" },
+        "mean_step": { "$ref": "#/$defs/positiveNumber" },
+        "median_step": { "$ref": "#/$defs/positiveNumber" },
+        "minimum_step": { "$ref": "#/$defs/positiveNumber" },
+        "maximum_step": { "$ref": "#/$defs/positiveNumber" },
+        "population_standard_deviation": { "type": "number", "minimum": 0 },
+        "median_absolute_deviation": { "type": "number", "minimum": 0 }
+      }
+    },
+    "repetition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repetition_id",
+        "status",
+        "metrics_sha256",
+        "summary_sha256",
+        "verification_sha256",
+        "checkpoint_sha256",
+        "steps_total",
+        "steps_measured",
+        "tokens_measured",
+        "timing_seconds",
+        "tokens_per_second"
+      ],
+      "properties": {
+        "repetition_id": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "status": { "const": "completed" },
+        "metrics_sha256": { "$ref": "#/$defs/sha256" },
+        "summary_sha256": { "$ref": "#/$defs/sha256" },
+        "verification_sha256": { "$ref": "#/$defs/sha256" },
+        "checkpoint_sha256": { "$ref": "#/$defs/sha256" },
+        "steps_total": { "type": "integer", "minimum": 6, "maximum": 1000 },
+        "steps_measured": { "type": "integer", "minimum": 3, "maximum": 999 },
+        "tokens_measured": { "type": "integer", "minimum": 6, "maximum": 32735232 },
+        "timing_seconds": { "$ref": "#/$defs/timing" },
+        "tokens_per_second": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "median",
+        "minimum",
+        "maximum",
+        "population_standard_deviation",
+        "median_absolute_deviation"
+      ],
+      "properties": {
+        "mean": { "$ref": "#/$defs/positiveNumber" },
+        "median": { "$ref": "#/$defs/positiveNumber" },
+        "minimum": { "$ref": "#/$defs/positiveNumber" },
+        "maximum": { "$ref": "#/$defs/positiveNumber" },
+        "population_standard_deviation": { "type": "number", "minimum": 0 },
+        "median_absolute_deviation": { "type": "number", "minimum": 0 }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repetitions_completed", "tokens_per_second"],
+      "properties": {
+        "repetitions_completed": { "type": "integer", "minimum": 3, "maximum": 10 },
+        "tokens_per_second": { "$ref": "#/$defs/distribution" }
+      }
+    }
+  }
+}

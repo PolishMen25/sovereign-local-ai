@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/core-mini-private-placement/0.1.0/schema.json",
+  "title": "Contrat privé de placement CORE-MINI",
+  "description": "Contrat opérateur hors Git. Ses valeurs exactes ne doivent jamais être publiées.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "placement_id",
+    "cpu_ids",
+    "allowed_memory_nodes",
+    "memory_policy",
+    "policy_memory_nodes"
+  ],
+  "properties": {
+    "schema_version": { "const": "core-mini-private-placement.v1" },
+    "placement_id": { "enum": ["placement-a", "placement-b"] },
+    "cpu_ids": { "$ref": "#/$defs/cpuIds" },
+    "allowed_memory_nodes": { "$ref": "#/$defs/memoryNodeIds" },
+    "memory_policy": {
+      "enum": ["bind", "interleave", "local", "preferred"]
+    },
+    "policy_memory_nodes": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4095
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "memory_policy": {
+            "enum": ["bind", "interleave", "preferred"]
+          }
+        },
+        "required": ["memory_policy"]
+      },
+      "then": {
+        "properties": {
+          "policy_memory_nodes": { "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "cpuIds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 1048575
+      }
+    },
+    "memoryNodeIds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4095
+      }
+    }
+  }
+}

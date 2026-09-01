@@ -183,11 +183,39 @@ recompose pas un nouveau journal créé après reprise, n'agrège pas les
 répétitions, ne compare pas lui-même les placements un socket/deux sockets et
 ne prouve ni l'affinité, ni la mémoire de pointe, ni les compteurs NUMA. Sa
 sortie fichier est créée sans remplacer une cible existante ou le journal
-source. Le passage existant reste donc **préliminaire** : il faut plusieurs
-répétitions comparables, une charge plus grande, les métadonnées matérielles et
-les mesures système avant de retenir un placement ou d'extrapoler vers
-CORE-80M. Le SHA-256 identifie exactement l'entrée résumée ; il ne prouve pas à
+source. Le SHA-256 identifie exactement l'entrée résumée ; il ne prouve pas à
 lui seul son authenticité ni le protocole matériel.
+
+Le runner phase 0 `tools/core_mini_numa_benchmark.py` est maintenant
+implémenté pour composer une preuve synthétique d'**un seul placement externe**
+à partir de 3 à 10 répétitions fraîches. Sa CLI exige un nouveau `--run-root`,
+un contrat privé strict `--placement-contract`, un identifiant de session au
+format UUID v4 et une archive Git canonique créée hors de l'arbre source. Elle
+vérifie le commit PAX et la concordance exacte archive/arbre avant et après le
+run, puis borne les étapes, la chauffe, le lot, la longueur de séquence, les
+threads, la graine et le délai de chaque processus enfant.
+
+Le runner n'applique aucune affinité. Il compare exactement le placement
+observé au contrat privé, refuse de commencer tant que les créations de sockets
+flux et datagrammes des familles `AF_INET` et `AF_INET6` ne sont pas déjà
+interdites, puis confirme cette restriction, l'absence d'accélérateur et le
+placement dans chaque phase enfant. Pour chaque répétition, il relit le résumé
+strict, vérifie les
+empreintes du journal et du
+checkpoint, puis fait reprendre une étape au checkpoint par le vérificateur
+offline sans modifier l'artefact source. La preuve publique ne conserve ni
+hostname, ni détail CPU/NUMA exact, ni commande, ni chemin.
+
+Le [protocole CORE-MINI NUMA](core-mini-numa-protocol.md) et les schémas public
+et privé décrivent les refus et la canonicalisation. Aucun run conforme de ce
+nouveau runner n'est encore documenté sur le nœud CPU. Il n'existe pas encore
+de comparateur multi-placement : deux preuves compatibles et distinctes seront
+nécessaires avant toute comparaison descriptive.
+
+Le passage existant reste donc **préliminaire**. Une charge plus grande, deux
+échelles miniatures, les mesures mémoire et système ainsi qu'une comparaison
+multi-placement acceptée restent nécessaires avant de retenir un placement ou
+d'extrapoler vers CORE-80M.
 
 Le benchmark doit :
 

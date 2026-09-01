@@ -26,6 +26,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - aucune promotion automatique de contenu externe ;
 - Collector externe write-only, MCP Knowledge interne séparé ;
 - aucun shell, chemin arbitraire ou accès réseau arbitraire via MCP ;
+- le runner NUMA n'applique jamais un placement et ne publie jamais le contrat
+  privé, l'identité de la machine, les listes CPU/NUMA, une commande ou un
+  chemin ;
 - les 60 agents sont des profils logiques partagés et restent désactivés tant
   que leurs gates ne sont pas franchis ;
 - aucun secret, poids, checkpoint, corpus réel ou détail interne dans Git.
@@ -37,6 +40,10 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - entraînement synthétique et checkpoint atomique de CORE-MINI ; nouveau
   chargement strict couvert par les tests locaux, avec compatibilité du
   checkpoint historique encore à confirmer sur Linux ;
+- runner de preuve CORE-MINI NUMA implémenté avec contrat de placement externe,
+  archive source et runtime offline vérifiés, contrôle INET flux/datagrammes
+  fail-closed et répétitions bornées ; aucune preuve conforme de
+  ce runner ni comparaison multi-placement n'est encore documentée ;
 - prototype MCP Knowledge `stdio` sur trois notices synthétiques ;
 - Collector de conversations write-only vers RAW ;
 - stockage chiffré validé avec des données synthétiques ;
@@ -74,8 +81,19 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   médiane, écart-type de population, MAD et débit ; cette capacité porte sur
   un journal commençant à l'étape 1, ne recompose pas une reprise et ne ferme
   pas le gate du benchmark NUMA ;
-- suite locale actuelle : 160 tests réussissent et un test d'intégration
-  PyTorch est ignoré lorsque le bundle CPU vérifié est absent ;
+- runner `tools/core_mini_numa_benchmark.py` Linux-only : CLI obligatoire
+  `--run-root`, `--placement-contract`, `--benchmark-session-id` et
+  `--source-archive`, paramètres bornés, configuration CORE-MINI fixe et contrat
+  privé conforme à `schemas/core-mini-private-placement.schema.json` ;
+- vérification exacte de l'affinité et de la politique mémoire dans chaque
+  phase enfant, refus préalable des sockets flux/datagrammes `AF_INET`/`AF_INET6`,
+  sonde enfant CPU-only, 3 à 10
+  répétitions fraîches, résumé relu et checkpoint repris une étape sans
+  modification ;
+- artefact public fermé par `schemas/core-mini-numa-evidence.schema.json`, avec
+  empreintes exactes et statistiques inter-répétitions, sans détail matériel,
+  commande ou chemin ; le commit est une déclaration au format strict, pas une
+  lecture de Git par le runner ;
 - Collector forcé sur loopback et relais Codex sans URL d'installation codée
   en dur ;
 - relais Codex refusant toute redirection HTTP et validant le payload en file,
@@ -93,23 +111,32 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - aucun runtime de génération CORE actif ;
 - `/v1/chat` reste volontairement en HTTP 503 ;
 - aucun RAG vectoriel, agent actif, RBAC de production ou interface finale ;
+- aucune preuve répétée du runner NUMA n'a encore été acceptée sur le nœud CPU,
+  aucun comparateur multi-placement n'est implémenté et G4 reste ouvert ;
 - l'isolation réseau complète et les restaurations de production restent des
   gates à prouver.
 
 ## Ordre de reprise recommandé
 
-1. vérifier la suite de tests locale et Linux, sans télécharger de dépendance ;
-2. confirmer la compatibilité d'un checkpoint CORE-MINI historique sur le
+1. vérifier la suite locale et Linux, sans télécharger de dépendance ;
+2. faire approuver hors Git deux contrats de placement distincts conformes au
+   schéma public et le bac à sable refusant les sockets flux/datagrammes INET ;
+3. sous confirmation humaine, produire au moins trois répétitions pour chaque
+   placement avec le même UUID de session, le même commit et le même workload,
+   puis conserver séparément les deux preuves publiques ;
+4. implémenter un comparateur strict de ces deux preuves avant toute conclusion
+   de placement, sans présenter ce lot comme la fermeture de G4 ;
+5. confirmer la compatibilité d'un checkpoint CORE-MINI historique sur le
    nœud CPU avec le vérificateur offline ;
-3. définir puis approuver les sources, licences, langues et exclusions du
+6. définir puis approuver les sources, licences, langues et exclusions du
    corpus ;
-4. produire un tokenizer expérimental depuis le seul split `train`, évaluer sa
+7. produire un tokenizer expérimental depuis le seul split `train`, évaluer sa
    qualité, puis faire approuver séparément son SHA-256 exact ;
-5. exécuter le premier mini-entraînement `authorized-text` avec le bundle exact
+8. exécuter le premier mini-entraînement `authorized-text` avec le bundle exact
    approuvé et conserver checkpoint, journal de métriques et lignée ;
-6. évaluer ce run, vérifier sa reprise hors ligne, puis exporter un bundle
+9. évaluer ce run, vérifier sa reprise hors ligne, puis exporter un bundle
    d'inférence borné et vérifié ;
-7. seulement après les gates, raccorder génération CORE, RAG, authentification,
+10. seulement après les gates, raccorder génération CORE, RAG, authentification,
    interface et profils d'agents.
 
 ## Refus attendus
