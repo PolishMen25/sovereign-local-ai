@@ -29,6 +29,17 @@ ni la licence, ni le contenu, ni l'empreinte des octets : ces contrôles restent
 python3 -B tools/validate_training_corpus_manifest.py manifest.json
 ```
 
+## Prototype technique disponible
+
+[`tools/train_byte_bpe.py`](../../tools/train_byte_bpe.py) est un entraînement
+Byte Pair Encoding déterministe et hors ligne. Il ne lit un corpus que si le
+manifeste passe l'autorisation explicite, si l'empreinte des octets concorde et
+si chaque ligne est un enregistrement JSONL strict `record_id` / `text`.
+Le résultat reste marqué `experimental` : l'algorithme est opérationnel, mais
+ni sa politique de normalisation ni ses 32 000 unités candidates ne sont
+approuvées. La configuration candidate est
+[`configs/tokenizers/byte-bpe-v0.candidate.json`](../../configs/tokenizers/byte-bpe-v0.candidate.json).
+
 L'option ci-dessous est obligatoire avant d'alimenter un entraînement
 linguistique. Elle refuse un corpus synthétique, une gouvernance en attente,
 une autorisation absente et un tokenizer non approuvé.

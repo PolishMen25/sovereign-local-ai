@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1.0",
+  "status": "experimental",
+  "name": "BYTE-BPE-V0",
+  "purpose": "exercise_a_deterministic_offline_tokenizer_pipeline_before_tokenizer_approval",
+  "algorithm": "byte_bpe",
+  "input_encoding": "utf-8",
+  "normalization_policy_id": "unicode-nfc-v1",
+  "candidate_vocabulary_size": 32000,
+  "special_tokens": ["<pad>", "<bos>", "<eos>", "<unk>"],
+  "training_data": "requires_an_approved_training_corpus_manifest",
+  "internet": "disabled"
+}
