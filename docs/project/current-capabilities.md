@@ -27,6 +27,7 @@ génère pas une réponse d'IA.
 | PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
 | CORE-MINI-1M | Harness validé | Modèle de 1 328 256 paramètres, entraînement synthétique, métriques, checkpoint atomique et reprise sécurisée | Aucun langage appris, aucune question possible |
 | CORE-80M | Conception seulement | Configuration candidate et comptage exact de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
+| Corpus / tokenizer | Gate préparatoire | Manifestes traçables, partitions isolées et refus d'entraînement sans autorisation | Aucune source, licence, proportion linguistique ou tokenizer final approuvé |
 | Moteur d'inférence | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime n'est pas disponible | Aucun chargement de checkpoint ni génération de texte |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état et recherche lexicale bornée avec provenance | Trois notices synthétiques, pas de RAG vectoriel ni de réponse générée |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |

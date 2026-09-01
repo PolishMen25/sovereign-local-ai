@@ -10,6 +10,11 @@ actuellement.
 
 Le projet vise à créer le modèle principal, son tokenizer, son pipeline et tous ses poids — y compris sa matrice d'embedding de tokens — dans ce projet et à les entraîner de zéro. Une décision différente reste ouverte uniquement pour le **moteur d'embeddings du RAG** et un éventuel reranker, qui sont des composants séparés de CORE-80M.
 
+Le contrat préparatoire de corpus et tokenizer est décrit dans
+[le gate dédié](corpus-and-tokenizer-gate.md). Il ne vaut pas approbation d'un
+corpus réel et bloque l'entraînement linguistique tant que les décisions de J3
+ne sont pas toutes validées.
+
 Toute modification des dimensions, des couches, des normalisations ou du partage de poids impose de recalculer et de tester le nombre de paramètres.
 
 La source machine du candidat est [`configs/models/core-80m.candidate.json`](../../configs/models/core-80m.candidate.json). Le compteur et son test lisent ce fichier directement afin d'éviter une dérive silencieuse entre configuration, calcul et documentation.
