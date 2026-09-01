@@ -101,7 +101,7 @@ Le nom « CORE-80M » est donc une désignation arrondie ; ce candidat précis c
 ## Contraintes d'exécution et d'entraînement
 
 - Le chemin de référence est **CPU-only**. Une disponibilité éventuelle de GPU ne doit pas devenir une dépendance implicite.
-- La machine d'entraînement confirmée est le ML350 bi-socket avec 2 × Xeon E5-2699 v4, soit 44 cœurs physiques / 88 threads et 88 Go de RAM. La répartition des DIMM par nœud NUMA, les instructions réellement exposées à l'invité, les ressources réservées à Proxmox et le stockage actif doivent encore être inventoriés avant tout dimensionnement.
+- La machine d'entraînement confirmée est le ML350 bi-socket avec 2 × Xeon E5-2698 v4, soit 40 cœurs physiques / 80 threads répartis sur deux nœuds NUMA, et 88 Go de RAM installés dont environ 78 Gio sont visibles. La répartition des DIMM par nœud NUMA, les instructions réellement exposées à l'invité, les ressources réservées à Proxmox et le stockage actif doivent encore être inventoriés avant tout dimensionnement.
 - L'affinité des processus et des threads, l'allocation mémoire locale à chaque socket et le coût des accès inter-sockets doivent être mesurés. « Deux sockets » ne signifie pas automatiquement « deux fois plus rapide ».
 - Les mesures doivent distinguer au minimum un socket et deux sockets, puis relever le débit en tokens/s, le temps par étape, la mémoire de pointe, l'utilisation CPU, les défauts NUMA, le temps d'entrée/sortie et le temps de sauvegarde/reprise.
 - La mémoire nécessaire ne se limite pas aux poids : gradients, états de l'optimiseur, activations, tampons, chargeur de données et checkpoints doivent entrer dans le bilan.
