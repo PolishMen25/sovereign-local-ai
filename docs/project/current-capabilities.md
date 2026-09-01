@@ -1,6 +1,6 @@
 # Capacités réellement disponibles
 
-Dernière vérification : 2026-08-31.
+Dernière vérification : 2026-09-01.
 
 Ce document est la source de vérité publique sur l'état exécutable du projet.
 Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
@@ -39,7 +39,7 @@ génère pas une réponse d'IA.
 
 ## Vérifications confirmées
 
-- 51 tests passent sur le nœud de calcul Linux ;
+- 57 tests passent sur le nœud de calcul Linux ;
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
 - un checkpoint CORE-MINI a été produit puis repris avec le chargeur sécurisé ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
