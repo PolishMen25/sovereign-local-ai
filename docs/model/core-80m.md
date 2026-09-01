@@ -125,9 +125,24 @@ Le candidat de validation est maintenant versionné dans
 `configs/models/core-mini.candidate.json`. Il reprend decoder-only, MHA,
 SwiGLU, RoPE, RMSNorm et embeddings liés avec `1 328 256` paramètres exacts.
 Le harness borné `tools/train_core_mini.py` est également versionné : il refuse
-un runtime non CPU, produit des séquences synthétiques déterministes, entraîne,
-sauvegarde atomiquement et permet la reprise d'un checkpoint. Ses validations
-structurelles participent à la suite locale complète du dépôt.
+un runtime non CPU, conserve un mode synthétique déterministe et ajoute un mode
+`authorized-text` séparé qui passe exclusivement par le bundle autorisé. Ce
+second mode exige la concordance exacte du manifeste, du split `train`, du
+tokenizer et du vocabulaire du modèle ; il lie ensuite le contrat, les métriques
+et le checkpoint à leur provenance sans y recopier le contenu brut. Les états
+du modèle et d'AdamW sont contrôlés par des primitives strictes partagées avant
+reprise ; les tenseurs AdamW aux strides, stockages ou alias inattendus sont
+refusés. La configuration CORE-MINI est lue, validée et hachée depuis une même
+copie d'octets bornée, puis comparée exactement au candidat attendu. Le
+checkpoint `authorized-text` lie aussi l'empreinte du préfixe exact de son
+journal de métriques afin de refuser une reprise sur un journal différent. Ces
+validations structurelles sont couvertes par la suite locale, mais
+aucun entraînement PyTorch de bout en bout n'a encore été exécuté en mode
+`authorized-text` et le nouveau chargeur strict n'a pas encore accepté le
+checkpoint historique sur Linux.
+
+Le chemin `authorized-text` n'a encore reçu aucun corpus réel approuvé. Il ne
+prouve donc ni apprentissage linguistique, ni qualité, ni poids CORE utilisable.
 
 Le contrôle `tools/verify_cpu_model_candidate.py` instancie séparément une
 configuration candidate en RAM CPU puis compare ses paramètres observés au

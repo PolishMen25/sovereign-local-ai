@@ -14,13 +14,53 @@ Le Collector impose un jeton Bearer d'au moins 32 caractères, `application/json
 
 `tools/codex_conversation_sync.py` est le relais local destiné au hook Codex `SessionEnd`. Il extrait uniquement les messages utilisateur et assistant du transcript local, retire les secrets probables, découpe les conversations sous la limite d'ingress puis les place dans une file locale avant envoi HTTPS. Le hook ne bloque pas sur le réseau : un processus détaché expédie la file, et un hook `SessionStart` relance les envois différés.
 
-L'adresse du Collector n'est jamais fournie par le dépôt. L'installation doit
-définir hors Git `SOVEREIGN_COLLECTOR_URL` et
-`SOVEREIGN_COLLECTOR_ALLOWED_HOST`. Le relais refuse une configuration absente,
-HTTP, contenant des identifiants, une requête, un fragment, un port non standard,
-un hôte non explicitement autorisé ou un chemin différent de
-`/v1/conversations`. Un exemple de hooks sans chemin personnel se trouve dans
-`configs/codex/hooks.windows.example.json`.
+Les URL HTTP ou HTTPS contenant une requête ou un fragment sont retirées sans
+dépendre de la casse du schéma. Un accusé HTTP `202` qui n'est pas un objet JSON
+valide est refusé ; la conversation reste alors dans la file pour une nouvelle
+tentative.
+
+L'adresse du Collector n'est jamais fournie par le dépôt. L'installation la
+définit hors Git, soit avec la paire `SOVEREIGN_COLLECTOR_URL` et
+`SOVEREIGN_COLLECTOR_ALLOWED_HOST`, soit dans le fichier local
+`collector-endpoint.json` situé sous `SOVEREIGN_SYNC_HOME` (ou, par défaut,
+`~/.codex/sovereign-sync`). Le fichier contient exactement deux chaînes :
+`collector_url` et `allowed_host`. Sa taille est bornée et les liens, objets non
+réguliers, champs supplémentaires, doublons et JSON non stricts sont refusés.
+Si au moins une variable d'environnement est présente, cette source est
+prioritaire ; une paire incomplète échoue sans repli silencieux vers le fichier.
+
+```json
+{
+  "collector_url": "https://collector.example.test/v1/conversations",
+  "allowed_host": "collector.example.test"
+}
+```
+
+Les deux sources passent par la même validation. Le relais refuse une
+configuration absente, HTTP, contenant des identifiants, une requête, un
+fragment, un port non standard, un hôte non explicitement autorisé ou un chemin
+différent de `/v1/conversations`. Un exemple de hooks sans chemin personnel se
+trouve dans `configs/codex/hooks.windows.example.json`.
+
+Le client HTTPS désactive les proxys ambiants et refuse les redirections HTTP
+`301`, `302`, `303`, `307` et `308`. Le jeton d'autorisation n'est donc jamais
+recopié vers une destination fournie par une réponse de redirection ; la
+conversation reste en file pour une nouvelle tentative.
+
+Avant tout envoi, chaque fichier de file est lu avec une limite de 1 Mio,
+doit être un fichier régulier, un objet JSON UTF-8 strict et canonique, respecter
+le schéma minimal d'une conversation et porter le même `conversation_id` que
+son nom. Après un `202`, le relais exige `application/json` lorsque les en-têtes
+sont accessibles puis un accusé composé exactement de `state`,
+`conversation_id` et `sha256`. L'état doit être `raw_imported` ou
+`already_imported`; l'identifiant et l'empreinte SHA-256 doivent correspondre
+exactement aux octets envoyés.
+
+Le reçu local ajoute uniquement `received_at`. Il est écrit atomiquement après
+synchronisation du fichier, relu et validé contre le payload avant suppression
+de la file. Un reçu absent, vide, corrompu, lié ou incohérent ne sert jamais à
+dédupliquer : le relais régénère ou conserve alors la conversation pour une
+nouvelle tentative.
 
 Le jeton reste dans `~/.codex/sovereign-sync/collector.token`, hors du dépôt. Les reçus locaux ne contiennent pas le contenu des conversations. Un historique peut être préparé avec `--backfill`, en excluant par délai les sessions encore actives. L'acceptation par le Collector conserve les données en `RAW`; aucune promotion vers `VALIDATED` n'est automatique.
 

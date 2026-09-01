@@ -17,6 +17,13 @@ et ne possède aucun savoir linguistique. CORE-80M n'est pas entraîné et aucun
 tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
 n'existe encore pour CORE.
 
+CORE-MINI possède maintenant un second chemin, nommé explicitement
+`authorized-text`. La validation du bundle, la tokenisation, le contrat, le
+journal et la construction du checkpoint sont couverts par des tests unitaires
+et structurels. Aucun entraînement PyTorch de bout en bout avec un corpus réel
+approuvé n'a encore été exécuté par ce chemin, qui n'a donc produit aucun poids
+linguistique.
+
 Le MCP Knowledge est utilisable séparément comme recherche lexicale dans un
 petit catalogue synthétique. Il retourne des résumés et leur provenance ; il ne
 génère pas une réponse d'IA.
@@ -27,7 +34,7 @@ génère pas une réponse d'IA.
 | --- | --- | --- | --- |
 | PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
 | Chat BOOTSTRAP | CLI locale fonctionnelle | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement en français sur CPU avec llama.cpp | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE |
-| CORE-MINI-1M | Harness validé | Modèle de 1 328 256 paramètres, entraînement synthétique, métriques, checkpoint atomique et reprise sécurisée | Aucun langage appris, aucune question possible |
+| CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; entraînement synthétique et checkpoint atomique ; modes explicitement séparés et contrôles stricts locaux | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité du checkpoint historique avec le nouveau chargeur à confirmer sur Linux |
 | CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
@@ -42,29 +49,49 @@ génère pas une réponse d'IA.
 ## Vérifications confirmées
 
 - 66 tests passent sur le nœud de calcul Linux ;
-- 110 tests passent dans le clone public local, avec un test PyTorch
-  d'intégration ignoré lorsque le bundle CPU vérifié est absent ; ces changements ne sont pas
-  encore déclarés redéployés sur le nœud de calcul ;
+- 150 tests réussissent dans la suite locale complète, élargie au mode
+  `authorized-text` et à la reprise stricte ; un test PyTorch d'intégration est
+  ignoré lorsque le bundle CPU vérifié est absent ; cette tranche n'est pas
+  déclarée redéployée sur le nœud de calcul ;
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
-- un checkpoint CORE-MINI a été produit puis repris avec le chargeur sécurisé ;
+- un checkpoint CORE-MINI a été produit puis repris sur Linux avec le chargeur
+  borné antérieur ; sa compatibilité avec les nouveaux contrôles stricts reste
+  à prouver ;
 - CORE-80M s'instancie en RAM CPU avec son nombre exact de paramètres ;
 - le harness et la future inférence partagent maintenant la même définition
   CPU-only du decoder, sans modifier le format des checkpoints existants ;
+- le trainer et le vérificateur lisent, valident et hachent la configuration
+  CORE-MINI depuis une seule copie d'octets bornée, avec architecture et
+  comptage exacts ; leurs parseurs publics n'exposent pas les chemins reçus ;
 - le tokenizer expérimental normalise, encode et décode de façon déterministe,
   refuse les fusions ou couvertures d'octets incohérentes et borne les entrées ;
 - le chargeur de texte autorisé refuse toute partition autre que `train` et lie
   corpus, manifeste et tokenizer sans recopier leur contenu dans la lignée ;
-- le vérificateur de checkpoint contrôle localement les contrats, clés et
-  limites ; la reprise d'un ancien checkpoint réel n'a pas encore été prouvée,
-  car la tentative distante a été interrompue par l'instabilité SSH ;
+- `train_core_mini.py` n'active ce chargeur que par
+  `--data-mode authorized-text`, exige les trois artefacts, vérifie le
+  vocabulaire exact et ne bascule jamais implicitement vers les données
+  synthétiques ;
+- le journal `authorized-text` refuse les clés ou valeurs inattendues, lie
+  chaque mesure au SHA-256 du contrat et vérifie la continuité avant reprise ;
+  son préfixe exact est haché dans le checkpoint puis exigé lors d'une reprise ;
+- le harness et le vérificateur partagent les contrôles stricts de l'état du
+  modèle et de l'optimiseur, y compris les strides, stockages et alias AdamW ;
+  la reprise d'un ancien checkpoint réel n'a pas encore été prouvée, car la
+  tentative distante a été interrompue par l'instabilité SSH ;
 - BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
 - un premier échange français a été généré localement, sans écoute réseau ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
   synthétiques ;
 - une recherche `stockage hybride` retourne des résumés avec `provenance_id` ;
 - aucun serveur Web de chat n'est démarré par défaut sur le nœud de calcul ;
-- le relais HTTPS du Collector répond en mode `write-only` ;
+- le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
+  refuse les redirections, valide chaque payload en file et ne le supprime
+  qu'après écriture atomique et vérification locale d'un reçu concordant ;
 - le coffre Synology chiffré est monté.
+
+Le relais HTTPS et le coffre restent des preuves opérationnelles réversibles de
+phase 0. Ils ne valident ni l'orientation P-002, ni la topologie cible, ni un
+gate de mise en production.
 
 Ces contrôles ne prouvent pas encore l'isolation réseau complète de la future
 zone IA-CORE, la qualité d'un modèle linguistique ou la disponibilité d'un
@@ -103,6 +130,11 @@ python -B -m tools.train_core_mini \
 ```
 
 Cette commande produit une preuve technique, pas un modèle auquel parler.
+
+Le mode `authorized-text` est volontairement inutilisable sans les trois
+artefacts approuvés et concordants. Sa forme de commande est documentée dans
+[le gate corpus et tokenizer](../model/corpus-and-tokenizer-gate.md) ; elle ne
+doit pas être exécutée avec un contenu réel avant l'approbation du gate.
 
 Le MCP Knowledge peut être interrogé par un client MCP compatible `stdio` avec
 les outils suivants :

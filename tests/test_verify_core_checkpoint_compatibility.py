@@ -1,11 +1,12 @@
+from contextlib import redirect_stdout
 from io import StringIO
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
-import tempfile
 import unittest
 from unittest.mock import patch
 
+from tests._temp_support import sovereign_temporary_directory
 from tools.verify_core_checkpoint_compatibility import (
     CHECKPOINT_KEYS,
     CompatibilityError,
@@ -62,6 +63,10 @@ class FakeTensor:
         dtype="float32",
         device="cpu",
         item_value=1.0,
+        stride=None,
+        storage_offset=0,
+        storage_token=None,
+        storage_bytes=None,
     ) -> None:
         self.shape = shape
         self.device = SimpleNamespace(type=device)
@@ -69,12 +74,50 @@ class FakeTensor:
         self.layout = "strided"
         self._scalar = scalar
         self._item_value = item_value
+        self._stride = (
+            tuple(stride)
+            if stride is not None
+            else self._contiguous_stride(shape)
+        )
+        self._storage_offset = storage_offset
+        self._storage_token = storage_token if storage_token is not None else object()
+        self._storage_bytes = (
+            storage_bytes
+            if storage_bytes is not None
+            else self.numel() * self.element_size()
+        )
+
+    @staticmethod
+    def _contiguous_stride(shape):
+        if shape == ():
+            return ()
+        result = []
+        running = 1
+        for dimension in reversed(shape):
+            result.append(running)
+            running *= dimension
+        return tuple(reversed(result))
 
     def numel(self) -> int:
         return 1 if self._scalar else 4
 
     def item(self):
         return self._item_value
+
+    def stride(self):
+        return self._stride
+
+    def storage_offset(self):
+        return self._storage_offset
+
+    def element_size(self):
+        return 4
+
+    def untyped_storage(self):
+        return SimpleNamespace(
+            nbytes=lambda: self._storage_bytes,
+            data_ptr=lambda: id(self._storage_token),
+        )
 
 
 class CheckpointCompatibilityTests(unittest.TestCase):
@@ -105,6 +148,15 @@ class CheckpointCompatibilityTests(unittest.TestCase):
         with self.assertRaisesRegex(CompatibilityError, "execution mode"):
             validate_training_contract(modified, config_sha256=CONFIG_HASH, torch=torch)
 
+        integer_rate = valid_contract()
+        integer_rate["learning_rate"] = 1
+        with self.assertRaisesRegex(CompatibilityError, "learning_rate"):
+            validate_training_contract(
+                integer_rate,
+                config_sha256=CONFIG_HASH,
+                torch=torch,
+            )
+
     def test_checkpoint_schema_model_config_and_contract_are_strict(self) -> None:
         checkpoint = {key: {} for key in CHECKPOINT_KEYS}
         checkpoint.update(
@@ -133,6 +185,41 @@ class CheckpointCompatibilityTests(unittest.TestCase):
                 torch=SimpleNamespace(__version__="2.13.0+cpu"),
             )
 
+    def test_historical_checkpoint_step_must_leave_room_for_one_resume_step(self) -> None:
+        checkpoint = {key: {} for key in CHECKPOINT_KEYS}
+        checkpoint.update(
+            schema_version="0.1.0",
+            model_name="CORE-MINI-1M",
+            step=10_000,
+            config_sha256=CONFIG_HASH,
+            training_contract=valid_contract(),
+            run={},
+        )
+        with self.assertRaisesRegex(CompatibilityError, "step"):
+            validate_checkpoint_document(
+                checkpoint,
+                model_name="CORE-MINI-1M",
+                config_sha256=CONFIG_HASH,
+                torch=SimpleNamespace(__version__="2.13.0+cpu"),
+            )
+        checkpoint["step"] = 9_999
+        step, _ = validate_checkpoint_document(
+            checkpoint,
+            model_name="CORE-MINI-1M",
+            config_sha256=CONFIG_HASH,
+            torch=SimpleNamespace(__version__="2.13.0+cpu"),
+        )
+        self.assertEqual(step, 9_999)
+        checkpoint["step"] = 10_000
+        final_step, _ = validate_checkpoint_document(
+            checkpoint,
+            model_name="CORE-MINI-1M",
+            config_sha256=CONFIG_HASH,
+            torch=SimpleNamespace(__version__="2.13.0+cpu"),
+            require_resume_room=False,
+        )
+        self.assertEqual(final_step, 10_000)
+
     def test_model_state_keys_and_strict_flag_are_verified(self) -> None:
         class Model:
             strict = None
@@ -150,6 +237,9 @@ class CheckpointCompatibilityTests(unittest.TestCase):
         model = Model()
         torch = SimpleNamespace(
             is_tensor=lambda value: isinstance(value, FakeTensor),
+            isfinite=lambda value: SimpleNamespace(
+                all=lambda: SimpleNamespace(item=lambda: True)
+            ),
             float32="float32",
         )
         count = load_model_state_strict(
@@ -179,12 +269,8 @@ class CheckpointCompatibilityTests(unittest.TestCase):
             )
 
     def test_optimizer_groups_order_and_tensor_shapes_are_verified(self) -> None:
-        class Parameter:
-            def __init__(self, shape):
-                self.shape = shape
-                self.device = SimpleNamespace(type="cpu")
-                self.dtype = "float32"
-                self.layout = "strided"
+        class Parameter(FakeTensor):
+            pass
 
         parameters = [Parameter((2, 2)), Parameter((2,))]
 
@@ -225,6 +311,9 @@ class CheckpointCompatibilityTests(unittest.TestCase):
         }
         torch = SimpleNamespace(
             is_tensor=lambda value: isinstance(value, FakeTensor),
+            isfinite=lambda value: SimpleNamespace(
+                all=lambda: SimpleNamespace(item=lambda: True)
+            ),
             float32="float32",
         )
         self.assertEqual(
@@ -255,6 +344,23 @@ class CheckpointCompatibilityTests(unittest.TestCase):
             result = main(["--checkpoint", private_path])
         self.assertEqual(result, 1)
         self.assertNotIn(private_path, stderr.getvalue())
+
+    def test_public_parser_is_path_free_and_help_stays_successful(self) -> None:
+        private_path = "C:/private/historical.pt"
+        for arguments in (
+            ["--unknown-option", private_path],
+            ["--checkpoint", private_path, "--config"],
+        ):
+            stderr = StringIO()
+            with patch("sys.stderr", stderr):
+                self.assertEqual(main(arguments), 1)
+            self.assertNotIn(private_path, stderr.getvalue())
+
+        stdout = StringIO()
+        with redirect_stdout(stdout), self.assertRaises(SystemExit) as captured:
+            main(["--help"])
+        self.assertEqual(captured.exception.code, 0)
+        self.assertIn("--checkpoint", stdout.getvalue())
 
 
 HAS_TORCH = importlib.util.find_spec("torch") is not None
@@ -309,7 +415,7 @@ class RealCheckpointCompatibilityTests(unittest.TestCase):
             "optimizer": optimizer.state_dict(),
             "run": {},
         }
-        with tempfile.TemporaryDirectory() as directory:
+        with sovereign_temporary_directory() as directory:
             checkpoint = Path(directory) / "historical.pt"
             save_checkpoint(torch, checkpoint, payload)
             report = verify_checkpoint(checkpoint, torch_module=torch)

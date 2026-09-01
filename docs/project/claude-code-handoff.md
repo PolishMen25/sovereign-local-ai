@@ -12,7 +12,8 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 - dépôt : `PolishMen25/sovereign-local-ai` ;
 - branche d'intégration : `codex/cpu-offline-harness` ;
-- phase : découverte et prototypes bornés, aucun service CORE de production ;
+- phase : découverte et prototypes bornés, aucun service n'est qualifié de
+  production ;
 - le dossier de travail d'un agent ne doit pas être supposé synchronisé : lire
   le HEAD distant et vérifier l'état Git avant toute modification.
 
@@ -33,7 +34,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 - chat BOOTSTRAP Qwen2.5-1.5B-Instruct en CLI locale CPU avec llama.cpp ;
 - instanciation CPU et comptage exact du candidat CORE-80M, sans poids ;
-- entraînement synthétique, checkpoint atomique et reprise de CORE-MINI ;
+- entraînement synthétique et checkpoint atomique de CORE-MINI ; nouveau
+  chargement strict couvert par les tests locaux, avec compatibilité du
+  checkpoint historique encore à confirmer sur Linux ;
 - prototype MCP Knowledge `stdio` sur trois notices synthétiques ;
 - Collector de conversations write-only vers RAW ;
 - stockage chiffré validé avec des données synthétiques ;
@@ -51,16 +54,37 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - chargeur `authorized_text_bundle.py` limité au split `train`, avec lignée
   contenu-free du corpus et du tokenizer ;
 - producteur du tokenizer lié à l'empreinte exacte du split `train` ;
-- vérificateur offline d'anciens checkpoints, chargement
-  `weights_only=True`, CPU, modèle/optimiseur stricts et une reprise bornée ;
+- mode `authorized-text` explicite dans `train_core_mini.py`, sans repli vers le
+  générateur synthétique : il exige le manifeste autorisé, le JSONL `train` et
+  le tokenizer correspondant, puis refuse un vocabulaire différent de celui du
+  modèle ;
+- contrat d'entraînement `0.2.0` sans contenu brut dans le checkpoint et journal
+  de métriques strict lié à son SHA-256, avec étapes contiguës ; le checkpoint
+  conserve l'empreinte du préfixe exact du journal exigé à la reprise ;
+- chargement commun de la configuration CORE-MINI depuis une seule copie
+  bornée : JSON strict, architecture et comptage exacts, SHA-256 calculé sur les
+  mêmes octets ; parseurs CLI publics qui n'exposent pas les chemins reçus ;
+- primitives partagées de checkpoint dans `services/inference/checkpoint.py` :
+  chargement CPU `weights_only=True`, clés, formes, types et état AdamW
+  stricts avant reprise, avec refus des strides, stockages et alias anormaux ;
+- vérificateur offline des checkpoints historiques construit sur ces mêmes
+  primitives ;
+- suite locale actuelle : 150 tests réussissent et un test d'intégration
+  PyTorch est ignoré lorsque le bundle CPU vérifié est absent ;
 - Collector forcé sur loopback et relais Codex sans URL d'installation codée
   en dur ;
+- relais Codex refusant toute redirection HTTP et validant le payload en file,
+  l'état, l'identifiant et le SHA-256 du reçu avant d'enregistrer ce reçu puis
+  de supprimer la file ;
 - configuration Windows personnelle exclue, exemple générique versionné.
 
 ## Ce qui ne fonctionne pas encore
 
 - aucun poids linguistique CORE utile ;
 - aucun tokenizer ou corpus final approuvé ;
+- aucun entraînement `authorized-text` n'a été exécuté de bout en bout avec
+  PyTorch et un bundle réel approuvé : le chemin est implémenté et couvert par
+  des tests unitaires et structurels, pas autorisé à produire des poids ;
 - aucun runtime de génération CORE actif ;
 - `/v1/chat` reste volontairement en HTTP 503 ;
 - aucun RAG vectoriel, agent actif, RBAC de production ou interface finale ;
@@ -76,9 +100,10 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
    corpus ;
 4. produire un tokenizer expérimental depuis le seul split `train`, évaluer sa
    qualité, puis faire approuver séparément son SHA-256 exact ;
-5. ajouter un mode d'entraînement `authorized-text` explicite, sans modifier le
-   mode synthétique et avec lignée stricte dans le checkpoint ;
-6. exporter un bundle d'inférence borné et vérifié ;
+5. exécuter le premier mini-entraînement `authorized-text` avec le bundle exact
+   approuvé et conserver checkpoint, journal de métriques et lignée ;
+6. évaluer ce run, vérifier sa reprise hors ligne, puis exporter un bundle
+   d'inférence borné et vérifié ;
 7. seulement après les gates, raccorder génération CORE, RAG, authentification,
    interface et profils d'agents.
 

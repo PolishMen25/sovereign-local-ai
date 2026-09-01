@@ -3,9 +3,13 @@
 **Statut : préparation de J3, aucune approbation de corpus.**
 
 Ce projet ne lance pas d'entraînement linguistique tant qu'un corpus, son
-tokenizer et son autorisation ne sont pas explicitement approuvés. Le modèle
-CORE-MINI déjà présent utilise uniquement des identifiants synthétiques : il
-ne constitue pas une exception à cette règle.
+tokenizer et son autorisation ne sont pas explicitement approuvés. Le
+checkpoint CORE-MINI existant utilise uniquement des identifiants synthétiques :
+il ne constitue pas une exception à cette règle. Le chemin technique
+`authorized-text` est implémenté et couvert par des tests unitaires et
+structurels, mais aucun entraînement PyTorch de bout en bout n'a encore été
+exécuté avec ce chemin. Il reste bloqué en pratique tant que les trois artefacts
+exacts et leur approbation ne sont pas réunis.
 
 ## Contrat versionné
 
@@ -66,6 +70,51 @@ une autorisation absente et un tokenizer non approuvé.
 python3 -B tools/validate_training_corpus_manifest.py \
   --require-training-authorization manifest.json
 ```
+
+## Chemin d'entraînement autorisé
+
+[`tools/train_core_mini.py`](../../tools/train_core_mini.py) conserve le mode
+synthétique historique par défaut et n'accède au texte que si
+`--data-mode authorized-text` est fourni. Dans ce mode, les trois arguments
+suivants sont indissociables :
+
+- `--authorized-manifest` : manifeste `0.2.0` autorisé ;
+- `--authorized-train-jsonl` : octets exacts du seul split `train` ;
+- `--authorized-tokenizer` : tokenizer expérimental construit depuis ce même
+  split et portant le même contrat de normalisation.
+
+Le chargeur vérifie notamment les autorisations distinctes, les tailles,
+comptes et SHA-256, les identifiants de corpus, la provenance, la normalisation
+et la taille exacte du vocabulaire attendue par CORE-MINI. Une erreur provoque
+un refus ; il n'existe aucun repli implicite vers les données synthétiques.
+
+Pour CORE-MINI, le manifeste et le tokenizer doivent déclarer exactement
+**4 096 unités**, conformément à
+[`core-mini.candidate.json`](../../configs/models/core-mini.candidate.json). Le
+candidat de **32 000 unités** destiné à la cible CORE-80M est incompatible avec
+CORE-MINI et le harness le refusera.
+
+```bash
+python -B -m tools.train_core_mini \
+  --config configs/models/core-mini.candidate.json \
+  --output-dir runs/core-mini-authorized \
+  --data-mode authorized-text \
+  --authorized-manifest manifest.json \
+  --authorized-train-jsonl train.jsonl \
+  --authorized-tokenizer tokenizer.json
+```
+
+Cette commande est une forme de référence, pas une autorisation de l'exécuter
+avec des données réelles. Lorsqu'un bundle sera approuvé, le harness produira
+des séquences déterministes et bornées, un contrat d'entraînement `0.2.0` à
+lignée sans contenu brut, ainsi qu'un journal strict dont chaque mesure est
+liée au SHA-256 de ce contrat. Le checkpoint enregistre également le SHA-256 du
+préfixe exact du journal correspondant à son étape ; la reprise refuse un
+journal absent, modifié ou rattaché à une autre étape. Elle exige enfin le même
+contrat et un état de checkpoint modèle/optimiseur strictement compatible.
+
+À ce jour, aucun bundle réel n'a franchi ce gate, aucun mini-entraînement
+linguistique autorisé n'a été exécuté et aucun poids CORE utile n'a été produit.
 
 ## Ce qui reste à décider
 

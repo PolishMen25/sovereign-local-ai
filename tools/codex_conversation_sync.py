@@ -14,8 +14,10 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
+import tempfile
 from typing import Any, Iterable
 from urllib import error, request
 from urllib.parse import urlsplit
@@ -24,12 +26,17 @@ from uuid import UUID, uuid5
 
 COLLECTOR_URL_ENV = "SOVEREIGN_COLLECTOR_URL"
 COLLECTOR_ALLOWED_HOST_ENV = "SOVEREIGN_COLLECTOR_ALLOWED_HOST"
+LOCAL_COLLECTOR_CONFIG_NAME = "collector-endpoint.json"
 SYNC_NAMESPACE = UUID("c8e104f4-41c4-4cdb-bb39-da7624d928cf")
 SCHEMA_VERSION = "0.1.0"
 MAX_MESSAGE_CHARS = 45_000
+MAX_CONVERSATION_MESSAGES = 10_000
 MAX_QUEUED_BODY_BYTES = 850_000
+MAX_COLLECTOR_BODY_BYTES = 1_048_576
 MAX_HOOK_INPUT_BYTES = 65_536
 MAX_HTTP_RESPONSE_BYTES = 8_192
+MAX_LOCAL_COLLECTOR_CONFIG_BYTES = 4_096
+RECEIPT_STATES = {"raw_imported", "already_imported"}
 
 SENSITIVE_LINE = re.compile(
     r"(?im)^.*(?:password|passwd|mdp|mot\s+de\s+passe|api[_ -]?key|access[_ -]?token|private[_ -]?key)\s*[:=].*$"
@@ -41,8 +48,36 @@ SENSITIVE_INLINE = re.compile(
 )
 BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}")
 KNOWN_SECRET_PREFIX = re.compile(r"(?i)\b(?:sk|ghp|github_pat|glpat|xox[baprs]|cfpat)[-_][A-Za-z0-9._-]{12,}")
-URL_WITH_QUERY = re.compile(r"https://[^\s<>\]\)]+[?#][^\s<>\]\)]*")
+URL_WITH_QUERY = re.compile(
+    r"https?://[^\s<>\]\)]+[?#][^\s<>\]\)]*",
+    re.IGNORECASE,
+)
 TOKEN_CANDIDATE = re.compile(r"(?<![\w])([A-Za-z0-9@#$%^&*!=+_-]{12,})(?![\w])")
+LOWERCASE_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+class _RejectRedirectHandler(request.HTTPRedirectHandler):
+    """Turn every HTTP redirect into a terminal, locally handled failure."""
+
+    def _reject_redirect(
+        self,
+        req: request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+    ) -> None:
+        try:
+            fp.close()
+        except OSError:
+            pass
+        raise RuntimeError("collector redirect refused")
+
+    http_error_301 = _reject_redirect
+    http_error_302 = _reject_redirect
+    http_error_303 = _reject_redirect
+    http_error_307 = _reject_redirect
+    http_error_308 = _reject_redirect
 
 
 def sync_home() -> Path:
@@ -50,11 +85,11 @@ def sync_home() -> Path:
     return Path(configured).expanduser() if configured else Path.home() / ".codex" / "sovereign-sync"
 
 
-def configured_collector_url() -> str:
-    """Return a strictly validated owner-supplied Collector endpoint."""
+def _validate_collector_endpoint(raw_url: str, allowed_host: str) -> str:
+    """Validate one endpoint pair, regardless of its local configuration source."""
 
-    raw_url = os.environ.get(COLLECTOR_URL_ENV, "").strip()
-    allowed_host = os.environ.get(COLLECTOR_ALLOWED_HOST_ENV, "").strip().lower()
+    raw_url = raw_url.strip()
+    allowed_host = allowed_host.strip().lower()
     if not raw_url or not allowed_host:
         raise ValueError("collector endpoint configuration is missing")
     parsed = urlsplit(raw_url)
@@ -71,6 +106,112 @@ def configured_collector_url() -> str:
     if parsed.path != "/v1/conversations":
         raise ValueError("collector endpoint path is invalid")
     return raw_url
+
+
+def _strict_json_object(
+    raw: bytes,
+    *,
+    context: str = "local collector configuration",
+) -> dict[str, Any]:
+    """Decode a small UTF-8 JSON object while rejecting duplicate keys."""
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        decoded: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in decoded:
+                raise ValueError(f"{context} contains duplicate fields")
+            decoded[key] = value
+        return decoded
+
+    def reject_non_finite(value: str) -> Any:
+        raise ValueError(f"{context} contains a non-finite JSON value")
+
+    try:
+        decoded = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=unique_object,
+            parse_constant=reject_non_finite,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as failure:
+        raise ValueError(f"{context} is not strict UTF-8 JSON") from failure
+    if not isinstance(decoded, dict):
+        raise ValueError(f"{context} must be a JSON object")
+    return decoded
+
+
+def _read_bounded_regular_file(path: Path, maximum: int, *, context: str) -> bytes:
+    """Read at most maximum + 1 bytes from one stable, non-symlink file."""
+
+    try:
+        initial = path.lstat()
+        if not stat.S_ISREG(initial.st_mode):
+            raise ValueError(f"{context} must be a regular file")
+        with path.open("rb") as opened_file:
+            opened = os.fstat(opened_file.fileno())
+            if not stat.S_ISREG(opened.st_mode):
+                raise ValueError(f"{context} must be a regular file")
+            if (initial.st_dev, initial.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ValueError(f"{context} changed while opening")
+            raw = opened_file.read(maximum + 1)
+    except FileNotFoundError as failure:
+        raise ValueError(f"{context} is missing") from failure
+    except OSError as failure:
+        raise ValueError(f"{context} cannot be read safely") from failure
+    if not 1 <= len(raw) <= maximum:
+        raise ValueError(f"{context} size is invalid")
+    return raw
+
+
+def _local_collector_config() -> tuple[str, str]:
+    """Load the endpoint pair from the bounded, non-symlink local file."""
+
+    config_path = sync_home() / LOCAL_COLLECTOR_CONFIG_NAME
+    try:
+        initial = config_path.lstat()
+        if not stat.S_ISREG(initial.st_mode):
+            raise ValueError("local collector configuration must be a regular file")
+        if initial.st_size > MAX_LOCAL_COLLECTOR_CONFIG_BYTES:
+            raise ValueError("local collector configuration exceeds its size limit")
+        with config_path.open("rb") as config_file:
+            opened = os.fstat(config_file.fileno())
+            if not stat.S_ISREG(opened.st_mode):
+                raise ValueError("local collector configuration must be a regular file")
+            if (initial.st_dev, initial.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ValueError("local collector configuration changed while opening")
+            raw = config_file.read(MAX_LOCAL_COLLECTOR_CONFIG_BYTES + 1)
+    except FileNotFoundError as failure:
+        raise ValueError("collector endpoint configuration is missing") from failure
+    except OSError as failure:
+        raise ValueError("local collector configuration cannot be read safely") from failure
+    if len(raw) > MAX_LOCAL_COLLECTOR_CONFIG_BYTES:
+        raise ValueError("local collector configuration exceeds its size limit")
+
+    decoded = _strict_json_object(raw)
+    expected_fields = {"collector_url", "allowed_host"}
+    if set(decoded) != expected_fields:
+        raise ValueError("local collector configuration fields are invalid")
+    raw_url = decoded["collector_url"]
+    allowed_host = decoded["allowed_host"]
+    if not isinstance(raw_url, str) or not isinstance(allowed_host, str):
+        raise ValueError("local collector configuration values must be strings")
+    return raw_url, allowed_host
+
+
+def configured_collector_url() -> str:
+    """Return a strictly validated owner-supplied Collector endpoint.
+
+    An explicitly present environment variable pair always wins.  A partial or
+    empty pair fails closed instead of silently falling back to the local file.
+    """
+
+    environment_url = os.environ.get(COLLECTOR_URL_ENV)
+    environment_host = os.environ.get(COLLECTOR_ALLOWED_HOST_ENV)
+    if environment_url is not None or environment_host is not None:
+        if environment_url is None or environment_host is None:
+            raise ValueError("collector endpoint environment configuration is incomplete")
+        return _validate_collector_endpoint(environment_url, environment_host)
+    local_url, local_host = _local_collector_config()
+    return _validate_collector_endpoint(local_url, local_host)
 
 
 def sanitize_text(text: str) -> str:
@@ -186,11 +327,158 @@ def build_documents(session_id: str, captured_at: str, messages: list[dict[str, 
     return documents
 
 
+def _validate_conversation_document(
+    document: dict[str, Any],
+    *,
+    expected_conversation_id: str,
+) -> None:
+    expected_fields = {"schema_version", "conversation_id", "captured_at", "messages"}
+    if set(document) != expected_fields or document.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("queued conversation schema is invalid")
+    conversation_id = document.get("conversation_id")
+    if type(conversation_id) is not str or conversation_id != expected_conversation_id:
+        raise ValueError("queued conversation id does not match its file")
+    try:
+        normalized_id = str(UUID(conversation_id))
+    except (ValueError, TypeError, AttributeError) as failure:
+        raise ValueError("queued conversation id is invalid") from failure
+    if normalized_id != conversation_id:
+        raise ValueError("queued conversation id is not canonical")
+    captured_at = document.get("captured_at")
+    if type(captured_at) is not str or "T" not in captured_at:
+        raise ValueError("queued conversation capture time is invalid")
+    messages = document.get("messages")
+    if type(messages) is not list or not 1 <= len(messages) <= MAX_CONVERSATION_MESSAGES:
+        raise ValueError("queued conversation message count is invalid")
+    for message in messages:
+        if type(message) is not dict or set(message) != {"role", "content"}:
+            raise ValueError("queued conversation message schema is invalid")
+        if message.get("role") not in {"user", "assistant", "system", "tool"}:
+            raise ValueError("queued conversation role is invalid")
+        content = message.get("content")
+        if type(content) is not str or not 1 <= len(content) <= MAX_MESSAGE_CHARS:
+            raise ValueError("queued conversation content size is invalid")
+
+
+def _load_queued_conversation(path: Path) -> tuple[bytes, dict[str, Any]]:
+    payload = _read_bounded_regular_file(
+        path,
+        MAX_COLLECTOR_BODY_BYTES,
+        context="queued conversation",
+    )
+    document = _strict_json_object(payload, context="queued conversation")
+    _validate_conversation_document(document, expected_conversation_id=path.stem)
+    canonical_payload = json.dumps(
+        document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    if payload != canonical_payload:
+        raise ValueError("queued conversation is not canonically encoded")
+    return payload, document
+
+
+def _validate_receipt(
+    receipt: dict[str, Any],
+    *,
+    payload: bytes,
+    conversation_id: str,
+    local: bool,
+) -> None:
+    expected_fields = {"state", "conversation_id", "sha256"}
+    if local:
+        expected_fields.add("received_at")
+    if set(receipt) != expected_fields:
+        raise ValueError("collector receipt fields are invalid")
+    state = receipt.get("state")
+    received_id = receipt.get("conversation_id")
+    digest = receipt.get("sha256")
+    if type(state) is not str or state not in RECEIPT_STATES:
+        raise ValueError("collector receipt state is invalid")
+    if type(received_id) is not str or received_id != conversation_id:
+        raise ValueError("collector receipt id is invalid")
+    if type(digest) is not str or LOWERCASE_SHA256.fullmatch(digest) is None:
+        raise ValueError("collector receipt digest format is invalid")
+    if digest != hashlib.sha256(payload).hexdigest():
+        raise ValueError("collector receipt digest does not match payload")
+    if local:
+        received_at = receipt.get("received_at")
+        if type(received_at) is not str:
+            raise ValueError("local receipt time is invalid")
+        normalized_time = received_at[:-1] + "+00:00" if received_at.endswith("Z") else received_at
+        try:
+            parsed_time = datetime.fromisoformat(normalized_time)
+        except ValueError as failure:
+            raise ValueError("local receipt time is invalid") from failure
+        if parsed_time.tzinfo is None:
+            raise ValueError("local receipt time must include a timezone")
+
+
+def _local_receipt_matches(path: Path, *, payload: bytes, conversation_id: str) -> bool:
+    try:
+        raw = _read_bounded_regular_file(
+            path,
+            MAX_HTTP_RESPONSE_BYTES,
+            context="local collector receipt",
+        )
+        receipt = _strict_json_object(raw, context="local collector receipt")
+        _validate_receipt(
+            receipt,
+            payload=payload,
+            conversation_id=conversation_id,
+            local=True,
+        )
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_response_content_type(response: Any) -> None:
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        info = getattr(response, "info", None)
+        headers = info() if callable(info) else None
+    if headers is None:
+        return
+    get_content_type = getattr(headers, "get_content_type", None)
+    if callable(get_content_type):
+        content_type = get_content_type()
+    else:
+        get_header = getattr(headers, "get", None)
+        if not callable(get_header):
+            return
+        raw_content_type = get_header("Content-Type")
+        if type(raw_content_type) is not str:
+            raise ValueError("collector receipt content type is missing")
+        content_type = raw_content_type.split(";", 1)[0].strip().lower()
+    if content_type != "application/json":
+        raise ValueError("collector receipt content type is invalid")
+
+
 def _atomic_write(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_bytes(data)
-    os.replace(temporary, path)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    temporary = Path(temporary_name)
+    try:
+        binary_file = os.fdopen(descriptor, "wb")
+        descriptor = -1
+        with binary_file:
+            binary_file.write(data)
+            binary_file.flush()
+            os.fsync(binary_file.fileno())
+        os.replace(temporary, path)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def queue_transcript(path: Path, supplied_session_id: str | None = None) -> int:
@@ -202,11 +490,17 @@ def queue_transcript(path: Path, supplied_session_id: str | None = None) -> int:
     queued = 0
     for document in build_documents(session_id, captured_at, messages):
         conversation_id = document["conversation_id"]
-        if (home / "receipts" / f"{conversation_id}.json").exists():
-            continue
         payload = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        if len(payload) >= 1_048_576:
+        if not 1 <= len(payload) <= MAX_COLLECTOR_BODY_BYTES:
             raise ValueError("sanitized conversation chunk exceeds collector limit")
+        _validate_conversation_document(document, expected_conversation_id=conversation_id)
+        receipt_path = home / "receipts" / f"{conversation_id}.json"
+        if _local_receipt_matches(
+            receipt_path,
+            payload=payload,
+            conversation_id=conversation_id,
+        ):
+            continue
         _atomic_write(home / "queue" / f"{conversation_id}.json", payload)
         queued += 1
     return queued
@@ -238,44 +532,72 @@ def flush_queue() -> int:
     # This dedicated endpoint must not inherit developer-tool proxy variables.
     # The hostname and HTTPS scheme are fixed above, so disabling ambient
     # proxies narrows the network path instead of making it configurable.
-    opener = request.build_opener(request.ProxyHandler({}))
+    opener = request.build_opener(
+        request.ProxyHandler({}),
+        _RejectRedirectHandler(),
+    )
     failures = 0
     for queued_path in sorted((home / "queue").glob("*.json")) if (home / "queue").exists() else []:
-        payload = queued_path.read_bytes()
-        upload = request.Request(
-            collector_url,
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                # Cloudflare's Browser Integrity Check rejects urllib's default
-                # Python user-agent before the request reaches the collector.
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/128.0.0.0 Safari/537.36"
-                ),
-            },
-            method="POST",
-        )
         try:
+            payload, document = _load_queued_conversation(queued_path)
+            conversation_id = document["conversation_id"]
+            receipt_path = home / "receipts" / f"{conversation_id}.json"
+            if _local_receipt_matches(
+                receipt_path,
+                payload=payload,
+                conversation_id=conversation_id,
+            ):
+                queued_path.unlink()
+                _log(f"queue_reconciled conversation={conversation_id}")
+                continue
+            upload = request.Request(
+                collector_url,
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    # Cloudflare's Browser Integrity Check rejects urllib's default
+                    # Python user-agent before the request reaches the collector.
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/128.0.0.0 Safari/537.36"
+                    ),
+                },
+                method="POST",
+            )
             with opener.open(upload, timeout=20) as response:
-                body = response.read(MAX_HTTP_RESPONSE_BYTES)
                 if response.status != 202:
                     raise RuntimeError(f"unexpected HTTP status {response.status}")
-            receipt = json.loads(body)
-            safe_receipt = {
+                _validate_response_content_type(response)
+                body = response.read(MAX_HTTP_RESPONSE_BYTES + 1)
+                if not 1 <= len(body) <= MAX_HTTP_RESPONSE_BYTES:
+                    raise ValueError("collector receipt size is invalid")
+            remote_receipt = _strict_json_object(body, context="remote collector receipt")
+            _validate_receipt(
+                remote_receipt,
+                payload=payload,
+                conversation_id=conversation_id,
+                local=False,
+            )
+            local_receipt = {
                 "received_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                "state": receipt.get("state", "accepted"),
-                "conversation_id": receipt.get("conversation_id", queued_path.stem),
-                "sha256": receipt.get("sha256", ""),
+                "state": remote_receipt["state"],
+                "conversation_id": remote_receipt["conversation_id"],
+                "sha256": remote_receipt["sha256"],
             }
             _atomic_write(
-                home / "receipts" / f"{queued_path.stem}.json",
-                json.dumps(safe_receipt, separators=(",", ":"), sort_keys=True).encode("utf-8"),
+                receipt_path,
+                json.dumps(local_receipt, separators=(",", ":"), sort_keys=True).encode("utf-8"),
             )
+            if not _local_receipt_matches(
+                receipt_path,
+                payload=payload,
+                conversation_id=conversation_id,
+            ):
+                raise ValueError("local collector receipt verification failed")
             queued_path.unlink()
-            _log(f"upload_accepted conversation={queued_path.stem}")
+            _log(f"upload_accepted conversation={conversation_id}")
         except (OSError, ValueError, RuntimeError, error.URLError, error.HTTPError) as upload_error:
             status = getattr(upload_error, "code", "network_error")
             _log(f"upload_deferred conversation={queued_path.stem} status={status}")
