@@ -35,6 +35,27 @@ class ParameterCountTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.count_parameters(invalid)
 
+    def test_untied_embeddings_add_a_separate_output_head(self) -> None:
+        document = MODULE.load_candidate_document()
+        config = MODULE.CoreConfig.from_document(document)
+        untied = MODULE.CoreConfig(
+            vocabulary_size=config.vocabulary_size,
+            hidden_size=config.hidden_size,
+            num_hidden_layers=config.num_hidden_layers,
+            num_attention_heads=config.num_attention_heads,
+            head_dimension=config.head_dimension,
+            intermediate_size=config.intermediate_size,
+            tie_word_embeddings=False,
+        )
+        tied_result = MODULE.count_parameters(config)
+        untied_result = MODULE.count_parameters(untied)
+        expected_output_head = config.vocabulary_size * config.hidden_size
+        self.assertEqual(untied_result["output_head"], expected_output_head)
+        self.assertEqual(
+            untied_result["total_trainable"],
+            tied_result["total_trainable"] + expected_output_head,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
