@@ -1,0 +1,14 @@
+[Unit]
+Description=Sovereign AI restricted Synology storage
+Wants=network-online.target
+After=network-online.target
+
+[Mount]
+What=//SYNOLOGY_HOST/sovereign-ai
+Where=/mnt/sovereign-ai
+Type=cifs
+Options=_netdev,credentials=/opt/sovereign/credentials/synology-smb,vers=3.1.1,seal,nosuid,nodev,noexec,file_mode=0640,dir_mode=0750,uid=sovereign,gid=sovereign
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target
