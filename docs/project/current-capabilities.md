@@ -7,9 +7,10 @@ Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
 
 ## Réponse courte
 
-Il est maintenant possible de poser une question à un modèle local depuis la
-CLI SSH et d'obtenir une réponse réellement générée. Ce chat utilise le modèle
-tiers temporaire **BOOTSTRAP**, pas CORE-80M.
+Il est maintenant possible de poser une question à un modèle local depuis une
+CLI SSH ou une interface HTTPS privée de tailnet et d'obtenir une réponse
+réellement générée. Ce chat utilise le modèle tiers temporaire **BOOTSTRAP**,
+pas CORE-80M.
 
 Le checkpoint CORE-MINI actuel prouve que l'entraînement CPU, la sauvegarde et
 la reprise fonctionnent. Il a appris sur des identifiants de tokens synthétiques
@@ -38,7 +39,7 @@ génère pas une réponse d'IA.
 | Composant | État exact | Ce qui fonctionne | Limite actuelle |
 | --- | --- | --- | --- |
 | PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
-| Chat BOOTSTRAP | CLI locale fonctionnelle | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement en français sur CPU avec llama.cpp | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE |
+| Chat BOOTSTRAP | CLI et service HTTPS privé fonctionnels | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp ; le serveur reste en boucle locale et est relayé uniquement dans le tailnet | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE ; aucune politique de conservation de conversations n'est approuvée |
 | CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; entraînement synthétique et checkpoint atomique ; modes explicitement séparés et contrôles stricts locaux | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité du checkpoint historique avec le nouveau chargeur à confirmer sur Linux |
 | Runner CORE-MINI NUMA | Implémenté, sans preuve matérielle conforme publiée | Contrat privé strict hors Git, archive source et runtime offline vérifiés, contrôle du placement externe et des sockets flux/datagrammes INET, attestations par phase, 3 à 10 répétitions fraîches et preuve publique minimisée | Linux et isolation externe requis ; un placement par preuve, aucun comparateur multi-placement, aucune mesure complète pour G4 |
 | CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
@@ -49,7 +50,7 @@ génère pas une réponse d'IA.
 | Synology | Stockage préparé | Coffre chiffré monté et essais synthétiques de copie/restauration | Pas encore le corpus réel ni la mémoire conversationnelle validée du modèle |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
-| Interface Web | Coquille locale testable | Page statique, santé, Bearer prototype et validation partielle des requêtes | Non démarrée par défaut; `/v1/chat` renvoie toujours HTTP 503 |
+| Interface Web du projet | Coquille locale testable | Page statique, santé, Bearer prototype et validation partielle des requêtes | Non démarrée par défaut; `/v1/chat` renvoie toujours HTTP 503. L'interface native BOOTSTRAP HTTPS est un service séparé |
 | Authentification/RBAC | Prototype non intégré | Politique de rôles testable séparément | Aucun compte, session, annuaire ou contrôle RBAC branché à l'interface |
 
 ## Vérifications confirmées
@@ -98,11 +99,15 @@ génère pas une réponse d'IA.
   toute dérive d'empreinte, de placement ou de source ; la sortie publique ne
   contient aucun hostname, détail CPU exact, commande ou chemin ;
 - BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
-- un premier échange français a été généré localement, sans écoute réseau ;
+- un premier échange français a été généré localement ;
+- le service BOOTSTRAP persistant est lié à la boucle locale, fonctionne sans
+  outils, agent, proxy MCP ou téléchargement à l'exécution, puis est relayé en
+  HTTPS privé au seul tailnet ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
   synthétiques ;
 - une recherche `stockage hybride` retourne des résumés avec `provenance_id` ;
-- aucun serveur Web de chat n'est démarré par défaut sur le nœud de calcul ;
+- l'interface Web propre au projet n'est pas démarrée ; elle reste distincte du
+  service BOOTSTRAP HTTPS privé ;
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
   refuse les redirections, valide chaque payload en file et ne le supprime
   qu'après écriture atomique et vérification locale d'un reçu concordant ;
@@ -118,9 +123,10 @@ service de production.
 
 ## Utilisable aujourd'hui
 
-Le chat BOOTSTRAP se lance dans une session SSH avec le lanceur décrit dans
-[le runbook CLI](../operations/bootstrap-chat-cli.md). La commande ouvre une
-conversation interactive réelle ; `/exit` ou `Ctrl+C` la termine.
+Le chat BOOTSTRAP est disponible en CLI SSH et, sur une machine autorisée du
+tailnet, via l'interface HTTPS privée décrite dans [le runbook
+BOOTSTRAP](../operations/bootstrap-chat-cli.md). La CLI ouvre une conversation
+interactive réelle ; `/exit` ou `Ctrl+C` la termine.
 
 Depuis la racine du dépôt :
 

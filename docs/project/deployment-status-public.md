@@ -9,9 +9,11 @@ compte, ni secret, ni chemin d'administration.
 
 ## État essentiel
 
-- **Chat BOOTSTRAP : disponible en CLI locale.** Des poids GGUF vérifiés sont
-  chargés par llama.cpp sur CPU et produisent une vraie réponse en français.
-  Ce modèle tiers temporaire est explicitement distinct de CORE.
+- **Chat BOOTSTRAP : disponible en CLI et HTTPS privé.** Des poids GGUF
+  vérifiés sont chargés par llama.cpp sur CPU et produisent une vraie réponse.
+  Le serveur reste lié à sa boucle locale et le relais HTTPS est restreint au
+  tailnet ; aucune exposition Internet n'est activée. Ce modèle tiers
+  temporaire est explicitement distinct de CORE.
 - **CORE-MINI : harness synthétique fonctionnel.** Entraînement synthétique et
   checkpoint atomique sont validés. Le nouveau chargement strict et le mode
   explicite `authorized-text` sont implémentés et couverts par les tests locaux,
@@ -25,8 +27,10 @@ compte, ni secret, ni chemin d'administration.
 - **MCP Knowledge : prototype local fonctionnel.** Il expose en `stdio` un état
   et une recherche lexicale bornée dans trois notices synthétiques avec
   provenance. Ce n'est pas un RAG vectoriel ni une IA générative.
-- **Interface Web : coquille de sécurité.** Elle est testable en boucle locale,
-  mais n'est pas démarrée par défaut et `/v1/chat` renvoie toujours HTTP `503`.
+- **Interface Web du projet : coquille de sécurité.** Elle est testable en
+  boucle locale, mais n'est pas démarrée par défaut et `/v1/chat` renvoie
+  toujours HTTP `503`. L'interface native du chat BOOTSTRAP est un service
+  séparé, privé au tailnet.
 - **Agents : configuration seulement.** Les 60 profils sont tous `draft` et
   aucun agent n'est actif.
 - **Orchestrateur et autorisations : préparation seulement.** Les validateurs
@@ -89,9 +93,10 @@ production.
 
 Le projet ne revendique pas encore : entraînement sur un corpus réel approuvé,
 poids linguistiques CORE, modèle conversationnel CORE, RAG sémantique, agents
-autonomes, interface utilisateur finale, authentification de production,
-service IA persistant, gate réseau achevé, preuve NUMA multi-placement acceptée
-ou entraînement CORE-80M.
+autonomes, interface utilisateur finale, authentification de production, gate
+réseau achevé, preuve NUMA multi-placement acceptée ou entraînement CORE-80M.
+Le service BOOTSTRAP privé est une démonstration bornée, pas un service CORE de
+production.
 
 Le contenu de ce jalon ne versionne aucun secret, identifiant privé ni adresse
 d'administration.

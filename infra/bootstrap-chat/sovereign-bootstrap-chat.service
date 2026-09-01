@@ -1,0 +1,20 @@
+[Unit]
+Description=Sovereign Local AI bootstrap chat (CPU only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sovereign
+Group=sovereign
+WorkingDirectory=/opt/sovereign
+ExecStart=/opt/sovereign/runtime/llama-b10537/llama-server --model /opt/sovereign/models/qwen2.5-1.5b-instruct-q4_k_m.gguf --ctx-size 4096 --threads 40 --threads-batch 40 --n-gpu-layers 0 --host 127.0.0.1 --port 8080 --offline --cors-origins localhost --no-cors-credentials --no-webui-mcp-proxy --no-agent
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

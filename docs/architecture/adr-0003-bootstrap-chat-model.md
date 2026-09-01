@@ -1,6 +1,6 @@
 # ADR-0003 — Modèle de chat bootstrap séparé de CORE
 
-- Statut : **ACCEPTÉ pour démonstration CLI locale**
+- Statut : **ACCEPTÉ pour démonstration locale et HTTPS privé de tailnet**
 - Date : 2026-09-01
 - Autorité : propriétaire du projet
 
@@ -20,9 +20,12 @@ verrouillés dans
 `configs/runtime/bootstrap-qwen2.5-1.5b-q4km.lock.json`.
 
 L'acquisition a lieu hors du futur domaine IA-CORE. Les fichiers sont vérifiés
-avant et après transfert. Le runtime ne télécharge rien. La première utilisation
-est une CLI via SSH, sans service persistant, port supplémentaire, outil, agent,
-RAG ou journalisation des prompts.
+avant et après transfert. Le runtime ne télécharge rien. La démonstration peut
+être utilisée en CLI SSH ou par un service persistant lié exclusivement à la
+boucle locale. Un relais HTTPS Tailscale, privé au tailnet et distinct de
+Tailscale Funnel, peut présenter son interface native aux appareils autorisés.
+Le runtime n'expose ni outil, ni agent, ni RAG, ni proxy MCP et aucune
+journalisation applicative des prompts n'est ajoutée.
 
 ## Limites
 
@@ -32,8 +35,10 @@ RAG ou journalisation des prompts.
   fournisseur ;
 - cette démonstration ne valide aucun gate G3 à G7 ;
 - les conversations privées ne deviennent ni corpus ni connaissance validée ;
-- une exposition Web ou LAN exige toujours la décision réseau, l'identité et les
-  tests d'isolation prévus.
+- aucune exposition Internet, Funnel, agent, outil, RAG ou MCP n'est autorisée
+  par cette ADR ;
+- une exposition Web ou LAN hors tailnet exige toujours la décision réseau,
+  l'identité et les tests d'isolation prévus.
 
 ## Retour arrière
 

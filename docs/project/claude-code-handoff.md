@@ -35,7 +35,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 ## Ce qui fonctionne réellement
 
-- chat BOOTSTRAP Qwen2.5-1.5B-Instruct en CLI locale CPU avec llama.cpp ;
+- chat BOOTSTRAP Qwen2.5-1.5B-Instruct en CLI locale CPU et interface HTTPS
+  privée de tailnet avec llama.cpp ; le serveur est lié à la boucle locale et
+  n'expose ni outils, ni agent, ni proxy MCP ;
 - instanciation CPU et comptage exact du candidat CORE-80M, sans poids ;
 - entraînement synthétique et checkpoint atomique de CORE-MINI ; nouveau
   chargement strict couvert par les tests locaux, avec compatibilité du
@@ -109,7 +111,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   PyTorch et un bundle réel approuvé : le chemin est implémenté et couvert par
   des tests unitaires et structurels, pas autorisé à produire des poids ;
 - aucun runtime de génération CORE actif ;
-- `/v1/chat` reste volontairement en HTTP 503 ;
+- `/v1/chat` de l'interface Web du projet reste volontairement en HTTP 503 ;
+  l'interface native HTTPS de BOOTSTRAP est séparée et ne doit pas être
+  confondue avec CORE ;
 - aucun RAG vectoriel, agent actif, RBAC de production ou interface finale ;
 - aucune preuve répétée du runner NUMA n'a encore été acceptée sur le nœud CPU,
   aucun comparateur multi-placement n'est implémenté et G4 reste ouvert ;
