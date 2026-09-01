@@ -7,7 +7,7 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
 ## Invariants déjà décidés
 
 - aucun GPU, CUDA, ROCm ou TPU dans le chemin V1 ;
-- calcul principal sur le **HPE ProLiant ML350 Gen9** : 2 × Xeon E5-2699 v4, 44 cœurs physiques / 88 threads, 88 Go de RAM, environ 12 To, sous Proxmox ;
+- calcul principal sur le **HPE ProLiant ML350 Gen9** : 2 × Xeon E5-2698 v4, 40 cœurs physiques / 80 threads, 88 Go de RAM, environ 12 To, sous Proxmox ;
 - **Synology RS3617xs+** : stockage long terme, archives, datasets, modèles validés, checkpoints importants, connaissances et sauvegardes — pas d'entraînement principal ;
 - **DL380p Gen8 exclu de la V1** ;
 - la zone **IA-CORE n'a aucun accès Internet direct**, blocage imposé au niveau réseau et pas seulement par l'application ;
