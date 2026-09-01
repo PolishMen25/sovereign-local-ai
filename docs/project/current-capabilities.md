@@ -26,7 +26,7 @@ génère pas une réponse d'IA.
 | --- | --- | --- | --- |
 | PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
 | CORE-MINI-1M | Harness validé | Modèle de 1 328 256 paramètres, entraînement synthétique, métriques, checkpoint atomique et reprise sécurisée | Aucun langage appris, aucune question possible |
-| CORE-80M | Conception seulement | Configuration candidate et comptage exact de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
+| CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental | Manifestes traçables, partitions isolées, Byte-BPE déterministe hors ligne et refus d'entraînement sans autorisation | Aucune source, licence, proportion linguistique ou tokenizer final approuvé |
 | Moteur d'inférence | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime n'est pas disponible | Aucun chargement de checkpoint ni génération de texte |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état et recherche lexicale bornée avec provenance | Trois notices synthétiques, pas de RAG vectoriel ni de réponse générée |
@@ -39,9 +39,10 @@ génère pas une réponse d'IA.
 
 ## Vérifications confirmées
 
-- 61 tests passent sur le nœud de calcul Linux ;
+- 63 tests passent sur le nœud de calcul Linux ;
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
 - un checkpoint CORE-MINI a été produit puis repris avec le chargeur sécurisé ;
+- CORE-80M s'instancie en RAM CPU avec son nombre exact de paramètres ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
   synthétiques ;
 - une recherche `stockage hybride` retourne des résumés avec `provenance_id` ;

@@ -36,7 +36,8 @@ compte, ni secret, ni chemin d'administration.
 
 - PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
 - CUDA et ROCm ne font pas partie du runtime ;
-- 61 tests passent sur Linux ;
+- 63 tests passent sur Linux ;
+- CORE-80M s'instancie en CPU avec son nombre candidat exact, sans poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise réussit ;
 - le MCP Knowledge répond et retourne des résultats synthétiques avec
   `provenance_id` ;

@@ -127,7 +127,17 @@ SwiGLU, RoPE, RMSNorm et embeddings liés avec `1 328 256` paramètres exacts.
 Le harness borné `tools/train_core_mini.py` est également versionné : il refuse
 un runtime non CPU, produit des séquences synthétiques déterministes, entraîne,
 sauvegarde atomiquement et permet la reprise d'un checkpoint. Ses validations
-structurelles participent à une suite locale de 61 tests réussis.
+structurelles participent à une suite locale de 63 tests réussis.
+
+Le contrôle `tools/verify_cpu_model_candidate.py` instancie séparément une
+configuration candidate en RAM CPU puis compare ses paramètres observés au
+compteur versionné. Il n'entraîne rien, n'enregistre aucun poids et ne rend pas
+le modèle conversationnel disponible ; il sert à révéler tôt une incompatibilité
+entre configuration et implémentation.
+
+Cette instanciation a été vérifiée sur le nœud de calcul CPU. Elle prouve la
+cohérence mécanique des 81 444 480 paramètres candidats, pas la qualité, le
+débit, le corpus, le tokenizer final ou l'existence de poids utilisables.
 
 Le bundle candidat PyTorch `2.13.0+cpu` pour CPython `3.13` a été acquis et
 vérifié après transfert hors ligne, puis installé dans un venv dédié sans index
