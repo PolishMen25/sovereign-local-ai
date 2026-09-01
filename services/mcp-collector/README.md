@@ -14,5 +14,13 @@ Le Collector impose un jeton Bearer d'au moins 32 caractères, `application/json
 
 `tools/codex_conversation_sync.py` est le relais local destiné au hook Codex `SessionEnd`. Il extrait uniquement les messages utilisateur et assistant du transcript local, retire les secrets probables, découpe les conversations sous la limite d'ingress puis les place dans une file locale avant envoi HTTPS. Le hook ne bloque pas sur le réseau : un processus détaché expédie la file, et un hook `SessionStart` relance les envois différés.
 
+L'adresse du Collector n'est jamais fournie par le dépôt. L'installation doit
+définir hors Git `SOVEREIGN_COLLECTOR_URL` et
+`SOVEREIGN_COLLECTOR_ALLOWED_HOST`. Le relais refuse une configuration absente,
+HTTP, contenant des identifiants, une requête, un fragment, un port non standard,
+un hôte non explicitement autorisé ou un chemin différent de
+`/v1/conversations`. Un exemple de hooks sans chemin personnel se trouve dans
+`configs/codex/hooks.windows.example.json`.
+
 Le jeton reste dans `~/.codex/sovereign-sync/collector.token`, hors du dépôt. Les reçus locaux ne contiennent pas le contenu des conversations. Un historique peut être préparé avec `--backfill`, en excluant par délai les sessions encore actives. L'acceptation par le Collector conserve les données en `RAW`; aucune promotion vers `VALIDATED` n'est automatique.
 

@@ -10,10 +10,12 @@ ne constitue pas une exception à cette règle.
 ## Contrat versionné
 
 [`schemas/training-corpus-manifest.schema.json`](../../schemas/training-corpus-manifest.schema.json)
-définit un manifeste sans contenu ni chemin interne. Chaque lot doit porter :
+définit le manifeste `0.2.0`, sans contenu ni chemin interne. Chaque lot doit
+porter :
 
 - son identifiant de paquet et son identifiant de provenance ;
-- les empreintes SHA-256 du paquet, de chaque partition et de la matérialisation ;
+- les tailles, comptes et empreintes SHA-256 propres à `train`, `validation`,
+  `test` et à la matérialisation globale ;
 - une licence déclarée, les langues et un état de revue `approved` ;
 - une partition exclusive entre entraînement, validation et test ;
 - le contrat d'entrée du tokenizer (UTF-8, politique de normalisation et taille
@@ -22,8 +24,10 @@ définit un manifeste sans contenu ni chemin interne. Chaque lot doit porter :
   d'entraînement.
 
 Le validateur standard contrôle la structure et les invariants, mais ne prouve
-ni la licence, ni le contenu, ni l'empreinte des octets : ces contrôles restent
-à exécuter dans le pipeline de matérialisation isolé.
+ni la licence ni la qualité du contenu. Le chargeur borné
+[`tools/authorized_text_bundle.py`](../../tools/authorized_text_bundle.py)
+vérifie les octets du seul split `train`, refuse `validation`, `test` et la
+matérialisation globale, puis lie son empreinte exacte à celle du tokenizer.
 
 ```bash
 python3 -B tools/validate_training_corpus_manifest.py manifest.json
@@ -33,11 +37,25 @@ python3 -B tools/validate_training_corpus_manifest.py manifest.json
 
 [`tools/train_byte_bpe.py`](../../tools/train_byte_bpe.py) est un entraînement
 Byte Pair Encoding déterministe et hors ligne. Il ne lit un corpus que si le
-manifeste passe l'autorisation explicite, si l'empreinte des octets concorde et
-si chaque ligne est un enregistrement JSONL strict `record_id` / `text`.
-Le résultat reste marqué `experimental` : l'algorithme est opérationnel, mais
-ni sa politique de normalisation ni ses 32 000 unités candidates ne sont
-approuvées. La configuration candidate est
+manifeste passe l'autorisation explicite, si la taille et l'empreinte des octets
+concordent et si chaque ligne est un enregistrement JSONL strict
+`record_id` / `text`, avec identifiant unique et limites explicites.
+
+Le format expérimental `0.2.0` conserve les fusions BPE dans leur ordre. Le
+module partagé [`services/inference/tokenizer.py`](../../services/inference/tokenizer.py)
+applique la même normalisation NFC pendant l'apprentissage et l'encodage,
+rejoue ces fusions par rang, conserve les identifiants spéciaux 0 à 3 et refuse
+un vocabulaire, une couverture des 256 octets ou un graphe de fusion altéré.
+Son état runtime est immuable et les tailles de texte et de décodage sont
+bornées. Un encode/decode déterministe est donc testable hors ligne sans faire
+de cet artefact un tokenizer approuvé.
+
+Le résultat reste marqué `experimental` : ni le corpus, ni la politique finale,
+ni les 32 000 unités candidates ne sont approuvés. Le prototype est borné à
+32 768 unités et son algorithme d'apprentissage naïf n'est pas encore adapté à
+un grand corpus. Le producteur et le chargeur utilisent désormais l'empreinte
+exacte de la partition `train`, sans autoriser pour autant un entraînement
+linguistique. La configuration candidate est
 [`configs/tokenizers/byte-bpe-v0.candidate.json`](../../configs/tokenizers/byte-bpe-v0.candidate.json).
 
 L'option ci-dessous est obligatoire avant d'alimenter un entraînement

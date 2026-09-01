@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.local-ai.invalid/training-corpus-manifest/0.1.0/schema.json",
+  "$id": "https://schemas.local-ai.invalid/training-corpus-manifest/0.2.0/schema.json",
   "title": "Manifest de corpus d'entraînement souverain",
   "description": "Contrat de lignée pour un corpus déjà validé. Il décrit des empreintes et décisions, jamais le contenu du corpus ni un chemin interne.",
   "type": "object",
@@ -17,7 +17,7 @@
     "approvals"
   ],
   "properties": {
-    "schema_version": { "const": "0.1.0" },
+    "schema_version": { "const": "0.2.0" },
     "corpus_id": { "type": "string", "pattern": "^corpus-[a-z0-9][a-z0-9-]{2,62}$" },
     "lifecycle_state": { "const": "VALIDATED" },
     "classification": { "enum": ["synthetic", "approved_training"] },
@@ -61,11 +61,12 @@
     "split": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["package_ids", "content_sha256", "record_count"],
+      "required": ["package_ids", "content_sha256", "byte_size", "record_count"],
       "properties": {
         "package_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" } },
         "content_sha256": { "$ref": "#/$defs/sha256" },
-        "record_count": { "type": "integer", "minimum": 1 }
+        "byte_size": { "type": "integer", "minimum": 1, "maximum": 1099511627776 },
+        "record_count": { "type": "integer", "minimum": 1, "maximum": 1000000000000 }
       }
     },
     "splits": {
@@ -85,7 +86,7 @@
       "properties": {
         "input_encoding": { "const": "utf-8" },
         "normalization_policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$" },
-        "candidate_vocabulary_size": { "type": "integer", "minimum": 256, "maximum": 262144 },
+        "candidate_vocabulary_size": { "type": "integer", "minimum": 260, "maximum": 262144 },
         "review_state": { "enum": ["pending", "approved"] }
       }
     },

@@ -109,6 +109,8 @@ python3 -B tools/count_core_parameters.py
 ## Commencer correctement
 
 1. Lire [AGENTS.md](AGENTS.md) et le [registre des décisions](docs/project/decisions.md).
+   Pour reprendre avec un autre agent, consulter aussi le
+   [handoff Claude Code](docs/project/claude-code-handoff.md).
 2. Compléter uniquement les informations encore ouvertes dans le [questionnaire de découverte](docs/project/discovery-questionnaire.md).
 3. Valider la topologie réseau, les flux, le stockage, l'identité, les sauvegardes et les politiques de données.
 4. Mesurer le ML350 : CPU, RAM, NUMA, disque, threads et tokens/seconde sur un mini-modèle.

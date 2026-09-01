@@ -127,7 +127,7 @@ SwiGLU, RoPE, RMSNorm et embeddings liés avec `1 328 256` paramètres exacts.
 Le harness borné `tools/train_core_mini.py` est également versionné : il refuse
 un runtime non CPU, produit des séquences synthétiques déterministes, entraîne,
 sauvegarde atomiquement et permet la reprise d'un checkpoint. Ses validations
-structurelles participent à une suite locale de 63 tests réussis.
+structurelles participent à la suite locale complète du dépôt.
 
 Le contrôle `tools/verify_cpu_model_candidate.py` instancie séparément une
 configuration candidate en RAM CPU puis compare ses paramètres observés au

@@ -38,8 +38,15 @@ compte, ni secret, ni chemin d'administration.
 - PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
 - CUDA et ROCm ne font pas partie du runtime ;
 - 66 tests passent sur Linux ;
+- 110 tests passent dans la préparation publique locale actuelle ; un test d'intégration
+  PyTorch est ignoré sur les postes qui ne possèdent pas le bundle CPU vérifié ;
 - CORE-80M s'instancie en CPU avec son nombre candidat exact, sans poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise réussit ;
+- le manifeste et le tokenizer expérimentaux sont maintenant liés au seul
+  split `train` par taille, compte et SHA-256 ;
+- la nouvelle vérification renforcée d'un checkpoint historique reste à
+  terminer sur Linux : la première tentative a été interrompue par le transport
+  SSH, sans modification du checkpoint source ;
 - le MCP Knowledge répond et retourne des résultats synthétiques avec
   `provenance_id` ;
 - un premier benchmark NUMA existe, mais il reste préliminaire et ne permet pas

@@ -47,7 +47,7 @@ Le détail des scénarios, des jeux de tests et des critères mesurables est con
 ## Synology RS3617xs+
 
 1. Version DSM et système de fichiers de chaque volume ?
-2. Modèle RAID, état SMART, confirmation des ~8,1 To utiles / ~7 To libres déclarés et politique de scrubbing ?
+2. Modèle RAID, état SMART, confirmation des capacités mesurées dans l'inventaire interne et politique de scrubbing ?
 3. NFS, SMB, iSCSI et Container Manager disponibles ou autorisés ?
 4. Interfaces 1/10 GbE, agrégation, MTU et réseau réellement utilisé ?
 5. Snapshots, réplication, chiffrement au repos et ACL actuellement configurés ?

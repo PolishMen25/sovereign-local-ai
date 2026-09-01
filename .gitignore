@@ -40,3 +40,17 @@ coverage.xml
 htmlcov/
 *.log
 
+# Owner-specific Codex hook configuration
+configs/codex/hooks.windows.json
+configs/codex/*.local.json
+
+# Bounded test workspaces (never fixtures)
+/tmp*/
+/tests/tmp*/
+/tests/runtime-*/
+/.authorized-bundle-*/
+
+# Temporary transfer bundles created during host provisioning
+*.tar
+*.b64
+

@@ -1,0 +1,29 @@
+{
+  "description": "Exemple de hooks pour la synchronisation expurgée vers un Collector configuré hors dépôt.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Path\\To\\python.exe\" \"C:\\Path\\To\\codex_conversation_sync.py\" --flush",
+            "async": true,
+            "timeout": 120,
+            "statusMessage": "Reprise de la synchronisation souveraine"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Path\\To\\python.exe\" \"C:\\Path\\To\\codex_conversation_sync.py\" --event",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

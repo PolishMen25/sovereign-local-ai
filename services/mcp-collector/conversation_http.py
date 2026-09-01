@@ -98,6 +98,11 @@ class CollectorHandler(BaseHTTPRequestHandler):
 
 def main() -> int:
     host = os.environ.get("SOVEREIGN_COLLECTOR_HOST", "127.0.0.1")
+    if host != "127.0.0.1":
+        raise SystemExit(
+            "SOVEREIGN_COLLECTOR_HOST must remain loopback-only at 127.0.0.1; "
+            "put TLS/public exposure in a reverse proxy"
+        )
     port = int(os.environ.get("SOVEREIGN_COLLECTOR_PORT", "8787"))
     if not os.environ.get("SOVEREIGN_COLLECTOR_TOKEN"):
         print("SOVEREIGN_COLLECTOR_TOKEN is required", file=sys.stderr)

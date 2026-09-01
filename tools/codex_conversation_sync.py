@@ -18,10 +18,12 @@ import subprocess
 import sys
 from typing import Any, Iterable
 from urllib import error, request
+from urllib.parse import urlsplit
 from uuid import UUID, uuid5
 
 
-COLLECTOR_URL = "https://collector.polishmen.fr/v1/conversations"
+COLLECTOR_URL_ENV = "SOVEREIGN_COLLECTOR_URL"
+COLLECTOR_ALLOWED_HOST_ENV = "SOVEREIGN_COLLECTOR_ALLOWED_HOST"
 SYNC_NAMESPACE = UUID("c8e104f4-41c4-4cdb-bb39-da7624d928cf")
 SCHEMA_VERSION = "0.1.0"
 MAX_MESSAGE_CHARS = 45_000
@@ -30,12 +32,12 @@ MAX_HOOK_INPUT_BYTES = 65_536
 MAX_HTTP_RESPONSE_BYTES = 8_192
 
 SENSITIVE_LINE = re.compile(
-    r"(?im)^.*(?:password|passwd|mot\s+de\s+passe|api[_ -]?key|access[_ -]?token|private[_ -]?key)\s*[:=].*$"
+    r"(?im)^.*(?:password|passwd|mdp|mot\s+de\s+passe|api[_ -]?key|access[_ -]?token|private[_ -]?key)\s*[:=].*$"
 )
 # Match labels even when they are embedded in a quoted block or a single-line
 # JSON/code fragment rather than starting at the beginning of a text line.
 SENSITIVE_INLINE = re.compile(
-    r"(?i)(?:password|passwd|mot\s+de\s+passe|api[_ -]?key|access[_ -]?token|private[_ -]?key)\s*[:=][^\r\n]*"
+    r"(?i)(?:password|passwd|mdp|mot\s+de\s+passe|api[_ -]?key|access[_ -]?token|private[_ -]?key)\s*[:=][^\r\n]*"
 )
 BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}")
 KNOWN_SECRET_PREFIX = re.compile(r"(?i)\b(?:sk|ghp|github_pat|glpat|xox[baprs]|cfpat)[-_][A-Za-z0-9._-]{12,}")
@@ -46,6 +48,29 @@ TOKEN_CANDIDATE = re.compile(r"(?<![\w])([A-Za-z0-9@#$%^&*!=+_-]{12,})(?![\w])")
 def sync_home() -> Path:
     configured = os.environ.get("SOVEREIGN_SYNC_HOME")
     return Path(configured).expanduser() if configured else Path.home() / ".codex" / "sovereign-sync"
+
+
+def configured_collector_url() -> str:
+    """Return a strictly validated owner-supplied Collector endpoint."""
+
+    raw_url = os.environ.get(COLLECTOR_URL_ENV, "").strip()
+    allowed_host = os.environ.get(COLLECTOR_ALLOWED_HOST_ENV, "").strip().lower()
+    if not raw_url or not allowed_host:
+        raise ValueError("collector endpoint configuration is missing")
+    parsed = urlsplit(raw_url)
+    if parsed.scheme != "https":
+        raise ValueError("collector endpoint must use HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("collector endpoint must not contain credentials")
+    if parsed.query or parsed.fragment:
+        raise ValueError("collector endpoint must not contain query or fragment")
+    if parsed.port not in {None, 443}:
+        raise ValueError("collector endpoint must use the standard HTTPS port")
+    if parsed.hostname is None or parsed.hostname.lower() != allowed_host:
+        raise ValueError("collector endpoint hostname is not explicitly allowed")
+    if parsed.path != "/v1/conversations":
+        raise ValueError("collector endpoint path is invalid")
+    return raw_url
 
 
 def sanitize_text(text: str) -> str:
@@ -60,13 +85,14 @@ def sanitize_text(text: str) -> str:
 
     def redact_mixed_token(match: re.Match[str]) -> str:
         value = match.group(1)
-        classes = (
+        core_classes = (
             any(char.islower() for char in value),
             any(char.isupper() for char in value),
             any(char.isdigit() for char in value),
-            any(not char.isalnum() for char in value),
         )
-        return "[SENSITIVE TOKEN REMOVED]" if all(classes) else value
+        has_symbol = any(not char.isalnum() for char in value)
+        looks_secret = all(core_classes) and (len(value) >= 16 or has_symbol)
+        return "[SENSITIVE TOKEN REMOVED]" if looks_secret else value
 
     sanitized = TOKEN_CANDIDATE.sub(redact_mixed_token, sanitized).strip()
     if len(sanitized) > MAX_MESSAGE_CHARS:
@@ -196,6 +222,11 @@ def _log(event: str) -> None:
 
 def flush_queue() -> int:
     home = sync_home()
+    try:
+        collector_url = configured_collector_url()
+    except ValueError:
+        _log("flush_skipped collector_endpoint_invalid")
+        return 2
     token_path = home / "collector.token"
     if not token_path.is_file():
         _log("flush_skipped token_missing")
@@ -212,7 +243,7 @@ def flush_queue() -> int:
     for queued_path in sorted((home / "queue").glob("*.json")) if (home / "queue").exists() else []:
         payload = queued_path.read_bytes()
         upload = request.Request(
-            COLLECTOR_URL,
+            collector_url,
             data=payload,
             headers={
                 "Authorization": f"Bearer {token}",

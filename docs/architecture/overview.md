@@ -8,9 +8,12 @@ La V1 fournit une IA locale souveraine, exploitable sans GPU et sans accès dire
 
 Décisions acquises :
 
-- calcul principal sur un HPE ML350 Gen9 : 2 × Xeon E5-2699 v4, 44 cœurs / 88 threads, 88 Go de RAM et environ 12 To de stockage ;
+- calcul principal sur un HPE ML350 Gen9 CPU-only, bi-socket et NUMA ; les
+  valeurs exactes proviennent de l'inventaire matériel approuvé et ne sont pas
+  recopiées dans l'architecture publique ;
 - virtualisation sur Proxmox ;
-- stockage durable de la V1 assuré par un Synology RS3617xs+ doté de 32 Go de RAM et d'environ 7 To libres ;
+- stockage durable de la V1 assuré par un Synology RS3617xs+ ; ses capacités et
+  son état exacts restent dans l'inventaire interne approuvé ;
 - stratégie de stockage hybride acceptée : stockage local Proxmox pour le calcul actif et le temporaire, Synology pour RAW, connaissances, modèles conservés et sauvegardes (D-023) ;
 - fonctionnement CPU-only pour la V1 ;
 - IA-CORE sans accès Internet au niveau réseau ;

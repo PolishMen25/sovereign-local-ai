@@ -1,6 +1,6 @@
 # Registre initial des décisions
 
-Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confirmées des orientations provisoires. Une orientation ne devient ferme qu'après validation explicite du propriétaire et, pour un choix structurant, création d'un ADR.
+Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confirmées des orientations provisoires. Une orientation ne devient ferme qu'après validation explicite du propriétaire et, pour un choix structurant, création d'un ADR.
 
 ## Décisions confirmées
 
@@ -8,8 +8,8 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 |---|---|---|
 | D-001 | Le projet est CPU-only. | Aucun composant obligatoire ne dépend d'un GPU, CUDA, ROCm ou TPU. |
 | D-002 | Le calcul principal se fait sur le HPE ML350 Gen9. | Entraînement, benchmarks et inférence principale y sont conçus et mesurés. |
-| D-003 | Configuration connue du ML350 : 2 × E5-2699 v4, 44C/88T, 88 Go, ~12 To, Proxmox. | NUMA dual-socket et marge pour l'hyperviseur doivent être pris en compte. |
-| D-004 | Le Synology RS3617xs+ est le stockage long terme ; configuration déclarée : 32 Go de RAM, ~8,1 To utiles, ~1,1 To utilisés et ~7 To libres. | RAW, datasets, connaissances, modèles validés, checkpoints importants, audit et sauvegardes y résident selon une arborescence/ACL à valider. Capacités et état doivent être vérifiés pendant l'inventaire. |
+| D-003 | **SUPERSEDED par D-025.** La fiche ML350 initialement déclarée est conservée uniquement dans le registre d'inventaire interne. | Ne plus utiliser la fiche déclarative comme mesure ni recopier ses valeurs dans le dépôt public. |
+| D-004 | Le Synology RS3617xs+ est le stockage long terme ; ses capacités et son état exacts relèvent de l'inventaire interne approuvé. | RAW, datasets, connaissances, modèles validés, checkpoints importants, audit et sauvegardes y résident selon une arborescence/ACL à valider. |
 | D-005 | Le RS3617xs+ ne fait pas l'entraînement principal. | Les datasets actifs et checkpoints temporaires pourront être placés sur stockage local du ML350. |
 | D-006 | Le DL380p Gen8 est exclu de la V1. | Aucun service, capacité ou disponibilité V1 ne dépend de cette machine. |
 | D-007 | IA-CORE n'a aucun accès Internet direct. | Le contrôle doit être imposé au réseau, y compris DNS et routes, et testé. |
@@ -30,6 +30,7 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 | D-022 | La connaissance de l'infrastructure locale est fournie par des inventaires et documents approuvés. | Aucune découverte réseau, exécution de commande, accès aux secrets ou modification de l'infrastructure n'est permise par défaut. |
 | D-023 | Le stockage V1 suit une stratégie hybride : capacité locale Proxmox pour le calcul actif et le temporaire ; Synology RS3617xs+ pour RAW, connaissances, modèles, checkpoints retenus et sauvegardes. | Le stockage local n'est pas la copie durable unique ; les flux vers le Synology restent restreints, mesurés et sauvegardés. Aucun disque n'est initialisé sans procédure approuvée. |
 | D-024 | Un modèle tiers Qwen2.5-1.5B-Instruct GGUF est autorisé comme chat BOOTSTRAP temporaire, distinct de CORE, en CLI locale CPU uniquement. | Acquisition et empreintes verrouillées ; aucun service persistant, outil, RAG ou téléchargement à l'exécution. Cette exception ne remplace pas CORE-80M et ne valide aucun gate d'entraînement. |
+| D-025 | Les mesures de l'inventaire matériel approuvé remplacent la fiche ML350 initialement déclarée ; le dépôt public conserve seulement le caractère bi-socket NUMA et CPU-only. | Benchmarks et allocations utilisent l'inventaire mesuré interne. Toute valeur exacte publiée doit être explicitement autorisée. |
 
 ## Orientations provisoires
 

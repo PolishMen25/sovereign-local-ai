@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import unittest
+from unittest import mock
 from uuid import uuid4
 
 
@@ -29,9 +30,50 @@ class CodexConversationSyncTests(unittest.TestCase):
         self.assertNotIn("abcdefghijklmnopqrstuvwxyz", sanitized)
         self.assertIn("texte utile", sanitized)
 
+    def test_collector_endpoint_is_required_and_strictly_validated(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "missing"):
+                MODULE.configured_collector_url()
+
+        valid = {
+            MODULE.COLLECTOR_URL_ENV: "https://collector.example.test/v1/conversations",
+            MODULE.COLLECTOR_ALLOWED_HOST_ENV: "collector.example.test",
+        }
+        with mock.patch.dict(os.environ, valid, clear=True):
+            self.assertEqual(
+                valid[MODULE.COLLECTOR_URL_ENV], MODULE.configured_collector_url()
+            )
+
+        invalid_urls = (
+            "http://collector.example.test/v1/conversations",
+            "https://user@collector.example.test/v1/conversations",
+            "https://collector.example.test:8443/v1/conversations",
+            "https://collector.example.test/v1/conversations?token=no",
+            "https://other.example.test/v1/conversations",
+            "https://collector.example.test/v1/internal",
+        )
+        for candidate in invalid_urls:
+            with self.subTest(candidate=candidate):
+                invalid = dict(valid)
+                invalid[MODULE.COLLECTOR_URL_ENV] = candidate
+                with mock.patch.dict(os.environ, invalid, clear=True):
+                    with self.assertRaises(ValueError):
+                        MODULE.configured_collector_url()
+
     def test_inline_secret_labels_are_removed(self) -> None:
         sanitized = MODULE.sanitize_text("config = {'password': 'VerySecret123@@'}")
         self.assertNotIn("VerySecret", sanitized)
+
+    def test_french_mdp_and_long_alphanumeric_tokens_are_removed(self) -> None:
+        source = "mdp : SyntheticAccessCode2026\nSyntheticSessionToken42\ntexte utile"
+        sanitized = MODULE.sanitize_text(source)
+        self.assertNotIn("SyntheticAccessCode", sanitized)
+        self.assertNotIn("SyntheticSessionToken", sanitized)
+        self.assertIn("texte utile", sanitized)
+
+    def test_ordinary_lowercase_identifiers_are_preserved(self) -> None:
+        source = "documentationlocale2026 et texte utile"
+        self.assertEqual(MODULE.sanitize_text(source), source)
 
     def test_extracts_only_visible_user_and_assistant_messages(self) -> None:
         transcript = self.temp_root / "rollout.jsonl"

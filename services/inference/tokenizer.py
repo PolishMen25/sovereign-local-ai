@@ -1,0 +1,370 @@
+"""Strict, deterministic byte-level BPE artifacts for local inference.
+
+The module has no network or third-party dependency.  Training and inference
+share the same NFC normalization and ordered merge implementation so an
+artifact cannot silently change tokenization between the two phases.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+from pathlib import Path
+import re
+from typing import Any, Iterable
+import unicodedata
+
+
+SCHEMA_VERSION = "0.2.0"
+ARTIFACT_STATUS = "experimental"
+ALGORITHM = "byte_bpe"
+INPUT_ENCODING = "utf-8"
+NORMALIZATION_POLICY_ID = "unicode-nfc-v1"
+SPECIAL_TOKENS = ["<pad>", "<bos>", "<eos>", "<unk>"]
+PAD_TOKEN_ID = 0
+BOS_TOKEN_ID = 1
+EOS_TOKEN_ID = 2
+UNK_TOKEN_ID = 3
+
+MAXIMUM_TOKEN_BYTES = 64
+MAXIMUM_VOCABULARY_SIZE = 32_768
+MAXIMUM_ARTIFACT_BYTES = 128 * 1024 * 1024
+MAXIMUM_RUNTIME_TEXT_BYTES = 1024 * 1024
+MAXIMUM_DECODE_TOKEN_IDS = 65_536
+
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+CORPUS_ID = re.compile(r"^corpus-[a-z0-9][a-z0-9-]{2,62}$")
+HEX_TOKEN = re.compile(r"^(?:[0-9a-f]{2}){1,64}$")
+
+DOCUMENT_KEYS = {
+    "schema_version",
+    "status",
+    "algorithm",
+    "training_corpus_id",
+    "training_corpus_sha256",
+    "input_encoding",
+    "normalization_policy_id",
+    "special_tokens",
+    "tokens_hex",
+    "merges",
+    "vocabulary_size",
+    "minimum_frequency",
+    "maximum_token_bytes",
+}
+
+
+def fail(message: str) -> None:
+    raise ValueError(message)
+
+
+def normalize_text(text: str) -> str:
+    if not isinstance(text, str):
+        fail("text must be a string")
+    return unicodedata.normalize("NFC", text)
+
+
+def canonical_byte_tokens() -> tuple[str, ...]:
+    return tuple(f"{value:02x}" for value in range(256))
+
+
+def merge_sequence(
+    sequence: list[str], pair: tuple[str, str], merged: str
+) -> list[str]:
+    output: list[str] = []
+    index = 0
+    while index < len(sequence):
+        if (
+            index + 1 < len(sequence)
+            and sequence[index] == pair[0]
+            and sequence[index + 1] == pair[1]
+        ):
+            output.append(merged)
+            index += 2
+        else:
+            output.append(sequence[index])
+            index += 1
+    return output
+
+
+@dataclass(frozen=True)
+class BpeTrainingResult:
+    """The non-special vocabulary and learned merges in stable rank order."""
+
+    tokens_hex: tuple[str, ...]
+    merges: tuple[tuple[str, str], ...]
+
+    @property
+    def vocabulary_size(self) -> int:
+        return len(SPECIAL_TOKENS) + len(self.tokens_hex)
+
+
+def train_byte_bpe(
+    texts: Iterable[str],
+    vocabulary_size: int,
+    *,
+    minimum_frequency: int = 2,
+) -> BpeTrainingResult:
+    """Learn bounded BPE merges deterministically from NFC-normalized text."""
+    if type(vocabulary_size) is not int or not 260 <= vocabulary_size <= MAXIMUM_VOCABULARY_SIZE:
+        fail(
+            "vocabulary_size must be between 260 and "
+            f"{MAXIMUM_VOCABULARY_SIZE}"
+        )
+    if type(minimum_frequency) is not int or not 2 <= minimum_frequency <= 1_000_000_000:
+        fail("minimum_frequency must be an integer between 2 and 1000000000")
+
+    if isinstance(texts, (str, bytes)):
+        fail("texts must be an iterable of strings, not a single string")
+    try:
+        normalized = [normalize_text(text) for text in texts]
+    except TypeError as error:
+        raise ValueError("texts must be an iterable of strings") from error
+    if not normalized or any(not text for text in normalized):
+        fail("texts must be a non-empty iterable of non-empty strings")
+
+    sequences = [
+        [f"{byte:02x}" for byte in text.encode(INPUT_ENCODING)]
+        for text in normalized
+    ]
+    tokens = list(canonical_byte_tokens())
+    vocabulary = set(tokens)
+    merges: list[tuple[str, str]] = []
+
+    while len(SPECIAL_TOKENS) + len(tokens) < vocabulary_size:
+        frequencies: dict[tuple[str, str], int] = {}
+        for sequence in sequences:
+            for pair in zip(sequence, sequence[1:]):
+                frequencies[pair] = frequencies.get(pair, 0) + 1
+
+        eligible: list[tuple[int, str, str]] = []
+        for (left, right), count in frequencies.items():
+            merged = left + right
+            if (
+                count >= minimum_frequency
+                and merged not in vocabulary
+                and len(merged) // 2 <= MAXIMUM_TOKEN_BYTES
+            ):
+                eligible.append((count, left, right))
+        if not eligible:
+            break
+
+        count, left, right = min(
+            eligible, key=lambda candidate: (-candidate[0], candidate[1], candidate[2])
+        )
+        del count
+        pair = (left, right)
+        merged = left + right
+        merges.append(pair)
+        tokens.append(merged)
+        vocabulary.add(merged)
+        sequences = [merge_sequence(sequence, pair, merged) for sequence in sequences]
+
+    return BpeTrainingResult(tokens_hex=tuple(tokens), merges=tuple(merges))
+
+
+def experimental_tokenizer_document(
+    *,
+    training_corpus_id: str,
+    training_corpus_sha256: str,
+    result: BpeTrainingResult,
+    minimum_frequency: int,
+) -> dict[str, Any]:
+    document: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "status": ARTIFACT_STATUS,
+        "algorithm": ALGORITHM,
+        "training_corpus_id": training_corpus_id,
+        "training_corpus_sha256": training_corpus_sha256,
+        "input_encoding": INPUT_ENCODING,
+        "normalization_policy_id": NORMALIZATION_POLICY_ID,
+        "special_tokens": list(SPECIAL_TOKENS),
+        "tokens_hex": list(result.tokens_hex),
+        "merges": [list(pair) for pair in result.merges],
+        "vocabulary_size": result.vocabulary_size,
+        "minimum_frequency": minimum_frequency,
+        "maximum_token_bytes": MAXIMUM_TOKEN_BYTES,
+    }
+    validate_tokenizer_document(document)
+    return document
+
+
+def _require_canonical_token(value: Any, context: str) -> str:
+    if not isinstance(value, str) or not HEX_TOKEN.fullmatch(value):
+        fail(f"{context} must be canonical lowercase hexadecimal bytes")
+    return value
+
+
+def validate_tokenizer_document(document: Any) -> dict[str, Any]:
+    """Validate every field and prove that the ordered merge graph is sound."""
+    if not isinstance(document, dict) or set(document) != DOCUMENT_KEYS:
+        fail(f"tokenizer artifact keys must be exactly {sorted(DOCUMENT_KEYS)}")
+    if document["schema_version"] != SCHEMA_VERSION:
+        fail("unsupported tokenizer schema_version")
+    if document["status"] != ARTIFACT_STATUS:
+        fail("tokenizer artifact must remain experimental")
+    if document["algorithm"] != ALGORITHM:
+        fail("unsupported tokenizer algorithm")
+    if document["input_encoding"] != INPUT_ENCODING:
+        fail("unsupported tokenizer input encoding")
+    if document["normalization_policy_id"] != NORMALIZATION_POLICY_ID:
+        fail("unsupported tokenizer normalization policy")
+    if document["special_tokens"] != SPECIAL_TOKENS:
+        fail("special tokens and their stable ids 0-3 do not match")
+    if (
+        not isinstance(document["training_corpus_id"], str)
+        or not CORPUS_ID.fullmatch(document["training_corpus_id"])
+    ):
+        fail("invalid tokenizer training_corpus_id")
+    if (
+        not isinstance(document["training_corpus_sha256"], str)
+        or not SHA256.fullmatch(document["training_corpus_sha256"])
+    ):
+        fail("invalid tokenizer training_corpus_sha256")
+    if (
+        type(document["minimum_frequency"]) is not int
+        or not 2 <= document["minimum_frequency"] <= 1_000_000_000
+    ):
+        fail("invalid tokenizer minimum_frequency")
+    if document["maximum_token_bytes"] != MAXIMUM_TOKEN_BYTES:
+        fail("invalid tokenizer maximum_token_bytes")
+
+    tokens = document["tokens_hex"]
+    if not isinstance(tokens, list):
+        fail("tokenizer tokens_hex must be a list")
+    if not 256 <= len(tokens) <= MAXIMUM_VOCABULARY_SIZE - len(SPECIAL_TOKENS):
+        fail("tokenizer token count is outside the bounded range")
+    canonical_tokens = [
+        _require_canonical_token(token, f"tokens_hex[{index}]")
+        for index, token in enumerate(tokens)
+    ]
+    if len(canonical_tokens) != len(set(canonical_tokens)):
+        fail("tokenizer tokens_hex contains a duplicate token")
+    if canonical_tokens[:256] != list(canonical_byte_tokens()):
+        fail("tokenizer must contain exactly one canonical token for each byte")
+
+    merges = document["merges"]
+    if not isinstance(merges, list) or len(merges) != len(canonical_tokens) - 256:
+        fail("tokenizer merge count must match its learned tokens")
+    available = set(canonical_byte_tokens())
+    for rank, raw_pair in enumerate(merges):
+        if not isinstance(raw_pair, list) or len(raw_pair) != 2:
+            fail(f"merges[{rank}] must contain exactly two tokens")
+        left = _require_canonical_token(raw_pair[0], f"merges[{rank}][0]")
+        right = _require_canonical_token(raw_pair[1], f"merges[{rank}][1]")
+        if left not in available or right not in available:
+            fail(f"merges[{rank}] references a token unavailable at that rank")
+        merged = left + right
+        if len(merged) // 2 > MAXIMUM_TOKEN_BYTES:
+            fail(f"merges[{rank}] exceeds the maximum token length")
+        if merged in available:
+            fail(f"merges[{rank}] recreates an existing token")
+        if canonical_tokens[256 + rank] != merged:
+            fail(f"merges[{rank}] does not produce the token assigned to its rank")
+        available.add(merged)
+
+    vocabulary_size = document["vocabulary_size"]
+    if type(vocabulary_size) is not int or vocabulary_size != len(SPECIAL_TOKENS) + len(canonical_tokens):
+        fail("tokenizer vocabulary_size does not match its token ids")
+    if vocabulary_size > MAXIMUM_VOCABULARY_SIZE:
+        fail("tokenizer vocabulary_size exceeds the bounded maximum")
+    return document
+
+
+@dataclass(frozen=True)
+class ByteBpeTokenizer:
+    """Immutable runtime view of a validated experimental artifact."""
+
+    _document_json: str
+    _tokens_hex: tuple[str, ...]
+    _merges: tuple[tuple[str, str], ...]
+    _vocabulary_size: int
+
+    @classmethod
+    def from_document(cls, document: Any) -> "ByteBpeTokenizer":
+        validated = validate_tokenizer_document(document)
+        # Keep only immutable runtime state.  The public document property
+        # reconstructs a copy so callers cannot mutate tokenization in place.
+        document_json = json.dumps(
+            validated, sort_keys=True, separators=(",", ":")
+        )
+        return cls(
+            _document_json=document_json,
+            _tokens_hex=tuple(validated["tokens_hex"]),
+            _merges=tuple(tuple(pair) for pair in validated["merges"]),
+            _vocabulary_size=validated["vocabulary_size"],
+        )
+
+    @property
+    def document(self) -> dict[str, Any]:
+        """Return a detached serializable copy of the validated artifact."""
+
+        return json.loads(self._document_json)
+
+    @property
+    def vocabulary_size(self) -> int:
+        return self._vocabulary_size
+
+    def encode(self, text: str, *, bos: bool = False, eos: bool = False) -> list[int]:
+        payload = normalize_text(text).encode(INPUT_ENCODING)
+        if len(payload) > MAXIMUM_RUNTIME_TEXT_BYTES:
+            fail("text exceeds the bounded runtime tokenizer size")
+        sequence = [f"{byte:02x}" for byte in payload]
+        for left, right in self._merges:
+            sequence = merge_sequence(sequence, (left, right), left + right)
+
+        ids_by_token = {
+            token: index
+            for index, token in enumerate(
+                self._tokens_hex, start=len(SPECIAL_TOKENS)
+            )
+        }
+        token_ids = [BOS_TOKEN_ID] if bos else []
+        token_ids.extend(ids_by_token[token] for token in sequence)
+        if eos:
+            token_ids.append(EOS_TOKEN_ID)
+        return token_ids
+
+    def decode(self, token_ids: Iterable[int]) -> str:
+        tokens = [bytes.fromhex(token) for token in self._tokens_hex]
+        output = bytearray()
+        for position, token_id in enumerate(token_ids):
+            if position >= MAXIMUM_DECODE_TOKEN_IDS:
+                fail("token_ids exceeds the bounded decode length")
+            if type(token_id) is not int:
+                fail(f"token_ids[{position}] must be an integer")
+            if token_id == EOS_TOKEN_ID:
+                break
+            if token_id in {PAD_TOKEN_ID, BOS_TOKEN_ID}:
+                continue
+            if token_id == UNK_TOKEN_ID:
+                output.extend("�".encode(INPUT_ENCODING))
+                continue
+            index = token_id - len(SPECIAL_TOKENS)
+            if not 0 <= index < len(tokens):
+                fail(f"token_ids[{position}] is outside the tokenizer vocabulary")
+            output.extend(tokens[index])
+        return output.decode(INPUT_ENCODING, errors="replace")
+
+
+def load_tokenizer(path: Path) -> ByteBpeTokenizer:
+    size = path.stat().st_size
+    if not 1 <= size <= MAXIMUM_ARTIFACT_BYTES:
+        fail("tokenizer artifact size is outside the bounded range")
+    raw = path.read_bytes()
+    if len(raw) != size:
+        fail("tokenizer artifact changed while it was being read")
+    try:
+        document = json.loads(raw.decode(INPUT_ENCODING))
+    except UnicodeDecodeError as error:
+        raise ValueError("tokenizer artifact must be valid UTF-8") from error
+    return ByteBpeTokenizer.from_document(document)
+
+
+def encode(
+    document: dict[str, Any], text: str, *, bos: bool = False, eos: bool = False
+) -> list[int]:
+    return ByteBpeTokenizer.from_document(document).encode(text, bos=bos, eos=eos)
+
+
+def decode(document: dict[str, Any], token_ids: Iterable[int]) -> str:
+    return ByteBpeTokenizer.from_document(document).decode(token_ids)

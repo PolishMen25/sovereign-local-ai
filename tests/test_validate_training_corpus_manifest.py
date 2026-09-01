@@ -18,7 +18,7 @@ def digest(value: str) -> str:
 
 def valid_manifest() -> dict:
     return {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "corpus_id": "corpus-synthetic-gate",
         "lifecycle_state": "VALIDATED",
         "classification": "synthetic",
@@ -29,9 +29,9 @@ def valid_manifest() -> dict:
             {"package_id": "package-test", "provenance_id": "provenance-test", "content_sha256": digest("d"), "license": "LicenseRef-Synthetic", "languages": ["fr"], "review_state": "approved"},
         ],
         "splits": {
-            "train": {"package_ids": ["package-train"], "content_sha256": digest("e"), "record_count": 1},
-            "validation": {"package_ids": ["package-validation"], "content_sha256": digest("f"), "record_count": 1},
-            "test": {"package_ids": ["package-test"], "content_sha256": digest("0"), "record_count": 1},
+            "train": {"package_ids": ["package-train"], "content_sha256": digest("e"), "byte_size": 30, "record_count": 1},
+            "validation": {"package_ids": ["package-validation"], "content_sha256": digest("f"), "byte_size": 30, "record_count": 1},
+            "test": {"package_ids": ["package-test"], "content_sha256": digest("0"), "byte_size": 40, "record_count": 1},
         },
         "tokenizer_contract": {"input_encoding": "utf-8", "normalization_policy_id": "unicode-nfc-v1", "candidate_vocabulary_size": 32000, "review_state": "pending"},
         "approvals": {"data_governance": "pending", "training_authorization": "not_approved"},
@@ -56,6 +56,41 @@ class TrainingCorpusManifestTests(unittest.TestCase):
         manifest = valid_manifest()
         manifest["splits"]["test"]["package_ids"] = ["package-train"]
         with self.assertRaises(ValueError):
+            MODULE.validate(manifest)
+
+    def test_each_split_requires_a_byte_size(self) -> None:
+        manifest = valid_manifest()
+        del manifest["splits"]["train"]["byte_size"]
+        with self.assertRaisesRegex(ValueError, "keys"):
+            MODULE.validate(manifest)
+
+    def test_split_hashes_must_be_distinct_from_each_other_and_global(self) -> None:
+        duplicate_split = valid_manifest()
+        duplicate_split["splits"]["test"]["content_sha256"] = duplicate_split["splits"]["train"]["content_sha256"]
+        with self.assertRaisesRegex(ValueError, "distinct"):
+            MODULE.validate(duplicate_split)
+
+        duplicate_global = valid_manifest()
+        duplicate_global["materialization"]["content_sha256"] = duplicate_global["splits"]["train"]["content_sha256"]
+        with self.assertRaisesRegex(ValueError, "global"):
+            MODULE.validate(duplicate_global)
+
+    def test_boolean_sizes_counts_and_vocabulary_are_rejected(self) -> None:
+        for mutate in (
+            lambda doc: doc["materialization"].__setitem__("byte_size", True),
+            lambda doc: doc["splits"]["train"].__setitem__("byte_size", True),
+            lambda doc: doc["splits"]["train"].__setitem__("record_count", True),
+            lambda doc: doc["tokenizer_contract"].__setitem__("candidate_vocabulary_size", True),
+        ):
+            manifest = valid_manifest()
+            mutate(manifest)
+            with self.subTest(manifest=manifest), self.assertRaises(ValueError):
+                MODULE.validate(manifest)
+
+    def test_global_record_count_must_equal_split_total(self) -> None:
+        manifest = valid_manifest()
+        manifest["materialization"]["record_count"] = 4
+        with self.assertRaisesRegex(ValueError, "split total"):
             MODULE.validate(manifest)
 
     def test_sensitive_location_is_rejected(self) -> None:

@@ -29,7 +29,7 @@ génère pas une réponse d'IA.
 | Chat BOOTSTRAP | CLI locale fonctionnelle | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement en français sur CPU avec llama.cpp | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE |
 | CORE-MINI-1M | Harness validé | Modèle de 1 328 256 paramètres, entraînement synthétique, métriques, checkpoint atomique et reprise sécurisée | Aucun langage appris, aucune question possible |
 | CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
-| Corpus / tokenizer | Prototype expérimental | Manifestes traçables, partitions isolées, Byte-BPE déterministe hors ligne et refus d'entraînement sans autorisation | Aucune source, licence, proportion linguistique ou tokenizer final approuvé |
+| Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état et recherche lexicale bornée avec provenance | Trois notices synthétiques, pas de RAG vectoriel ni de réponse générée |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
@@ -42,9 +42,21 @@ génère pas une réponse d'IA.
 ## Vérifications confirmées
 
 - 66 tests passent sur le nœud de calcul Linux ;
+- 110 tests passent dans le clone public local, avec un test PyTorch
+  d'intégration ignoré lorsque le bundle CPU vérifié est absent ; ces changements ne sont pas
+  encore déclarés redéployés sur le nœud de calcul ;
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
 - un checkpoint CORE-MINI a été produit puis repris avec le chargeur sécurisé ;
 - CORE-80M s'instancie en RAM CPU avec son nombre exact de paramètres ;
+- le harness et la future inférence partagent maintenant la même définition
+  CPU-only du decoder, sans modifier le format des checkpoints existants ;
+- le tokenizer expérimental normalise, encode et décode de façon déterministe,
+  refuse les fusions ou couvertures d'octets incohérentes et borne les entrées ;
+- le chargeur de texte autorisé refuse toute partition autre que `train` et lie
+  corpus, manifeste et tokenizer sans recopier leur contenu dans la lignée ;
+- le vérificateur de checkpoint contrôle localement les contrats, clés et
+  limites ; la reprise d'un ancien checkpoint réel n'a pas encore été prouvée,
+  car la tentative distante a été interrompue par l'instabilité SSH ;
 - BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
 - un premier échange français a été généré localement, sans écoute réseau ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices

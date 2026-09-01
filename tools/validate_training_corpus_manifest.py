@@ -14,6 +14,9 @@ PACKAGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 CORPUS_ID = re.compile(r"^corpus-[a-z0-9][a-z0-9-]{2,62}$")
 LANGUAGE = re.compile(r"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$")
 POLICY_ID = re.compile(r"^[a-z][a-z0-9._-]{2,127}$")
+MAXIMUM_MATERIALIZATION_BYTES = 1_099_511_627_776
+MAXIMUM_RECORDS = 1_000_000_000_000
+MAXIMUM_SOURCE_PACKAGES = 100_000
 
 TOP_LEVEL = {
     "schema_version", "corpus_id", "lifecycle_state", "classification", "materialization",
@@ -38,9 +41,19 @@ def require_sha256(value: Any, context: str) -> None:
         fail(f"{context} must be a lowercase SHA-256")
 
 
+def require_bounded_int(
+    value: Any, *, minimum: int, maximum: int, context: str
+) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        fail(f"{context} must be an integer between {minimum} and {maximum}")
+    return value
+
+
 def ensure_no_sensitive_keys(value: Any) -> None:
     if isinstance(value, dict):
         for key, nested in value.items():
+            if not isinstance(key, str):
+                fail("manifest keys must be strings")
             lowered = key.lower()
             if any(fragment in lowered for fragment in SENSITIVE_KEY_FRAGMENTS) or SENSITIVE_TOKEN_FIELD.search(lowered):
                 fail(f"forbidden sensitive field: {key}")
@@ -54,7 +67,7 @@ def validate(document: Any, *, require_training_authorization: bool = False) -> 
     """Validate structure and invariants; it never validates the corpus bytes themselves."""
     ensure_no_sensitive_keys(document)
     doc = exact_keys(document, TOP_LEVEL, "manifest")
-    if doc["schema_version"] != "0.1.0":
+    if doc["schema_version"] != "0.2.0":
         fail("unsupported schema_version")
     if not isinstance(doc["corpus_id"], str) or not CORPUS_ID.fullmatch(doc["corpus_id"]):
         fail("invalid corpus_id")
@@ -67,12 +80,22 @@ def validate(document: Any, *, require_training_authorization: bool = False) -> 
     if materialization["format"] != "jsonl-utf8":
         fail("unsupported materialization format")
     require_sha256(materialization["content_sha256"], "materialization.content_sha256")
-    if not all(isinstance(materialization[field], int) and materialization[field] > 0 for field in ("byte_size", "record_count")):
-        fail("materialization sizes must be positive integers")
+    require_bounded_int(
+        materialization["byte_size"],
+        minimum=1,
+        maximum=MAXIMUM_MATERIALIZATION_BYTES,
+        context="materialization.byte_size",
+    )
+    require_bounded_int(
+        materialization["record_count"],
+        minimum=1,
+        maximum=MAXIMUM_RECORDS,
+        context="materialization.record_count",
+    )
 
     packages = doc["source_packages"]
-    if not isinstance(packages, list) or not packages:
-        fail("source_packages must not be empty")
+    if not isinstance(packages, list) or not 1 <= len(packages) <= MAXIMUM_SOURCE_PACKAGES:
+        fail("source_packages count is outside the bounded range")
     package_ids: set[str] = set()
     for package in packages:
         package = exact_keys(package, {"package_id", "provenance_id", "content_sha256", "license", "languages", "review_state"}, "source_package")
@@ -83,18 +106,20 @@ def validate(document: Any, *, require_training_authorization: bool = False) -> 
         if not isinstance(package["provenance_id"], str) or not PACKAGE_ID.fullmatch(package["provenance_id"]):
             fail("invalid provenance_id")
         require_sha256(package["content_sha256"], "source_package.content_sha256")
-        if not isinstance(package["license"], str) or not package["license"].strip():
+        if not isinstance(package["license"], str) or not 1 <= len(package["license"].strip()) <= 200:
             fail("source_package.license is required")
         if package["review_state"] != "approved":
             fail("each source package requires approval")
         languages = package["languages"]
-        if not isinstance(languages, list) or not languages or any(not isinstance(language, str) or not LANGUAGE.fullmatch(language) for language in languages):
+        if not isinstance(languages, list) or not 1 <= len(languages) <= 32 or any(not isinstance(language, str) or not LANGUAGE.fullmatch(language) for language in languages):
             fail("source_package.languages must contain language tags")
 
     splits = exact_keys(doc["splits"], {"train", "validation", "test"}, "splits")
     assigned_ids: set[str] = set()
+    split_hashes: set[str] = set()
+    split_record_count = 0
     for split_name, split in splits.items():
-        split = exact_keys(split, {"package_ids", "content_sha256", "record_count"}, f"splits.{split_name}")
+        split = exact_keys(split, {"package_ids", "content_sha256", "byte_size", "record_count"}, f"splits.{split_name}")
         package_refs = split["package_ids"]
         if not isinstance(package_refs, list) or not package_refs or any(not isinstance(value, str) for value in package_refs):
             fail(f"splits.{split_name}.package_ids must not be empty")
@@ -104,18 +129,39 @@ def validate(document: Any, *, require_training_authorization: bool = False) -> 
             fail("a source package may belong to only one split")
         assigned_ids.update(package_refs)
         require_sha256(split["content_sha256"], f"splits.{split_name}.content_sha256")
-        if not isinstance(split["record_count"], int) or split["record_count"] <= 0:
-            fail(f"splits.{split_name}.record_count must be positive")
+        if split["content_sha256"] in split_hashes:
+            fail("train, validation and test must have distinct content hashes")
+        split_hashes.add(split["content_sha256"])
+        require_bounded_int(
+            split["byte_size"],
+            minimum=1,
+            maximum=MAXIMUM_MATERIALIZATION_BYTES,
+            context=f"splits.{split_name}.byte_size",
+        )
+        split_record_count += require_bounded_int(
+            split["record_count"],
+            minimum=1,
+            maximum=MAXIMUM_RECORDS,
+            context=f"splits.{split_name}.record_count",
+        )
     if assigned_ids != package_ids:
         fail("every source package must be assigned to exactly one split")
+    if materialization["content_sha256"] in split_hashes:
+        fail("global materialization hash must differ from every split hash")
+    if materialization["record_count"] != split_record_count:
+        fail("global materialization record count must equal the split total")
 
     tokenizer = exact_keys(doc["tokenizer_contract"], {"input_encoding", "normalization_policy_id", "candidate_vocabulary_size", "review_state"}, "tokenizer_contract")
     if tokenizer["input_encoding"] != "utf-8":
         fail("tokenizer input encoding must be utf-8")
     if not isinstance(tokenizer["normalization_policy_id"], str) or not POLICY_ID.fullmatch(tokenizer["normalization_policy_id"]):
         fail("invalid tokenizer normalization policy")
-    if not isinstance(tokenizer["candidate_vocabulary_size"], int) or not 256 <= tokenizer["candidate_vocabulary_size"] <= 262144:
-        fail("tokenizer vocabulary size is out of range")
+    require_bounded_int(
+        tokenizer["candidate_vocabulary_size"],
+        minimum=260,
+        maximum=262_144,
+        context="tokenizer candidate_vocabulary_size",
+    )
     if tokenizer["review_state"] not in {"pending", "approved"}:
         fail("invalid tokenizer review state")
 
