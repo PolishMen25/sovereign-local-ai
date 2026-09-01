@@ -146,4 +146,3 @@ Voir [docs/ROADMAP.md](docs/ROADMAP.md).
 Aucune licence n'est ajoutée tant que le propriétaire n'a pas choisi les droits
 de réutilisation. L'absence de licence signifie qu'aucun droit de réutilisation
 n'est accordé implicitement ; ce choix reste à traiter pendant la découverte.
-
