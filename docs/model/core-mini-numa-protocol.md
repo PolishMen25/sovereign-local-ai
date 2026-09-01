@@ -152,6 +152,27 @@ workload, avec deux contrats de placement distincts. Elle doit vérifier les
 SHA-256 des preuves avant de calculer des ratios descriptifs. Le libellé opaque
 ne permet pas, à lui seul, d'affirmer « un socket » ou « deux sockets ».
 
+### Comparateur implémenté
+
+`tools/compare_core_mini_numa_evidence.py` produit cet artefact séparé. Il lit
+exactement deux fichiers de preuve, recalcule leur SHA-256 et le
+`workload_contract_sha256` à partir de l'objet `workload` avant tout calcul de
+ratio, puis refuse notamment : deux preuves du même libellé, un `proof_id` ou un
+fichier identique, deux sessions de benchmark différentes, un contrat de
+workload divergent — le champ fautif est nommé —, un contrat de placement
+partagé, moins de trois répétitions, une statistique non finie ou hors de son
+intervalle observé, des octets non canoniques et une sortie déjà existante.
+
+La sortie est fermée par `schemas/core-mini-numa-comparison.schema.json`, dans
+la même forme `canonical-json-v1` suivie d'un unique octet LF. Elle porte des
+ratios descriptifs `b / a`, les deux distributions et un champ `separation`.
+
+Trois à dix répétitions ne soutiennent aucune affirmation de significativité :
+`separation` ne rapporte donc que le chevauchement des intervalles observés.
+Des intervalles qui se chevauchent donnent `inconclusive-overlapping-observed-ranges`.
+Le champ `higher_median_label` reste descriptif et ne désigne pas un gagnant.
+L'artefact porte `gate_status: g4-open` : il ne ferme jamais G4.
+
 ## Minimisation de la sortie publique
 
 Le schéma est fermé avec `additionalProperties: false`. La sortie ne contient

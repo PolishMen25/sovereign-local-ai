@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-local-ai.invalid/schemas/core-mini-numa-comparison.schema.json",
+  "title": "Comparaison descriptive de deux placements CORE-MINI",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "canonicalization",
+    "comparison_id",
+    "created_at_utc",
+    "benchmark_session_id",
+    "shared_contract",
+    "placements",
+    "descriptive_ratios",
+    "separation",
+    "evidence_scope",
+    "gate_status"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "artifact_type": { "const": "two-placement-descriptive-comparison" },
+    "canonicalization": { "const": "canonical-json-v1" },
+    "comparison_id": { "$ref": "#/$defs/comparisonId" },
+    "created_at_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "benchmark_session_id": { "$ref": "#/$defs/sessionId" },
+    "shared_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workload_contract_sha256",
+        "source_revision",
+        "source_archive_sha256",
+        "source_tree_manifest_sha256",
+        "offline_runtime_lock_sha256",
+        "runtime_observation_sha256",
+        "environment_contract_sha256",
+        "model_config_sha256",
+        "steps",
+        "warmup_steps",
+        "batch_size",
+        "sequence_length",
+        "seed",
+        "threads"
+      ],
+      "properties": {
+        "workload_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "source_revision": { "type": "string" },
+        "source_archive_sha256": { "$ref": "#/$defs/sha256" },
+        "source_tree_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "offline_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_observation_sha256": { "$ref": "#/$defs/sha256" },
+        "environment_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "model_config_sha256": { "$ref": "#/$defs/sha256" },
+        "steps": { "type": "integer", "minimum": 1 },
+        "warmup_steps": { "type": "integer", "minimum": 0 },
+        "batch_size": { "type": "integer", "minimum": 1 },
+        "sequence_length": { "type": "integer", "minimum": 1 },
+        "seed": { "type": "integer" },
+        "threads": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "placements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["placement-a", "placement-b"],
+      "properties": {
+        "placement-a": { "$ref": "#/$defs/placementSummary" },
+        "placement-b": { "$ref": "#/$defs/placementSummary" }
+      }
+    },
+    "descriptive_ratios": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean_b_over_a",
+        "median_b_over_a",
+        "minimum_b_over_a",
+        "maximum_b_over_a"
+      ],
+      "properties": {
+        "mean_b_over_a": { "$ref": "#/$defs/positiveNumber" },
+        "median_b_over_a": { "$ref": "#/$defs/positiveNumber" },
+        "minimum_b_over_a": { "$ref": "#/$defs/positiveNumber" },
+        "maximum_b_over_a": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "separation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_ranges_overlap", "outcome", "higher_median_label"],
+      "properties": {
+        "observed_ranges_overlap": { "type": "boolean" },
+        "outcome": {
+          "enum": [
+            "inconclusive-overlapping-observed-ranges",
+            "disjoint-observed-ranges"
+          ]
+        },
+        "higher_median_label": {
+          "enum": ["placement-a", "placement-b", "tied"]
+        }
+      }
+    },
+    "evidence_scope": { "const": "descriptive-two-placement-comparison-only" },
+    "gate_status": { "const": "g4-open" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "positiveNumber": { "type": "number", "exclusiveMinimum": 0 },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^session-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "comparisonId": {
+      "type": "string",
+      "pattern": "^comparison-[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "proofId": {
+      "type": "string",
+      "pattern": "^proof-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "median",
+        "minimum",
+        "maximum",
+        "population_standard_deviation",
+        "median_absolute_deviation"
+      ],
+      "properties": {
+        "mean": { "$ref": "#/$defs/positiveNumber" },
+        "median": { "$ref": "#/$defs/positiveNumber" },
+        "minimum": { "$ref": "#/$defs/positiveNumber" },
+        "maximum": { "$ref": "#/$defs/positiveNumber" },
+        "population_standard_deviation": { "type": "number", "minimum": 0 },
+        "median_absolute_deviation": { "type": "number", "minimum": 0 }
+      }
+    },
+    "placementSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proof_id",
+        "proof_file_sha256",
+        "contract_commitment_sha256",
+        "repetitions_completed",
+        "tokens_per_second"
+      ],
+      "properties": {
+        "proof_id": { "$ref": "#/$defs/proofId" },
+        "proof_file_sha256": { "$ref": "#/$defs/sha256" },
+        "contract_commitment_sha256": { "$ref": "#/$defs/sha256" },
+        "repetitions_completed": { "type": "integer", "minimum": 3 },
+        "tokens_per_second": { "$ref": "#/$defs/distribution" }
+      }
+    }
+  }
+}
