@@ -1,6 +1,6 @@
 # Registre initial des décisions
 
-Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confirmées des orientations provisoires. Une orientation ne devient ferme qu'après validation explicite du propriétaire et, pour un choix structurant, création d'un ADR.
+Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confirmées des orientations provisoires. Une orientation ne devient ferme qu'après validation explicite du propriétaire et, pour un choix structurant, création d'un ADR.
 
 ## Décisions confirmées
 
@@ -8,7 +8,7 @@ Dernière mise à jour : 2026-08-25. Ce registre distingue les décisions confir
 |---|---|---|
 | D-001 | Le projet est CPU-only. | Aucun composant obligatoire ne dépend d'un GPU, CUDA, ROCm ou TPU. |
 | D-002 | Le calcul principal se fait sur le HPE ML350 Gen9. | Entraînement, benchmarks et inférence principale y sont conçus et mesurés. |
-| D-003 | Configuration connue du ML350 : 2 × E5-2699 v4, 44C/88T, 88 Go, ~12 To, Proxmox. | NUMA dual-socket et marge pour l'hyperviseur doivent être pris en compte. |
+| D-003 | Configuration mesurée du ML350 : 2 × E5-2698 v4, 40C/80T, 88 Go installés (~78 Gio visibles), deux nœuds NUMA, ~12 To, Proxmox. | NUMA dual-socket et marge pour l'hyperviseur doivent être pris en compte. Corrigé le 2026-09-01 : le registre annonçait 2 × E5-2699 v4 et 44C/88T, contredits par la mesure sur la machine. |
 | D-004 | Le Synology RS3617xs+ est le stockage long terme ; configuration déclarée : 32 Go de RAM, ~8,1 To utiles, ~1,1 To utilisés et ~7 To libres. | RAW, datasets, connaissances, modèles validés, checkpoints importants, audit et sauvegardes y résident selon une arborescence/ACL à valider. Capacités et état doivent être vérifiés pendant l'inventaire. |
 | D-005 | Le RS3617xs+ ne fait pas l'entraînement principal. | Les datasets actifs et checkpoints temporaires pourront être placés sur stockage local du ML350. |
 | D-006 | Le DL380p Gen8 est exclu de la V1. | Aucun service, capacité ou disponibilité V1 ne dépend de cette machine. |
