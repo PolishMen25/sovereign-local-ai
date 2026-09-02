@@ -157,7 +157,12 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
         _, digest, expected_python, architecture, minimum_glibc, torch_version = (
             benchmark.load_offline_runtime_lock(lock_path)
         )
+        numpy_lock_path = PROJECT_ROOT / "configs" / "runtime" / "numpy-2.5.2-cpu-cp313-linux-x86_64.lock.json"
+        _, numpy_digest, numpy_version = benchmark.load_numpy_runtime_lock(
+            numpy_lock_path
+        )
         self.assertRegex(digest, r"^[0-9a-f]{64}$")
+        self.assertRegex(numpy_digest, r"^[0-9a-f]{64}$")
         runtime = {
             "device": "cpu_only",
             "accelerator_backend": "absent",
@@ -165,6 +170,7 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
             "platform_machine": architecture,
             "platform_system": "Linux",
             "glibc_version": minimum_glibc,
+            "numpy_version": numpy_version,
             "torch_version": torch_version,
         }
         benchmark.validate_runtime_observation(
@@ -173,6 +179,7 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
             expected_architecture=architecture,
             minimum_glibc=minimum_glibc,
             expected_torch=torch_version,
+            expected_numpy=numpy_version,
         )
         runtime["torch_version"] = "0.0.0+cpu"
         with self.assertRaises(benchmark.BenchmarkRefused):
@@ -182,6 +189,18 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
                 expected_architecture=architecture,
                 minimum_glibc=minimum_glibc,
                 expected_torch=torch_version,
+                expected_numpy=numpy_version,
+            )
+        runtime["torch_version"] = torch_version
+        runtime["numpy_version"] = "0.0.0"
+        with self.assertRaises(benchmark.BenchmarkRefused):
+            benchmark.validate_runtime_observation(
+                runtime,
+                expected_python=expected_python,
+                expected_architecture=architecture,
+                minimum_glibc=minimum_glibc,
+                expected_torch=torch_version,
+                expected_numpy=numpy_version,
             )
 
     def test_private_contract_is_strict_and_hashes_exact_bytes(self) -> None:
@@ -365,6 +384,39 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
         with self.assertRaises(benchmark.BenchmarkRefused):
             child.build_phase_command(args)
 
+    def test_repetition_passes_only_wrapper_owned_training_options(self) -> None:
+        placement = benchmark.PlacementSnapshot((0, 1), (0,), "bind", (0,))
+        with sovereign_temporary_directory() as directory:
+            run_root = Path(directory)
+            with (
+                patch.object(benchmark, "capture_placement", return_value=placement),
+                patch.object(
+                    benchmark,
+                    "run_child",
+                    side_effect=benchmark.BenchmarkRefused("stop after command capture"),
+                ) as run_child,
+            ):
+                with self.assertRaises(benchmark.BenchmarkRefused):
+                    benchmark._run_repetition(
+                        run_root,
+                        repetition=1,
+                        config_path=run_root / "config.json",
+                        model_name="CORE-MINI-1M",
+                        expected_placement=placement,
+                        required_memory_policy="bind",
+                        steps=8,
+                        warmup_steps=2,
+                        batch_size=2,
+                        sequence_length=32,
+                        threads=2,
+                        seed=1,
+                        timeout_seconds=30,
+                    )
+            command = run_child.call_args.args[0]
+            parsed = child.parse_args(command[4:])
+            self.assertEqual(parsed.phase, "train")
+            self.assertNotIn("--learning-rate", command)
+
     def test_child_attestation_binds_cpu_memory_policy_phase_and_network(self) -> None:
         placement = benchmark.PlacementSnapshot((0, 1), (0,), "bind", (0,))
         document = {
@@ -406,6 +458,7 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
             source_tree_manifest_sha256="2" * 64,
             config_sha256="c" * 64,
             offline_runtime_lock_sha256="d" * 64,
+            numpy_runtime_lock_sha256="9" * 64,
             runtime_observation_sha256="f" * 64,
             environment_contract_sha256="e" * 64,
             repetitions=runs,
@@ -471,6 +524,7 @@ class CoreMiniNumaBenchmarkTests(unittest.TestCase):
                 source_tree_manifest_sha256="2" * 64,
                 config_sha256="c" * 64,
                 offline_runtime_lock_sha256="d" * 64,
+                numpy_runtime_lock_sha256="9" * 64,
                 runtime_observation_sha256="f" * 64,
                 environment_contract_sha256="e" * 64,
                 repetitions=[repetition(2, 100.0)] * 3,

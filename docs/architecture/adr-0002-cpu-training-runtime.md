@@ -5,7 +5,8 @@
 
 ## Contexte
 
-CORE-MINI-1M et CORE-80M sont des architectures créées dans le projet. Des
+CORE-MINI-1M et CORE-700M sont des architectures créées dans le projet ;
+CORE-80M reste une référence historique. Des
 checkpoints synthétiques de validation CORE-MINI existent, mais aucun poids
 linguistique utile ni tokenizer final n'est disponible. Le chemin doit
 fonctionner sur CPU x86-64 bi-socket NUMA, sans CUDA, sans télémétrie et sans
@@ -20,7 +21,7 @@ mini-modèle, puis conserver un runtime Python de référence et évaluer un for
 d’inférence optimisé après validation des poids.
 
 - Avantages : autograd, optimiseur, checkpoints et mesures disponibles ; chemin
-  réaliste vers CORE-80M.
+  réaliste vers CORE-700M.
 - Risques : dépendances lourdes, opérateurs et performances NUMA à mesurer,
   chaîne de paquets à figer hors ligne.
 
@@ -62,17 +63,21 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
   strictement hors ligne depuis le wheelhouse verrouillé. Python système reste
   inchangé. Le runtime observé est PyTorch `2.13.0+cpu` sous Python `3.13.5`,
   sans CUDA ni ROCm.
+- **CONFIRMÉ** — NumPy `2.5.2` a été acquis avec taille et SHA-256 publiés
+  vérifiés, transféré puis installé hors ligne sans résolution de dépendances.
+  Son lock séparé est versionné et sa version participe désormais à la sonde
+  et à la preuve NUMA.
 - **CONFIRMÉ** — Le harness CORE-MINI est versionné et ses validations
-  structurelles participent à une suite locale de 51 tests réussis.
+  structurelles participent à la suite complète de 198 tests locaux réussis.
 - **CONFIRMÉ** — Le cycle réel entraînement → checkpoint → reprise a réussi sur
-  le ML350 avec 4 étapes synthétiques bornées. La reprise emploie
-  `weights_only=True`; le contrat ne conserve que des types sûrs et le
-  checkpoint final de l'étape 4 est identifié par SHA-256.
-- **CONFIRMÉ** — Un premier passage NUMA comparable a été exécuté. Il montre
-  que davantage de sockets ou de threads n'accélère pas automatiquement ce
-  petit workload. La mesure n'a qu'une répétition ; les résultats détaillés
-  restent dans le journal technique interne et ne suffisent pas à choisir le
-  placement de CORE-80M.
+  le ML350 sur 20 étapes synthétiques bornées, puis a repris 5 étapes jusqu'à
+  l'étape 25. La reprise emploie `weights_only=True`; le contrat ne conserve
+  que des types sûrs et les checkpoints sont identifiés par SHA-256.
+- **CONFIRMÉ** — Le préflight du runner NUMA répété a validé l'archive source,
+  le runtime CPU hors ligne, le placement externe et le refus des sockets
+  Internet. Le premier run réel a ensuite refusé un argument appartenant au
+  wrapper enfant ; le défaut est corrigé et testé localement. Les deux preuves
+  répétées A/B restent à rejouer sur la révision déployée.
 
 Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
 le benchmark NUMA complet avec répétitions et charges plus grandes, ni la
@@ -91,4 +96,4 @@ donc **PROPOSÉ**.
 6. restaurer les artefacts depuis le Synology et reproduire le résultat.
 
 L'installation bornée du framework et le smoke test CORE-MINI sont réalisés.
-Cette proposition n'autorise pas encore l'entraînement long de CORE-80M.
+Cette proposition n'autorise pas encore l'entraînement long de CORE-700M.

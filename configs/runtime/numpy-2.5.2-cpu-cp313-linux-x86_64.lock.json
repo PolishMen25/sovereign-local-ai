@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1.0",
+  "status": "acquired_installed",
+  "acquired_at": "2026-09-02",
+  "source_index": "https://pypi.org/simple",
+  "target": {
+    "host_role": "ml350_training_candidate",
+    "os": "linux",
+    "architecture": "x86_64",
+    "python": "3.13",
+    "abi": "cp313",
+    "minimum_glibc": "2.27",
+    "observed_glibc": "2.41"
+  },
+  "policy": {
+    "cpu_only": true,
+    "offline_install_only": true,
+    "forbidden_filename_markers": [
+      "cuda",
+      "cu11",
+      "cu12",
+      "cu13",
+      "nvidia",
+      "rocm",
+      "triton"
+    ]
+  },
+  "packages": [
+    {
+      "filename": "numpy-2.5.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+      "name": "numpy",
+      "version": "2.5.2",
+      "bytes": 16709995,
+      "sha256": "29b86ff8a6cc556b47ec6b64b194815cc80e6bf5eedcc6cddfd65318cb0b4eee",
+      "published_sha256_verified": true,
+      "license_expression": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0"
+    }
+  ]
+}

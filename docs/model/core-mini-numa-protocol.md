@@ -6,7 +6,7 @@ aucune preuve conforme issue du nœud CPU n'est encore documentée.**
 Ce protocole définit une preuve bornée pour **un seul placement externe** de
 CORE-MINI-1M. Il permet de répéter un workload synthétique comparable sans
 publier l'identité de la machine ni sa topologie détaillée. Il n'autorise ni
-entraînement long, ni exposition réseau, ni choix de placement pour CORE-80M.
+entraînement long, ni exposition réseau, ni choix de placement pour CORE-700M.
 
 Le passage NUMA préliminaire déjà documenté avec une seule répétition n'est pas
 une preuve conforme à ce protocole.
@@ -15,7 +15,8 @@ L'implémentation de référence est `tools/core_mini_numa_benchmark.py`. Elle
 produit une preuve publique conforme à
 [`core-mini-numa-evidence.schema.json`](../../schemas/core-mini-numa-evidence.schema.json)
 pour un seul placement. Elle ne compare pas deux placements et n'applique
-jamais elle-même une affinité.
+jamais elle-même une affinité. La version `0.2.0` du contrat lie séparément les
+locks PyTorch et NumPy à la preuve.
 
 ## Frontière du placement externe
 
@@ -104,8 +105,8 @@ Une invocation du runner produit au plus une preuve pour un placement :
 1. lire une seule fois les octets bornés de la configuration CORE-MINI et du
    contrat privé, puis construire le contrat d'environnement depuis les
    restrictions effectivement appliquées ;
-2. vérifier l'archive source et le lock offline du runtime, enregistrer
-   l'observation stricte de Python/PyTorch/Linux/architecture/glibc, puis fixer
+2. vérifier l'archive source et les locks offline PyTorch et NumPy, enregistrer
+   l'observation stricte de Python/PyTorch/NumPy/Linux/architecture/glibc, puis fixer
    le commit source, le workload synthétique, la
    graine, le nombre de threads, le lot, la longueur de séquence, le nombre
    d'étapes et la chauffe ;
@@ -175,7 +176,7 @@ Le runner refuse notamment :
 - moins de trois répétitions, une répétition manquante ou dupliquée ;
 - un placement absent, non vérifié ou différent pendant la preuve ;
 - une archive source non canonique, un commit PAX absent, une dérive du runtime,
-  de la configuration ou des hyperparamètres, ou un changement des sources
+  de NumPy, de la configuration ou des hyperparamètres, ou un changement des sources
   hachées pendant le run ;
 - un journal, un résumé ou un checkpoint dont l'empreinte ne correspond pas ;
 - un nombre non fini, une statistique non reproductible ou une clé inconnue ;
@@ -188,7 +189,7 @@ Même conforme, cet artefact reste une **preuve répétée miniature et
 synthétique**. Il ne mesure pas encore la mémoire de pointe, l'utilisation CPU,
 les défauts et accès NUMA, les entrées/sorties, le coût de checkpoint/reprise ou
 deux échelles miniatures. Il ne prouve ni la qualité d'un modèle, ni la
-faisabilité ou la durée d'entraînement de CORE-80M.
+faisabilité ou la durée d'entraînement de CORE-700M.
 
 Le gate G4 reste donc **ouvert** jusqu'au benchmark reproductible complet,
 accepté par le propriétaire. Aucun résultat de ce runner ne doit être présenté

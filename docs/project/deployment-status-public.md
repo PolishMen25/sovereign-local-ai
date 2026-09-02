@@ -1,6 +1,6 @@
 # État public du déploiement
 
-Dernière vérification : 2026-09-01.
+Dernière vérification : 2026-09-02.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md). Ce résumé reste
@@ -9,18 +9,21 @@ compte, ni secret, ni chemin d'administration.
 
 ## État essentiel
 
-- **Chat BOOTSTRAP : disponible en CLI et HTTPS privé.** Des poids GGUF
+- **Chat BOOTSTRAP : disponible en CLI et via une passerelle HTTPS privée.** Des poids GGUF
   vérifiés sont chargés par llama.cpp sur CPU et produisent une vraie réponse.
-  Le serveur reste lié à sa boucle locale et le relais HTTPS est restreint au
-  tailnet ; aucune exposition Internet n'est activée. Ce modèle tiers
+  Le serveur reste lié à sa boucle locale ; la passerelle authentifiée appelle
+  ce moteur, nomme chaque réponse `BOOTSTRAP` et est relayée dans le tailnet.
+  La première configuration du propriétaire reste à terminer. Ce modèle tiers
   temporaire est explicitement distinct de CORE.
 - **CORE-MINI : harness synthétique fonctionnel.** Entraînement synthétique et
-  checkpoint atomique sont validés. Le nouveau chargement strict et le mode
+  checkpoint atomique sont validés par un run de 20 étapes repris 5 étapes
+  jusqu'à l'étape 25. Le nouveau chargement strict et le mode
   explicite `authorized-text` sont implémentés et couverts par les tests locaux,
   mais aucun run `authorized-text` de bout en bout ni reprise du checkpoint
   historique avec ces nouveaux contrôles n'est encore confirmé sur Linux. Le
-  runner NUMA répété est implémenté, mais aucune preuve conforme produite par ce
-  runner n'est encore documentée sur le nœud CPU.
+  runner NUMA répété est implémenté ; son préflight réel a réussi, puis un
+  défaut d'argument a été détecté et corrigé localement. Les preuves A/B doivent
+  encore être rejouées après redéploiement.
 - **CORE-700M : conception seulement.** L'architecture candidate et son
   comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
   référence historique ; aucun tokenizer final, corpus approuvé ou poids
@@ -29,10 +32,10 @@ compte, ni secret, ni chemin d'administration.
   `stdio` l'état, la recherche lexicale et une provenance exacte. Un index
   hybride SQLite/FTS5/vecteurs est testé, sans moteur d'embeddings installé ni
   données réelles indexées.
-- **Interface Web du projet : implémentée localement, non déployée.** Première
-  configuration, Argon2id, sessions, CSRF, mémoire, historique et client
-  llama.cpp loopback sont testés. L'interface native BOOTSTRAP reste le seul
-  service HTTPS actuellement installé.
+- **Interface Web du projet : déployée derrière le HTTPS privé.** Argon2id,
+  sessions, CSRF, mémoire SQLite locale, historique, export, suppression et
+  client llama.cpp loopback fonctionnent. L'initialisation du compte
+  propriétaire reste à effectuer ; la mémoire n'est pas encore répliquée.
 - **Agents : configuration seulement.** Les 60 profils sont tous `draft` et
   aucun agent n'est actif.
 - **Orchestrateur et autorisations : préparation seulement.** Les validateurs
@@ -40,9 +43,13 @@ compte, ni secret, ni chemin d'administration.
   profils, outils et confirmations ne sont pas encore raccordés au chat.
 - **Collector : ingress write-only actif.** Son endpoint HTTPS de santé répond ;
   une entrée acceptée reste `RAW` et n'est jamais promue automatiquement.
-- **Stockage : partage Synology préparé, non monté.** L'arborescence durable
-  existe, mais le client SMB, le secret local et l'unité de montage ne sont pas
-  actifs dans le conteneur de calcul. Aucune restauration n'est revendiquée.
+- **Stockage : partage Synology préparé, non monté.** L'arborescence durable et
+  le client SMB existent, mais le secret local et l'unité de montage ne sont
+  pas actifs. Aucune restauration n'est revendiquée.
+- **Zone CORE : invitée non privilégiée active.** Le runtime PyTorch/NumPy CPU
+  est installé hors ligne et les flux sont bornés. Aucun poids ni service de
+  génération CORE n'est actif ; le test d'isolation après redémarrage reste à
+  compléter.
 
 Ces éléments restent des preuves opérationnelles réversibles de phase 0. Ils ne
 valident ni l'orientation P-002, ni la topologie cible, ni un gate de mise en
@@ -50,13 +57,14 @@ production.
 
 ## Preuves techniques actuelles
 
-- PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
+- PyTorch CPU et NumPy sont installés hors ligne dans un environnement isolé
+  sur le nœud de calcul, avec locks et empreintes vérifiés ;
 - CUDA et ROCm ne font pas partie du runtime ;
 - CORE-80M s'est historiquement instancié en CPU avec son nombre candidat exact ;
 - CORE-700M possède une configuration et un comptage exacts, sans instanciation
   complète mesurée ni poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise a réussi sur Linux
-  avec le chargeur borné antérieur ;
+  avec 20 étapes puis 5 étapes de reprise sous les contrôles stricts actuels ;
 - le manifeste et le tokenizer expérimentaux sont maintenant liés au seul
   split `train` par taille, compte et SHA-256 ;
 - la configuration CORE-MINI est lue, validée et hachée depuis une unique copie
@@ -70,9 +78,8 @@ production.
 - la reprise du modèle et de l'optimiseur utilise des contrôles CPU stricts
   partagés avec le vérificateur offline et refuse les strides, stockages ou
   alias AdamW anormaux ;
-- la nouvelle vérification renforcée d'un checkpoint historique reste à
-  terminer sur Linux : la première tentative a été interrompue par le transport
-  SSH, sans modification du checkpoint source ;
+- la vérification renforcée d'un ancien checkpoint historique reste à terminer
+  sur Linux ;
 - le MCP Knowledge répond et retourne des résultats synthétiques avec
   `provenance_id` ;
 - l'expéditeur du Collector refuse les redirections HTTP, valide les payloads

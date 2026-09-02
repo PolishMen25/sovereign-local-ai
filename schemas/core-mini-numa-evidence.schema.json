@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.local-ai.invalid/core-mini-numa-evidence/0.1.0/schema.json",
+  "$id": "https://schemas.local-ai.invalid/core-mini-numa-evidence/0.2.0/schema.json",
   "title": "Preuve répétée CORE-MINI pour un placement externe",
   "description": "Contrat public strict pour une preuve synthétique d'un seul placement. Les détails de machine, commandes et chemins restent hors de l'artefact.",
   "type": "object",
@@ -20,7 +20,7 @@
     "evidence_scope"
   ],
   "properties": {
-    "schema_version": { "const": "0.1.0" },
+    "schema_version": { "const": "0.2.0" },
     "artifact_type": { "const": "single-placement-run-proof" },
     "proof_id": { "$ref": "#/$defs/proofId" },
     "created_at_utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
@@ -83,6 +83,7 @@
         "source_archive_sha256",
         "source_tree_manifest_sha256",
         "offline_runtime_lock_sha256",
+        "numpy_runtime_lock_sha256",
         "runtime_observation_sha256",
         "environment_contract_sha256",
         "model_config_sha256",
@@ -102,6 +103,7 @@
         "source_archive_sha256": { "$ref": "#/$defs/sha256" },
         "source_tree_manifest_sha256": { "$ref": "#/$defs/sha256" },
         "offline_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "numpy_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
         "runtime_observation_sha256": { "$ref": "#/$defs/sha256" },
         "environment_contract_sha256": { "$ref": "#/$defs/sha256" },
         "model_config_sha256": { "$ref": "#/$defs/sha256" },

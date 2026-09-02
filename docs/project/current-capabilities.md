@@ -1,6 +1,6 @@
 # Capacités réellement disponibles
 
-Dernière vérification : 2026-09-01.
+Dernière vérification : 2026-09-02.
 
 Ce document est la source de vérité publique sur l'état exécutable du projet.
 Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
@@ -19,9 +19,11 @@ tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
 n'existe encore pour CORE.
 
 Un runner CPU/NUMA synthétique et fail-closed est maintenant implémenté pour
-produire une preuve répétée d'un placement externe. Il n'a pas encore produit
-de preuve conforme documentée sur le nœud CPU et ne compare pas deux
-placements ; il ne ferme donc pas le gate G4.
+produire une preuve répétée d'un placement externe. Son préflight réel a passé
+les contrôles de source, runtime, placement et sockets ; le premier run a mis
+en évidence un doublon d'option entre runner et wrapper, désormais corrigé et
+testé localement. Les deux preuves A/B doivent encore être rejouées après
+déploiement de cette correction ; le gate G4 reste ouvert.
 
 CORE-MINI possède maintenant un second chemin, nommé explicitement
 `authorized-text`. La validation du bundle, la tokenisation, le contrat, le
@@ -38,29 +40,30 @@ génère pas une réponse d'IA.
 
 | Composant | État exact | Ce qui fonctionne | Limite actuelle |
 | --- | --- | --- | --- |
-| PyTorch CPU hors ligne | Installé et vérifié | Environnement isolé sur le nœud de calcul, calcul CPU, aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
-| Chat BOOTSTRAP | CLI et service HTTPS privé fonctionnels | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp ; le serveur reste en boucle locale et est relayé uniquement dans le tailnet | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE ; aucune politique de conservation de conversations n'est approuvée |
-| CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; entraînement synthétique et checkpoint atomique ; modes explicitement séparés et contrôles stricts locaux | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité du checkpoint historique avec le nouveau chargeur à confirmer sur Linux |
-| Runner CORE-MINI NUMA | Implémenté, sans preuve matérielle conforme publiée | Contrat privé strict hors Git, archive source et runtime offline vérifiés, contrôle du placement externe et des sockets flux/datagrammes INET, attestations par phase, 3 à 10 répétitions fraîches et preuve publique minimisée | Linux et isolation externe requis ; un placement par preuve, aucun comparateur multi-placement, aucune mesure complète pour G4 |
+| Runtime tensoriel CPU hors ligne | Installé et vérifié | PyTorch `2.13.0+cpu` et NumPy `2.5.2` dans un environnement isolé, acquis par empreintes et installés sans index réseau ; aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
+| Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur et conserve localement les échanges masqués | Modèle tiers temporaire, aucun RAG/outil/agent, pas CORE ; première configuration propriétaire encore requise et mémoire non répliquée |
+| CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes puis reprise de 5 étapes jusqu'à l'étape 25 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité d'un ancien checkpoint historique encore à confirmer |
+| Runner CORE-MINI NUMA | Implémenté, préflight réel validé, sans preuve A/B acceptée | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, répétitions fraîches et preuve publique minimisée | Correction d'argument testée localement à redéployer ; aucun comparateur multi-placement ni mesure complète pour G4 |
+| Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne, stockage de travail local et flux réseau fortement bornés ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
 | CORE-700M | Architecture candidate et comptage exact vérifié | Configuration de 691 160 320 paramètres ; CORE-80M reste une référence historique | Aucune instanciation complète mesurée, aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
 | RAG hybride | Module local testé, non déployé | SQLite, FTS5, vecteurs finis fournis hors module, score hybride et provenance | Aucun moteur d'embeddings vérifié installé, aucun catalogue réel indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
-| Synology | Partage durable préparé sur le NAS | Arborescence RAW/VALIDATED/modèles/sauvegardes créée ; compte de service dédié préparé | Aucun montage dans le conteneur, client SMB absent, secret de service non installé et aucune restauration validée |
+| Synology | Partage durable préparé sur le NAS | Arborescence RAW/VALIDATED/modèles/sauvegardes créée ; compte de service dédié et client SMB préparés | Aucun montage, secret local ou unité de montage actifs et aucune restauration validée |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
-| Mémoire conversationnelle | Module SQLite local testé, non déployé | Masquage de secrets, empreintes, historique, export et suppression avec reçu sans contenu | Pas encore placée sur le stockage durable ni raccordée au RAG |
-| Interface Web du projet | Passerelle authentifiée implémentée et testée localement | Première configuration, login, CSRF, historique et client llama.cpp loopback avec moteur explicitement nommé | Non déployée sur le sas ; le service HTTPS actuellement visible reste l'interface native BOOTSTRAP |
-| Authentification/RBAC | Compte propriétaire et sessions implémentés, non déployés | Argon2id obligatoire sans repli, jetons de session hachés, cookie sécurisé et CSRF | Paquet Argon2id et compte réel non encore installés ; politiques des agents non raccordées |
+| Mémoire conversationnelle | SQLite local actif dans la passerelle | Masquage de secrets, empreintes, historique, export et suppression avec reçu sans contenu | Pas encore placée sur le stockage durable ni raccordée au RAG |
+| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique et `/v1/chat` réel vers llama.cpp avec moteur `BOOTSTRAP` explicite | Première configuration propriétaire et streaming encore à terminer ; aucun moteur CORE |
+| Authentification/RBAC | Argon2id et sessions déployés | Secret propriétaire créé dans le navigateur, jetons de session hachés, cookie sécurisé et CSRF | Compte propriétaire pas encore initialisé ; politiques des agents non raccordées |
 
 ## Vérifications confirmées
 
 - PyTorch annonce un build CPU et `torch.cuda.is_available()` vaut `False` ;
-- un checkpoint CORE-MINI a été produit puis repris sur Linux avec le chargeur
-  borné antérieur ; sa compatibilité avec les nouveaux contrôles stricts reste
-  à prouver ;
+- un checkpoint CORE-MINI a été produit après 20 étapes puis repris 5 étapes
+  sur Linux avec les contrôles stricts actuels ; la compatibilité d'un ancien
+  checkpoint historique reste un test séparé ;
 - CORE-80M s'est historiquement instancié en RAM CPU avec son nombre exact de paramètres ; CORE-700M possède seulement un comptage exact local et n'a pas encore été instancié sur le nœud ;
 - le harness et la future inférence partagent maintenant la même définition
   CPU-only du decoder, sans modifier le format des checkpoints existants ;
@@ -80,8 +83,8 @@ génère pas une réponse d'IA.
   son préfixe exact est haché dans le checkpoint puis exigé lors d'une reprise ;
 - le harness et le vérificateur partagent les contrôles stricts de l'état du
   modèle et de l'optimiseur, y compris les strides, stockages et alias AdamW ;
-  la reprise d'un ancien checkpoint réel n'a pas encore été prouvée, car la
-  tentative distante a été interrompue par l'instabilité SSH ;
+  la compatibilité d'un ancien checkpoint historique n'a pas encore été
+  prouvée ;
 - le summarizer de métriques `v2` valide strictement un journal synthétique ou
   `authorized-text`, publie le SHA-256 exact de ses octets et calcule, après
   chauffe, moyenne, médiane, minimum, maximum, écart-type de population, MAD et
@@ -103,16 +106,17 @@ génère pas une réponse d'IA.
 - BOOTSTRAP charge ses poids GGUF vérifiés et génère du texte français localement ;
 - un premier échange français a été généré localement ;
 - le service BOOTSTRAP persistant est lié à la boucle locale, fonctionne sans
-  outils, agent, proxy MCP ou téléchargement à l'exécution, puis est relayé en
-  HTTPS privé au seul tailnet ;
+  outils, agent, proxy MCP ou téléchargement à l'exécution ; la passerelle Web
+  authentifiée l'appelle localement et est relayée en HTTPS privé au tailnet ;
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
   synthétiques ;
 - une recherche `stockage hybride` retourne des résumés avec `provenance_id` ;
-- la passerelle Web propre au projet possède maintenant une implémentation
-  locale testée, mais elle n'est pas installée sur le sas et reste distincte du
-  service BOOTSTRAP HTTPS privé ;
-- la suite locale complète passe, dont mémoire privée, suppression, RAG hybride,
-  Argon2id fail-closed, client llama.cpp loopback et comptage CORE-700M ;
+- la passerelle Web propre au projet est installée sur le sas ; son endpoint de
+  chat appelle réellement BOOTSTRAP et sa mémoire SQLite locale prend en charge
+  historique, export et suppression explicite ;
+- 198 tests locaux passent sur la correction en attente de déploiement ; la
+  révision actuellement installée avait passé 197 tests Linux avant cette
+  correction ;
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
   refuse les redirections, valide chaque payload en file et ne le supprime
   qu'après écriture atomique et vérification locale d'un reçu concordant ;
@@ -122,16 +126,18 @@ Le relais HTTPS et le coffre restent des preuves opérationnelles réversibles d
 phase 0. Ils ne valident ni l'orientation P-002, ni la topologie cible, ni un
 gate de mise en production.
 
-Ces contrôles ne prouvent pas encore l'isolation réseau complète de la future
-zone IA-CORE, la qualité d'un modèle linguistique ou la disponibilité d'un
-service de production.
+Ces contrôles ne prouvent pas encore l'isolation réseau complète après tous les
+scénarios de redémarrage, la qualité d'un modèle linguistique ou la
+disponibilité d'un service de production.
 
 ## Utilisable aujourd'hui
 
-Le chat BOOTSTRAP est disponible en CLI SSH et, sur une machine autorisée du
-tailnet, via l'interface HTTPS privée décrite dans [le runbook
-BOOTSTRAP](../operations/bootstrap-chat-cli.md). La CLI ouvre une conversation
-interactive réelle ; `/exit` ou `Ctrl+C` la termine.
+Le chat BOOTSTRAP est disponible en CLI SSH. La passerelle Web est également
+active sur le HTTPS privé décrit dans [le runbook
+BOOTSTRAP](../operations/bootstrap-chat-cli.md), mais le propriétaire doit
+d'abord activer son client tailnet puis terminer la première configuration du
+compte dans le navigateur. La CLI ouvre une conversation interactive réelle ;
+`/exit` ou `Ctrl+C` la termine.
 
 Depuis la racine du dépôt :
 

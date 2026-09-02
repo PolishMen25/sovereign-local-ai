@@ -45,6 +45,12 @@ RUNTIME_LOCK = (
     / "runtime"
     / "pytorch-2.13.0-cpu-cp313-linux-x86_64.lock.json"
 )
+NUMPY_RUNTIME_LOCK = (
+    PROJECT_ROOT
+    / "configs"
+    / "runtime"
+    / "numpy-2.5.2-cpu-cp313-linux-x86_64.lock.json"
+)
 
 EVIDENCE_TYPE = "single-placement-run-proof"
 MAXIMUM_SOURCE_BYTES = 2 * 1024 * 1024
@@ -95,6 +101,7 @@ import platform
 import socket
 import sys
 
+import numpy
 import torch
 
 DENIED_SOCKET_ERRORS = {
@@ -125,6 +132,7 @@ result = {
     "platform_machine": platform.machine(),
     "platform_system": platform.system(),
     "glibc_version": platform.libc_ver()[1],
+    "numpy_version": str(numpy.__version__),
     "torch_version": str(torch.__version__),
 }
 print(json.dumps(result, sort_keys=True, separators=(",", ":")))
@@ -804,9 +812,97 @@ def load_offline_runtime_lock(
     )
 
 
+def load_numpy_runtime_lock(path: Path) -> tuple[dict[str, Any], str, str]:
+    payload = _read_regular_bytes(path, maximum_bytes=MAXIMUM_SOURCE_BYTES)
+    document = _parse_json_object(
+        payload,
+        expected_keys={
+            "schema_version",
+            "status",
+            "acquired_at",
+            "source_index",
+            "target",
+            "policy",
+            "packages",
+        },
+        maximum_bytes=MAXIMUM_SOURCE_BYTES,
+    )
+    target = document["target"]
+    policy = document["policy"]
+    packages = document["packages"]
+    if (
+        document["schema_version"] != "0.1.0"
+        or document["status"] != "acquired_installed"
+        or not isinstance(document["source_index"], str)
+        or not document["source_index"].startswith("https://pypi.org/")
+        or not isinstance(target, dict)
+        or set(target)
+        != {
+            "host_role",
+            "os",
+            "architecture",
+            "python",
+            "abi",
+            "minimum_glibc",
+            "observed_glibc",
+        }
+        or target["os"] != "linux"
+        or target["architecture"] != "x86_64"
+        or target["python"] != "3.13"
+        or target["abi"] != "cp313"
+        or not isinstance(policy, dict)
+        or set(policy)
+        != {"cpu_only", "offline_install_only", "forbidden_filename_markers"}
+        or policy["cpu_only"] is not True
+        or policy["offline_install_only"] is not True
+        or not isinstance(policy["forbidden_filename_markers"], list)
+        or not policy["forbidden_filename_markers"]
+        or not isinstance(packages, list)
+        or len(packages) != 1
+    ):
+        raise BenchmarkRefused("NumPy runtime lock is incompatible")
+    package = packages[0]
+    required_package_keys = {
+        "filename",
+        "name",
+        "version",
+        "bytes",
+        "sha256",
+        "published_sha256_verified",
+        "license_expression",
+    }
+    if not isinstance(package, dict) or set(package) != required_package_keys:
+        raise BenchmarkRefused("NumPy runtime package lock is incompatible")
+    filename = package["filename"]
+    version = package["version"]
+    forbidden = tuple(
+        marker.casefold() for marker in policy["forbidden_filename_markers"]
+        if isinstance(marker, str) and marker
+    )
+    if (
+        len(forbidden) != len(policy["forbidden_filename_markers"])
+        or not isinstance(filename, str)
+        or Path(filename).name != filename
+        or not filename.endswith(".whl")
+        or package["name"].casefold() != "numpy"
+        or not isinstance(version, str)
+        or SAFE_VERSION_PATTERN.fullmatch(version) is None
+        or type(package["bytes"]) is not int
+        or package["bytes"] <= 0
+        or not isinstance(package["sha256"], str)
+        or re.fullmatch(r"[0-9a-f]{64}", package["sha256"]) is None
+        or package["published_sha256_verified"] is not True
+        or not isinstance(package["license_expression"], str)
+        or not package["license_expression"]
+        or any(marker in filename.casefold() for marker in forbidden)
+    ):
+        raise BenchmarkRefused("NumPy runtime package entry is invalid")
+    return document, hashlib.sha256(payload).hexdigest(), version
+
+
 def validate_runtime_observation(
     runtime: dict[str, Any], *, expected_python: str, expected_architecture: str,
-    minimum_glibc: str, expected_torch: str
+    minimum_glibc: str, expected_torch: str, expected_numpy: str
 ) -> None:
     if (
         runtime.get("device") != "cpu_only"
@@ -816,6 +912,7 @@ def validate_runtime_observation(
         or runtime.get("platform_system") != "Linux"
         or runtime.get("platform_machine") != expected_architecture
         or runtime.get("torch_version") != expected_torch
+        or runtime.get("numpy_version") != expected_numpy
     ):
         raise BenchmarkRefused("observed runtime differs from the offline lock")
     observed_glibc = _version_parts(runtime.get("glibc_version"))
@@ -1190,6 +1287,7 @@ def _runtime_probe(
             "platform_machine",
             "platform_system",
             "glibc_version",
+            "numpy_version",
             "torch_version",
         },
     )
@@ -1228,6 +1326,7 @@ def _runtime_probe(
         "platform_machine": _safe_version(document["platform_machine"]),
         "platform_system": _safe_version(document["platform_system"]),
         "glibc_version": _safe_version(document["glibc_version"]),
+        "numpy_version": _safe_version(document["numpy_version"]),
         "torch_version": _safe_version(document["torch_version"]),
         "accelerator_backend": "absent",
         "device": "cpu_only",
@@ -1329,6 +1428,7 @@ def build_evidence(
     source_tree_manifest_sha256: str,
     config_sha256: str,
     offline_runtime_lock_sha256: str,
+    numpy_runtime_lock_sha256: str,
     runtime_observation_sha256: str,
     environment_contract_sha256: str,
     repetitions: list[dict[str, Any]],
@@ -1343,6 +1443,7 @@ def build_evidence(
         source_tree_manifest_sha256,
         config_sha256,
         offline_runtime_lock_sha256,
+        numpy_runtime_lock_sha256,
         runtime_observation_sha256,
         environment_contract_sha256,
     ):
@@ -1368,6 +1469,7 @@ def build_evidence(
         "source_archive_sha256": source_archive_sha256,
         "source_tree_manifest_sha256": source_tree_manifest_sha256,
         "offline_runtime_lock_sha256": offline_runtime_lock_sha256,
+        "numpy_runtime_lock_sha256": numpy_runtime_lock_sha256,
         "runtime_observation_sha256": runtime_observation_sha256,
         "environment_contract_sha256": environment_contract_sha256,
         "model_config_sha256": config_sha256,
@@ -1394,7 +1496,7 @@ def build_evidence(
     ) is None:
         raise BenchmarkRefused("evidence timestamp is incompatible")
     return {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "artifact_type": EVIDENCE_TYPE,
         "proof_id": f"proof-{identifier}",
         "created_at_utc": created,
@@ -1456,8 +1558,6 @@ def _run_repetition(
             str(batch_size),
             "--sequence-length",
             str(sequence_length),
-            "--learning-rate",
-            "0.0003",
             "--seed",
             str(seed),
             "--threads",
@@ -1712,6 +1812,9 @@ def _main(argv: list[str] | None = None) -> int:
         minimum_glibc,
         expected_torch_version,
     ) = load_offline_runtime_lock(RUNTIME_LOCK)
+    _, numpy_runtime_lock_sha256, expected_numpy_version = (
+        load_numpy_runtime_lock(NUMPY_RUNTIME_LOCK)
+    )
     config_bytes = _read_regular_bytes(DEFAULT_CONFIG, maximum_bytes=MAXIMUM_SOURCE_BYTES)
     config_sha256 = hashlib.sha256(config_bytes).hexdigest()
     run_root = _create_run_root(args.run_root)
@@ -1750,6 +1853,7 @@ def _main(argv: list[str] | None = None) -> int:
         expected_architecture=expected_architecture,
         minimum_glibc=minimum_glibc,
         expected_torch=expected_torch_version,
+        expected_numpy=expected_numpy_version,
     )
     runtime_observation = {
         "schema_version": "core-mini-runtime-observation.v1",
@@ -1810,6 +1914,7 @@ def _main(argv: list[str] | None = None) -> int:
         source_tree_manifest_sha256=source_tree_manifest_sha256,
         config_sha256=config_sha256,
         offline_runtime_lock_sha256=offline_runtime_lock_sha256,
+        numpy_runtime_lock_sha256=numpy_runtime_lock_sha256,
         runtime_observation_sha256=runtime_observation_sha256,
         environment_contract_sha256=environment_contract_sha256,
         repetitions=repetitions,
