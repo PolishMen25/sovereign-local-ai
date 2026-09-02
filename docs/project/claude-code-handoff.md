@@ -45,7 +45,7 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - runner de preuve CORE-MINI NUMA implémenté avec contrat de placement externe,
   archive source et runtime offline vérifiés, contrôle INET flux/datagrammes
   fail-closed et répétitions bornées ; aucune preuve conforme de
-  ce runner ni comparaison multi-placement n'est encore documentée ;
+  ce runner ni comparaison multi-placement produite n'est encore documentée ;
 - prototype MCP Knowledge `stdio` sur trois notices synthétiques ;
 - Collector de conversations write-only vers RAW ;
 - stockage chiffré validé avec des données synthétiques ;
@@ -116,7 +116,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   confondue avec CORE ;
 - aucun RAG vectoriel, agent actif, RBAC de production ou interface finale ;
 - aucune preuve répétée du runner NUMA n'a encore été acceptée sur le nœud CPU,
-  aucun comparateur multi-placement n'est implémenté et G4 reste ouvert ;
+  le comparateur multi-placement est implémenté et couvert par des tests
+  unitaires, mais il n'a encore consommé aucune preuve réelle, et G4 reste
+  ouvert ;
 - l'isolation réseau complète et les restaurations de production restent des
   gates à prouver.
 
@@ -128,8 +130,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 3. sous confirmation humaine, produire au moins trois répétitions pour chaque
    placement avec le même UUID de session, le même commit et le même workload,
    puis conserver séparément les deux preuves publiques ;
-4. implémenter un comparateur strict de ces deux preuves avant toute conclusion
-   de placement, sans présenter ce lot comme la fermeture de G4 ;
+4. exécuter `tools/compare_core_mini_numa_evidence.py` sur ces deux preuves
+   avant toute conclusion de placement, sans présenter ce lot comme la
+   fermeture de G4 ;
 5. confirmer la compatibilité d'un checkpoint CORE-MINI historique sur le
    nœud CPU avec le vérificateur offline ;
 6. définir puis approuver les sources, licences, langues et exclusions du
