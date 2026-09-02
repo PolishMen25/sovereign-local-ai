@@ -17,6 +17,15 @@ class ParameterCountTests(unittest.TestCase):
         document = MODULE.load_candidate_document()
         config = MODULE.CoreConfig.from_document(document)
         result = MODULE.count_parameters(config)
+        self.assertEqual(document["name"], "CORE-700M")
+        self.assertEqual(result["total_trainable"], 691_160_320)
+        self.assertEqual(result, document["parameter_count"])
+
+    def test_historical_core_80m_total_remains_exact(self) -> None:
+        path = MODULE_PATH.parents[1] / "configs" / "models" / "core-80m.candidate.json"
+        document = MODULE.load_candidate_document(path)
+        config = MODULE.CoreConfig.from_document(document)
+        result = MODULE.count_parameters(config)
         self.assertEqual(result["total_trainable"], 81_444_480)
         self.assertEqual(result, document["parameter_count"])
 

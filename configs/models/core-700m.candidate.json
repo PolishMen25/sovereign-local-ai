@@ -1,0 +1,44 @@
+{
+  "schema_version": "0.1.0",
+  "status": "candidate",
+  "name": "CORE-700M",
+  "architecture": {
+    "family": "decoder_only_transformer",
+    "attention_variant": "standard_mha",
+    "vocabulary_size": 32000,
+    "hidden_size": 1280,
+    "num_hidden_layers": 32,
+    "num_attention_heads": 20,
+    "head_dimension": 64,
+    "intermediate_size": 3584,
+    "activation": "swiglu",
+    "position_encoding": "rope",
+    "normalization": "rmsnorm",
+    "tie_word_embeddings": true,
+    "use_bias": false,
+    "context_length": 2048
+  },
+  "parameter_count": {
+    "token_embeddings": 40960000,
+    "attention_per_layer": 6553600,
+    "mlp_per_layer": 13762560,
+    "norms_per_layer": 2560,
+    "transformer_blocks": 650199040,
+    "final_norm": 1280,
+    "output_head": 0,
+    "total_trainable": 691160320
+  },
+  "training_stages": {
+    "token_targets": [10000000, 100000000, 1000000000, 8000000000],
+    "requires_gate_approval": true,
+    "continuous_operation": "only_after_reproducible_cpu_numa_benchmark"
+  },
+  "unresolved": [
+    "approved_corpus_manifest",
+    "approved_tokenizer_sha256",
+    "initialization",
+    "precision_policy",
+    "optimizer_policy",
+    "evaluation_thresholds"
+  ]
+}

@@ -57,7 +57,7 @@ Ne sont pas encore figés : l'adoption définitive d'un Research Gateway, son pl
                              ▼
   ┌─────────────────────────────────────────────────────┐
   │ DOMAINE IA-CORE — HPE ML350 Gen9 / Proxmox          │
-  │ import │ catalogue │ index │ CORE-80M │ MCP local   │
+  │ import │ catalogue │ index │ CORE-700M│ MCP local   │
   │                  aucune route Internet              │
   └──────────────────────────┬──────────────────────────┘
                              │ stockage/backup restreint
@@ -113,7 +113,7 @@ La promotion copie un paquet validé vers une zone d'import inactive. IA-CORE v�
 
 IA-CORE regroupe les fonctions de confiance :
 
-- service d'inférence local, dont CORE-80M constitue le candidat de modèle documenté séparément ;
+- service d'inférence local, dont CORE-700M constitue le candidat principal documenté séparément ;
 - catalogue des modèles, jeux de données et versions ;
 - pipeline d'import et d'indexation ;
 - stockage des connaissances approuvées ;

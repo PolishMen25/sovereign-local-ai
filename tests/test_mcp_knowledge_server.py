@@ -44,6 +44,32 @@ class McpKnowledgeServerTests(unittest.TestCase):
         response, _ = MODULE.handle_request({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "search_validated", "arguments": {"query": "test", "path": "/etc/passwd"}}}, initialized)
         self.assertTrue(response["result"]["isError"])
 
+    def test_exact_provenance_lookup_returns_no_content_body(self) -> None:
+        previous = os.environ.get("SOVEREIGN_KNOWLEDGE_ROOT")
+        os.environ["SOVEREIGN_KNOWLEDGE_ROOT"] = str(Path(__file__).parent / "fixtures")
+        try:
+            initialized = self.initialized_server()
+            response, _ = MODULE.handle_request(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 4,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_provenance",
+                        "arguments": {"provenance_id": "pkg-1"},
+                    },
+                },
+                initialized,
+            )
+        finally:
+            if previous is None:
+                del os.environ["SOVEREIGN_KNOWLEDGE_ROOT"]
+            else:
+                os.environ["SOVEREIGN_KNOWLEDGE_ROOT"] = previous
+        documents = response["result"]["structuredContent"]["documents"]
+        self.assertEqual("pkg-1", documents[0]["provenance_id"])
+        self.assertNotIn("summary", documents[0])
+
 
 if __name__ == "__main__":
     unittest.main()

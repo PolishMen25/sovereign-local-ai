@@ -1,34 +1,26 @@
 # Interface Web interne
 
-Future interface de chat, historique, citations et suivi des tâches pour les utilisateurs autorisés. Son framework, son hébergement et son identité restent ouverts ; IIS est une possibilité à confirmer, pas une décision.
+L'interface fournit une première configuration locale, une authentification
+Argon2id, des sessions avec cookie sécurisé et CSRF, un chat relié au runtime
+BOOTSTRAP loopback, ainsi que la liste, l'export et la suppression des
+conversations privées. Elle reste un sas distinct de CORE.
 
-L'interface ne fournit aucun tunnel permettant à IA-CORE de contacter Internet.
+Le champ `engine` de chaque réponse vaut explicitement `BOOTSTRAP`,
+`CORE-700M` ou `unavailable`. Il est interdit de présenter BOOTSTRAP comme CORE.
+Les requêtes et réponses suivent les schémas `local-chat-request.v1` et
+`local-assistant-response.v1`.
 
-## Contrat de préparation
+`app.py` force une écoute loopback. Le secret de première installation est
+injecté hors dépôt par `SOVEREIGN_SETUP_TOKEN` et contient au moins 32
+caractères. Les bases d'authentification et de mémoire sont placées sous le
+répertoire opérateur `SOVEREIGN_WEB_STATE`. Le client BOOTSTRAP refuse toute URL
+autre que loopback, tout proxy et toute redirection.
 
-Les échanges cibles de la future interface sont décrits par les schémas
-`schemas/local-chat-request.schema.json` et
-`schemas/local-chat-response.schema.json`. Une requête porte un identifiant de
-corrélation, un message borné, un profil logique facultatif et des références
-de contexte explicites. Une réponse distingue son état, ses citations de
-provenance et ses propositions ; chaque proposition exige `requires_confirmation:
-true`.
+Le RAG hybride, les profils d'agents et les actions confirmables ne sont pas
+encore raccordés à la route de chat. Une absence d'Argon2id ou du runtime local
+provoque un refus sûr ; aucun fournisseur distant n'est utilisé.
 
-Le prototype actuel ne réalise qu'une validation partielle du contrat d'entrée
-(version, identifiant et taille du message). Il n'est donc pas présenté comme
-un validateur complet du schéma.
-
-Le premier écran prévu est volontairement simple : sélection d'un profil,
-conversation, citations repliables, état de la tâche et bouton de confirmation
-séparé. Aucun secret, chemin arbitraire, commande ou action externe ne doit être
-transmis par le navigateur. Le framework, l'authentification, l'hébergement et
-le port restent à décider par ADR ; aucun serveur web n'est démarré par ce
-contrat.
-
-Le prototype `app.py` peut être lancé uniquement pour un essai local avec un
-jeton injecté hors dépôt (`SOVEREIGN_WEB_TOKEN`) ; il force une écoute loopback.
-Il ne charge pas encore le registre d'agents, l'autorisation par rôles, le MCP
-Knowledge ou le runtime d'inférence. `POST /v1/chat` renvoie donc toujours HTTP
-`503` avec `local inference is not ready`. Il ne constitue pas une exposition
-de production ni une interface de conversation utilisable.
+Le service ne doit jamais écouter directement sur le LAN. Un reverse proxy
+HTTPS approuvé porte l'accès LAN ou tailnet, tandis que le processus Python
+reste sur `127.0.0.1`.
 

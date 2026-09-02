@@ -10,7 +10,7 @@ Les gates `G0–G8` de ce document pilotent le projet. Les gates `A0–A8` du do
 
 > Des prototypes appartenant à des jalons ultérieurs sont déjà présents pour
 > réduire les risques techniques. Leur présence ne signifie pas que le jalon ou
-> son gate est terminé. En particulier, le chat, CORE-80M, le RAG sémantique et
+> son gate est terminé. En particulier, le chat CORE-700M, le RAG sémantique et
 > les agents restent non disponibles.
 
 ## Périmètre V1
@@ -86,12 +86,12 @@ Livrables :
 
 ## J4 — Mini-modèle et benchmark CPU/NUMA
 
-**Objectif :** prouver le chemin logiciel complet et mesurer la faisabilité avant toute projection vers CORE-80M.
+**Objectif :** prouver le chemin logiciel complet et mesurer la faisabilité avant toute projection vers CORE-700M.
 
 Livrables :
 
 - implémentation miniature utilisant les mêmes familles d'opérations que le candidat : masque causal, MHA, RoPE, RMSNorm, SwiGLU et poids liés ;
-- compteur lisant la configuration candidate et vérifiant exactement 81 444 480 paramètres ;
+- compteur lisant la configuration candidate et vérifiant exactement 691 160 320 paramètres ;
 - cycle entraînement → évaluation → checkpoint → reprise → inférence sur un petit corpus autorisé ;
 - mesures un socket/deux sockets, placements NUMA, threads, lots et longueurs de séquence ;
 - débit en tokens/s, mémoire de pointe, CPU, défauts NUMA, entrées/sorties et temps de checkpoint ;
@@ -114,7 +114,7 @@ Livrables :
 
 **Gate G5 :** `GO` vers l'entraînement cible, révision explicite du plan ou arrêt. Une extrapolation non confirmée bloque le passage.
 
-## J6 — Entraînement du candidat CORE-80M
+## J6 — Entraînement progressif du candidat CORE-700M
 
 **Objectif :** entraîner la configuration approuvée sans perdre la traçabilité.
 

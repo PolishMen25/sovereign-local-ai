@@ -4,11 +4,13 @@
   "title": "Local assistant chat response",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "request_id", "profile_id", "status", "answer", "citations", "proposals"],
+  "required": ["schema_version", "request_id", "conversation_id", "profile_id", "engine", "status", "answer", "citations", "proposals"],
   "properties": {
     "schema_version": { "const": "local-assistant-response.v1" },
     "request_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
+    "conversation_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
     "profile_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$" },
+    "engine": { "enum": ["BOOTSTRAP", "CORE-700M", "unavailable"] },
     "status": { "enum": ["completed", "needs_confirmation", "refused", "queued", "error"] },
     "answer": { "type": "string", "maxLength": 120000 },
     "citations": {

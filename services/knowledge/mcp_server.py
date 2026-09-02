@@ -21,6 +21,7 @@ MAX_CATALOGUE_BYTES = 1_048_576
 MAX_CATALOGUE_LINES = 1_000
 MAX_RESULTS = 5
 TOKEN_PATTERN = re.compile(r"[a-z0-9]{2,}", re.IGNORECASE)
+PROVENANCE_PATTERN = re.compile(r"^[A-Za-z0-9_.:/-]{1,160}$")
 
 
 def error(request_id: object, code: int, message: str) -> dict[str, object]:
@@ -55,6 +56,23 @@ def tools() -> list[dict[str, object]]:
                 "additionalProperties": False,
                 "required": ["query"],
                 "properties": {"query": {"type": "string", "minLength": 2, "maxLength": MAX_QUERY_LENGTH}},
+            },
+        },
+        {
+            "name": "get_provenance",
+            "description": "Returns bounded document identifiers linked to one exact approved provenance identifier.",
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["provenance_id"],
+                "properties": {
+                    "provenance_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9_.:/-]+$",
+                    }
+                },
             },
         },
     ]
@@ -120,6 +138,29 @@ def search_tool(arguments: object) -> dict[str, object]:
     return {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "structuredContent": payload}
 
 
+def provenance_tool(arguments: object) -> dict[str, object]:
+    if not isinstance(arguments, dict) or set(arguments) != {"provenance_id"}:
+        return tool_error("get_provenance requires only a provenance_id")
+    provenance_id = arguments.get("provenance_id")
+    if not isinstance(provenance_id, str) or PROVENANCE_PATTERN.fullmatch(provenance_id) is None:
+        return tool_error("provenance_id is invalid")
+    try:
+        records = catalogue_records(configured_catalogue())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        return tool_error("knowledge catalogue is unavailable or invalid")
+    matches = [
+        {
+            "document_id": record["document_id"],
+            "title": record["title"],
+            "provenance_id": record["provenance_id"],
+        }
+        for record in records
+        if record["provenance_id"] == provenance_id
+    ][:MAX_RESULTS]
+    payload = {"provenance_id": provenance_id, "documents": matches}
+    return {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "structuredContent": payload}
+
+
 def handle_request(message: object, initialized: bool) -> tuple[dict[str, object] | None, bool]:
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
         return error(None, -32600, "invalid request"), initialized
@@ -153,6 +194,8 @@ def handle_request(message: object, initialized: bool) -> tuple[dict[str, object
             return result(request_id, status_tool()), initialized
         if name == "search_validated":
             return result(request_id, search_tool(parameters.get("arguments"))), initialized
+        if name == "get_provenance":
+            return result(request_id, provenance_tool(parameters.get("arguments"))), initialized
         return error(request_id, -32602, f"unknown tool: {name}"), initialized
     return (None if is_notification else error(request_id, -32601, "method not found")), initialized
 

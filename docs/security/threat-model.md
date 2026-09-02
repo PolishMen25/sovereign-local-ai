@@ -23,7 +23,7 @@ Orientation provisoire : un Research Gateway est l'option B recommandée pour l'
 ## 3. Actifs à protéger
 
 - données utilisateur, documents locaux, prompts et réponses ;
-- poids, configurations, évaluations et artefacts de CORE-80M ;
+- poids, configurations, évaluations et artefacts de CORE-700M ;
 - corpus approuvés, index, métadonnées et historique de provenance ;
 - secrets d'API du Gateway, identifiants, certificats et clés de signature ;
 - hôtes Proxmox, machines invitées, configurations réseau et consoles d'administration ;

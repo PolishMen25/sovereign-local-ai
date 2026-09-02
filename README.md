@@ -6,8 +6,8 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
 
 > **Utilisation actuelle : un chat tiers BOOTSTRAP fonctionne localement en
 > CLI CPU.** Il fournit des réponses réelles pendant la construction de CORE,
-> mais n'est ni CORE-MINI ni CORE-80M. CORE-MINI valide toujours le chemin
-> d'entraînement et CORE-80M n'a pas encore de poids linguistiques. Voir la
+> mais n'est ni CORE-MINI ni CORE-700M. CORE-MINI valide toujours le chemin
+> d'entraînement et CORE-700M n'a pas encore de poids linguistiques. Voir la
 > matrice [Capacités réellement disponibles](docs/project/current-capabilities.md).
 
 ## Invariants déjà décidés
@@ -65,11 +65,11 @@ Collector externe -X-> lecture des données privées
 
 L'option Research Gateway est la direction recommandée pour l'étude, car elle centralise les clés, les coûts, les fournisseurs et l'audit. Elle reste une **décision provisoire** jusqu'à validation de la topologie, des usages et des politiques de sortie.
 
-## Cible CORE-80M
+## Cible CORE-700M
 
-Le premier candidat vérifiable est un Transformer decoder-only de **81 444 480 paramètres entraînables** : vocabulaire 32 000, dimension 640, 12 blocs, 10 têtes, MLP SwiGLU 1 792, RoPE, RMSNorm, matrice d'embedding de tokens et tête de sortie liées, sans biais.
+Le candidat principal est un Transformer decoder-only de **691 160 320 paramètres entraînables** : vocabulaire 32 000, dimension 1 280, 32 blocs, 20 têtes, MLP SwiGLU 3 584, RoPE, RMSNorm, matrice d'embedding de tokens et tête de sortie liées, sans biais. CORE-80M reste une référence historique, sans entraînement long prévu.
 
-Ce nombre est exact pour cette définition, mais l'architecture est encore un candidat. Le tokenizer, les langues, la longueur de contexte, le dataset et la politique du moteur d'embeddings du RAG doivent être décidés après l'audit. Voir [docs/model/core-80m.md](docs/model/core-80m.md) et vérifier le calcul avec :
+Ce nombre est exact pour cette définition, mais aucun poids linguistique n'existe encore. Le contexte candidat est 2 048 tokens ; le corpus exact, le tokenizer, la précision et les seuils d'évaluation restent soumis aux gates. Voir [docs/model/core-700m.md](docs/model/core-700m.md) et vérifier le calcul avec :
 
 Sous Windows :
 
@@ -95,7 +95,7 @@ python3 -B tools/count_core_parameters.py
 │   ├── security/                     menaces, frontières et gates
 │   ├── mcp/                          collecteur externe et MCP interne
 │   ├── data/                         provenance et cycle de vie
-│   ├── model/                        définition de CORE-80M
+│   ├── model/                        définitions CORE-MINI, CORE-80M et CORE-700M
 │   ├── agents/                       agents logiques et permissions
 │   ├── project/                      décisions et questionnaire de découverte
 │   └── ROADMAP.md                    phases et critères de sortie
@@ -137,7 +137,7 @@ Consulter [SECURITY.md](SECURITY.md) et [docs/security/threat-model.md](docs/sec
 
 ## Roadmap
 
-La progression suit des gates mesurables : découverte, architecture sécurisée, ingestion contrôlée, corpus/tokenizer/RAG, mini-modèle et benchmark CPU/NUMA, pilote de montée en échelle, entraînement CORE-80M, Knowledge/RAG/MCP interne, puis profils d'agents et durcissement. Des prototypes de jalons ultérieurs peuvent exister sans que leur gate soit franchi. La génération d'images et le DL380p sont hors périmètre V1.
+La progression suit des gates mesurables : découverte, architecture sécurisée, ingestion contrôlée, corpus/tokenizer/RAG, mini-modèle et benchmark CPU/NUMA, pilote de montée en échelle, entraînement progressif CORE-700M, Knowledge/RAG/MCP interne, puis profils d'agents et durcissement. Des prototypes de jalons ultérieurs peuvent exister sans que leur gate soit franchi. La génération d'images et le DL380p sont hors périmètre V1.
 
 Voir [docs/ROADMAP.md](docs/ROADMAP.md).
 

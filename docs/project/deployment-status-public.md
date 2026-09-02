@@ -21,25 +21,28 @@ compte, ni secret, ni chemin d'administration.
   historique avec ces nouveaux contrôles n'est encore confirmé sur Linux. Le
   runner NUMA répété est implémenté, mais aucune preuve conforme produite par ce
   runner n'est encore documentée sur le nœud CPU.
-- **CORE-80M : conception seulement.** L'architecture et son comptage sont
-  versionnés, mais aucun tokenizer final, corpus approuvé ou poids utilisable
-  n'existe.
-- **MCP Knowledge : prototype local fonctionnel.** Il expose en `stdio` un état
-  et une recherche lexicale bornée dans trois notices synthétiques avec
-  provenance. Ce n'est pas un RAG vectoriel ni une IA générative.
-- **Interface Web du projet : coquille de sécurité.** Elle est testable en
-  boucle locale, mais n'est pas démarrée par défaut et `/v1/chat` renvoie
-  toujours HTTP `503`. L'interface native du chat BOOTSTRAP est un service
-  séparé, privé au tailnet.
+- **CORE-700M : conception seulement.** L'architecture candidate et son
+  comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
+  référence historique ; aucun tokenizer final, corpus approuvé ou poids
+  CORE-700M utilisable n'existe.
+- **MCP Knowledge et RAG : implémentation locale partielle.** MCP expose en
+  `stdio` l'état, la recherche lexicale et une provenance exacte. Un index
+  hybride SQLite/FTS5/vecteurs est testé, sans moteur d'embeddings installé ni
+  données réelles indexées.
+- **Interface Web du projet : implémentée localement, non déployée.** Première
+  configuration, Argon2id, sessions, CSRF, mémoire, historique et client
+  llama.cpp loopback sont testés. L'interface native BOOTSTRAP reste le seul
+  service HTTPS actuellement installé.
 - **Agents : configuration seulement.** Les 60 profils sont tous `draft` et
   aucun agent n'est actif.
 - **Orchestrateur et autorisations : préparation seulement.** Les validateurs
-  fail-closed existent, mais aucun modèle, outil, compte utilisateur ou RBAC
-  réel n'est branché.
+  fail-closed existent et le compte propriétaire local est implémenté, mais les
+  profils, outils et confirmations ne sont pas encore raccordés au chat.
 - **Collector : ingress write-only actif.** Son endpoint HTTPS de santé répond ;
   une entrée acceptée reste `RAW` et n'est jamais promue automatiquement.
-- **Stockage : coffre chiffré monté.** Seules des données synthétiques ont servi
-  aux validations actuelles ; elles ne constituent pas la mémoire du modèle.
+- **Stockage : partage Synology préparé, non monté.** L'arborescence durable
+  existe, mais le client SMB, le secret local et l'unité de montage ne sont pas
+  actifs dans le conteneur de calcul. Aucune restauration n'est revendiquée.
 
 Ces éléments restent des preuves opérationnelles réversibles de phase 0. Ils ne
 valident ni l'orientation P-002, ni la topologie cible, ni un gate de mise en
@@ -49,7 +52,9 @@ production.
 
 - PyTorch CPU est installé dans un environnement isolé sur le nœud de calcul ;
 - CUDA et ROCm ne font pas partie du runtime ;
-- CORE-80M s'instancie en CPU avec son nombre candidat exact, sans poids ;
+- CORE-80M s'est historiquement instancié en CPU avec son nombre candidat exact ;
+- CORE-700M possède une configuration et un comptage exacts, sans instanciation
+  complète mesurée ni poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise a réussi sur Linux
   avec le chargeur borné antérieur ;
 - le manifeste et le tokenizer expérimentaux sont maintenant liés au seul
@@ -87,14 +92,14 @@ production.
 - sa preuve publique ne contient ni hostname, ni modèle ou liste CPU, ni
   commande ou chemin. Elle porte sur un seul placement ; aucune comparaison
   multi-placement conforme, mesure mémoire ou série complète de compteurs NUMA
-  ne permet encore d'extrapoler CORE-80M.
+  ne permet encore d'extrapoler CORE-700M.
 
 ## Non revendiqué
 
 Le projet ne revendique pas encore : entraînement sur un corpus réel approuvé,
 poids linguistiques CORE, modèle conversationnel CORE, RAG sémantique, agents
 autonomes, interface utilisateur finale, authentification de production, gate
-réseau achevé, preuve NUMA multi-placement acceptée ou entraînement CORE-80M.
+réseau achevé, preuve NUMA multi-placement acceptée ou entraînement CORE-700M.
 Le service BOOTSTRAP privé est une démonstration bornée, pas un service CORE de
 production.
 

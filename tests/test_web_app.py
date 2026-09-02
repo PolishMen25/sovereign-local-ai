@@ -16,8 +16,16 @@ class WebAppTests(unittest.TestCase):
             parse_chat(b'{"schema_version":"wrong"}')
 
     def test_response_matches_local_contract(self) -> None:
-        payload = response("req-123456", "coordination", "error", "not ready")
+        payload = response(
+            "req-123456",
+            "coordination",
+            "error",
+            "not ready",
+            engine="BOOTSTRAP",
+            conversation_id="conversation_001",
+        )
         self.assertEqual(payload["schema_version"], "local-assistant-response.v1")
+        self.assertEqual(payload["engine"], "BOOTSTRAP")
         self.assertEqual(json.loads(json.dumps(payload))["status"], "error")
 
 

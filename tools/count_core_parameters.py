@@ -11,7 +11,7 @@ from typing import Any
 
 
 DEFAULT_CONFIG_PATH = (
-    Path(__file__).parents[1] / "configs" / "models" / "core-80m.candidate.json"
+    Path(__file__).parents[1] / "configs" / "models" / "core-700m.candidate.json"
 )
 
 

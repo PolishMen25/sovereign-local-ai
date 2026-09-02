@@ -10,11 +10,11 @@ Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
 Il est maintenant possible de poser une question à un modèle local depuis une
 CLI SSH ou une interface HTTPS privée de tailnet et d'obtenir une réponse
 réellement générée. Ce chat utilise le modèle tiers temporaire **BOOTSTRAP**,
-pas CORE-80M.
+pas CORE-700M.
 
 Le checkpoint CORE-MINI actuel prouve que l'entraînement CPU, la sauvegarde et
 la reprise fonctionnent. Il a appris sur des identifiants de tokens synthétiques
-et ne possède aucun savoir linguistique. CORE-80M n'est pas entraîné et aucun
+et ne possède aucun savoir linguistique. CORE-700M n'est pas entraîné et aucun
 tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
 n'existe encore pour CORE.
 
@@ -42,16 +42,18 @@ génère pas une réponse d'IA.
 | Chat BOOTSTRAP | CLI et service HTTPS privé fonctionnels | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp ; le serveur reste en boucle locale et est relayé uniquement dans le tailnet | Modèle tiers temporaire, aucun outil/RAG/agent, pas CORE ; aucune politique de conservation de conversations n'est approuvée |
 | CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; entraînement synthétique et checkpoint atomique ; modes explicitement séparés et contrôles stricts locaux | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité du checkpoint historique avec le nouveau chargeur à confirmer sur Linux |
 | Runner CORE-MINI NUMA | Implémenté, sans preuve matérielle conforme publiée | Contrat privé strict hors Git, archive source et runtime offline vérifiés, contrôle du placement externe et des sockets flux/datagrammes INET, attestations par phase, 3 à 10 répétitions fraîches et preuve publique minimisée | Linux et isolation externe requis ; un placement par preuve, aucun comparateur multi-placement, aucune mesure complète pour G4 |
-| CORE-80M | Architecture CPU vérifiée | Configuration candidate, comptage et instanciation CPU exacte de 81 444 480 paramètres | Aucun tokenizer final, corpus approuvé ou poids |
+| CORE-700M | Architecture candidate et comptage exact vérifié | Configuration de 691 160 320 paramètres ; CORE-80M reste une référence historique | Aucune instanciation complète mesurée, aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
-| MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état et recherche lexicale bornée avec provenance | Trois notices synthétiques, pas de RAG vectoriel ni de réponse générée |
+| MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
+| RAG hybride | Module local testé, non déployé | SQLite, FTS5, vecteurs finis fournis hors module, score hybride et provenance | Aucun moteur d'embeddings vérifié installé, aucun catalogue réel indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
-| Synology | Stockage préparé | Coffre chiffré monté et essais synthétiques de copie/restauration | Pas encore le corpus réel ni la mémoire conversationnelle validée du modèle |
+| Synology | Partage durable préparé sur le NAS | Arborescence RAW/VALIDATED/modèles/sauvegardes créée ; compte de service dédié préparé | Aucun montage dans le conteneur, client SMB absent, secret de service non installé et aucune restauration validée |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
-| Interface Web du projet | Coquille locale testable | Page statique, santé, Bearer prototype et validation partielle des requêtes | Non démarrée par défaut; `/v1/chat` renvoie toujours HTTP 503. L'interface native BOOTSTRAP HTTPS est un service séparé |
-| Authentification/RBAC | Prototype non intégré | Politique de rôles testable séparément | Aucun compte, session, annuaire ou contrôle RBAC branché à l'interface |
+| Mémoire conversationnelle | Module SQLite local testé, non déployé | Masquage de secrets, empreintes, historique, export et suppression avec reçu sans contenu | Pas encore placée sur le stockage durable ni raccordée au RAG |
+| Interface Web du projet | Passerelle authentifiée implémentée et testée localement | Première configuration, login, CSRF, historique et client llama.cpp loopback avec moteur explicitement nommé | Non déployée sur le sas ; le service HTTPS actuellement visible reste l'interface native BOOTSTRAP |
+| Authentification/RBAC | Compte propriétaire et sessions implémentés, non déployés | Argon2id obligatoire sans repli, jetons de session hachés, cookie sécurisé et CSRF | Paquet Argon2id et compte réel non encore installés ; politiques des agents non raccordées |
 
 ## Vérifications confirmées
 
@@ -59,7 +61,7 @@ génère pas une réponse d'IA.
 - un checkpoint CORE-MINI a été produit puis repris sur Linux avec le chargeur
   borné antérieur ; sa compatibilité avec les nouveaux contrôles stricts reste
   à prouver ;
-- CORE-80M s'instancie en RAM CPU avec son nombre exact de paramètres ;
+- CORE-80M s'est historiquement instancié en RAM CPU avec son nombre exact de paramètres ; CORE-700M possède seulement un comptage exact local et n'a pas encore été instancié sur le nœud ;
 - le harness et la future inférence partagent maintenant la même définition
   CPU-only du decoder, sans modifier le format des checkpoints existants ;
 - le trainer et le vérificateur lisent, valident et hachent la configuration
@@ -106,12 +108,15 @@ génère pas une réponse d'IA.
 - le MCP Knowledge répond actuellement en `stdio` et voit trois notices
   synthétiques ;
 - une recherche `stockage hybride` retourne des résumés avec `provenance_id` ;
-- l'interface Web propre au projet n'est pas démarrée ; elle reste distincte du
+- la passerelle Web propre au projet possède maintenant une implémentation
+  locale testée, mais elle n'est pas installée sur le sas et reste distincte du
   service BOOTSTRAP HTTPS privé ;
+- la suite locale complète passe, dont mémoire privée, suppression, RAG hybride,
+  Argon2id fail-closed, client llama.cpp loopback et comptage CORE-700M ;
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
   refuse les redirections, valide chaque payload en file et ne le supprime
   qu'après écriture atomique et vérification locale d'un reçu concordant ;
-- le coffre Synology chiffré est monté.
+- le partage Synology existe, mais il n'est pas monté dans le conteneur de calcul.
 
 Le relais HTTPS et le coffre restent des preuves opérationnelles réversibles de
 phase 0. Ils ne valident ni l'orientation P-002, ni la topologie cible, ni un
@@ -138,7 +143,7 @@ python3 -B -m unittest discover -s tests -q
 python3 -B tools/count_core_parameters.py \
   --config configs/models/core-mini.candidate.json
 python3 -B tools/count_core_parameters.py \
-  --config configs/models/core-80m.candidate.json
+  --config configs/models/core-700m.candidate.json
 ```
 
 Dans l'environnement PyTorch CPU préparé, CORE-MINI peut être entraîné sur un
@@ -174,7 +179,7 @@ les outils suivants :
 - `knowledge_status {}` ;
 - `search_validated {"query": "stockage hybride"}`.
 
-## Pour rendre le chat CORE utilisable
+## Pour rendre le chat CORE-700M utilisable
 
 Il reste à réaliser, dans cet ordre :
 

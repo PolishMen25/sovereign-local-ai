@@ -91,7 +91,7 @@ un refus ; il n'existe aucun repli implicite vers les données synthétiques.
 Pour CORE-MINI, le manifeste et le tokenizer doivent déclarer exactement
 **4 096 unités**, conformément à
 [`core-mini.candidate.json`](../../configs/models/core-mini.candidate.json). Le
-candidat de **32 000 unités** destiné à la cible CORE-80M est incompatible avec
+candidat de **32 000 unités** destiné à la cible CORE-700M est incompatible avec
 CORE-MINI et le harness le refusera.
 
 ```bash

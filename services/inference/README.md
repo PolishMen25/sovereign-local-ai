@@ -34,7 +34,7 @@ linguistiques et n'active pas le runtime. Il est couvert par les tests locaux,
 mais sa compatibilité avec le checkpoint historique reste à confirmer sur
 Linux.
 
-Le candidat `CORE-80M` reste une configuration d’architecture, pas un modèle
+Le candidat `CORE-700M` reste une configuration d’architecture, pas un modèle
 prêt à charger. L’implémentation complète attend le tokenizer, le corpus, des
 poids linguistiques validés, la génération, le mini-benchmark et la politique
 de précision définis aux gates correspondants. Le champ déclaratif

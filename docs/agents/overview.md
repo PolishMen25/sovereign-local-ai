@@ -77,7 +77,7 @@ Sur CPU, l'ordonnancement doit protéger la latence et la mémoire : limite de c
 
 Le modèle est chargé une fois par instance de service et reçoit le profil comme configuration de requête. L'état propre à une mission ne doit pas modifier les poids partagés. L'adaptation par fine-tuning, adapters ou routage de modèles reste une décision future et ne doit pas être supposée dans la V1.
 
-Le candidat actuel est documenté dans [CORE-80M](../model/core-80m.md). Son architecture demeure provisoire jusqu'aux gates de benchmark et de données.
+Le candidat principal est documenté dans [CORE-700M](../model/core-700m.md). CORE-80M reste une référence historique. L'activation demeure soumise aux gates de benchmark et de données.
 
 ### Passerelle MCP
 

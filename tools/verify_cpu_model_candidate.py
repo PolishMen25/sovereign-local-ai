@@ -13,7 +13,7 @@ from tools.count_core_parameters import CoreConfig, count_parameters
 from tools.train_core_mini import build_model, require_cpu_torch
 
 
-DEFAULT_CONFIG = Path(__file__).parents[1] / "configs" / "models" / "core-80m.candidate.json"
+DEFAULT_CONFIG = Path(__file__).parents[1] / "configs" / "models" / "core-700m.candidate.json"
 
 
 def load_candidate(path: Path) -> tuple[dict[str, Any], CoreConfig]:

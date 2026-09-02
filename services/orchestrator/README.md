@@ -22,3 +22,15 @@ inconnus ou non conformes et journaliser l'identifiant de profil, sa version et
 la corrélation de requête. Une demande d'outil ou d'écriture n'est jamais
 autorisée par le texte produit par le modèle.
 
+## Confirmation en deux étapes
+
+`confirmations.py` fournit un registre SQLite séparé pour les actions étroites
+explicitement autorisées. Une proposition lie capacité, cible et SHA-256 d'un
+payload canonique. Le propriétaire confirme ce digest ; l'exécuteur reçoit
+alors une autorisation aléatoire, courte et consommable une seule fois. Le
+module n'exécute aucune action et n'est pas exposé comme outil MCP du modèle.
+
+Les capacités génériques telles que `shell`, lecture de chemin arbitraire ou
+réseau arbitraire ne figurent pas dans l'allowlist et sont refusées avant la
+création d'une proposition.
+

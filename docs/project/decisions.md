@@ -19,7 +19,7 @@ Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confir
 | D-011 | L'original RAW est conservé avec sa provenance. | Une transformation ne remplace pas l'original ; empreinte et version de schéma sont requises. |
 | D-012 | Toute donnée Internet est non fiable. | Défenses contre pièces jointes malveillantes, HTML actif et prompt injection indirecte. |
 | D-013 | Le modèle principal est créé dans le projet. | Tokenizer, architecture, dataset, entraînement, évaluation et inférence sont sous contrôle local. |
-| D-014 | La première cible est comprise entre 50M et 100M de paramètres. | `CORE-80M` sert de candidat de travail avec comptage exact. |
+| D-014 | **SUPERSEDED par D-026.** La première cible était comprise entre 50M et 100M de paramètres. | `CORE-80M` reste une référence historique avec comptage exact ; aucun entraînement long n'est lancé pour ce candidat. |
 | D-015 | Les performances et durées doivent être mesurées. | Mini-modèle et benchmark matériel obligatoires avant entraînement long ou estimation. |
 | D-016 | Environ 60 agents sont des profils logiques. | Modèles partagés, registry, permissions, mémoire et outils par profil ; pas 60 copies en RAM. |
 | D-017 | Le RAG porte la connaissance évolutive. | Les nouvelles recherches ne déclenchent pas automatiquement un réentraînement des poids. |
@@ -31,6 +31,12 @@ Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confir
 | D-023 | Le stockage V1 suit une stratégie hybride : capacité locale Proxmox pour le calcul actif et le temporaire ; Synology RS3617xs+ pour RAW, connaissances, modèles, checkpoints retenus et sauvegardes. | Le stockage local n'est pas la copie durable unique ; les flux vers le Synology restent restreints, mesurés et sauvegardés. Aucun disque n'est initialisé sans procédure approuvée. |
 | D-024 | Un modèle tiers Qwen2.5-1.5B-Instruct GGUF est autorisé comme chat BOOTSTRAP temporaire, distinct de CORE, en CLI locale CPU et en HTTPS privé de tailnet. | Acquisition et empreintes verrouillées ; le service persistant reste lié à la boucle locale et le relais HTTPS est limité au tailnet. Aucun outil, agent, RAG, proxy MCP ni téléchargement à l'exécution. Cette exception ne remplace pas CORE-80M et ne valide aucun gate d'entraînement. |
 | D-025 | Les mesures de l'inventaire matériel approuvé remplacent la fiche ML350 initialement déclarée ; le dépôt public conserve seulement le caractère bi-socket NUMA et CPU-only. | Benchmarks et allocations utilisent l'inventaire mesuré interne. Toute valeur exacte publiée doit être explicitement autorisée. |
+| D-026 | `CORE-700M` remplace CORE-80M comme candidat principal, avec 691 160 320 paramètres entraînables et un contexte candidat de 2 048 tokens. | Configuration, compteur, modèle et tests évoluent ensemble ; aucun entraînement long ni délai annoncé avant les gates CPU/NUMA, corpus, tokenizer et évaluation. |
+| D-027 | Les conversations et données personnelles restent dans la mémoire/RAG jusqu'à suppression explicite et ne sont jamais ajoutées automatiquement aux poids. | Export, suppression, provenance et masquage de secrets sont requis ; le corpus d'entraînement reste séparé. |
+| D-028 | Un petit moteur d'embeddings RAG pré-entraîné est autorisé séparément de CORE. | Acquisition contrôlée, licence et empreinte vérifiées, exécution locale hors ligne, aucune télémétrie ni ajustement implicite. |
+| D-029 | Le sas d'interface et IA-CORE sont deux invités non privilégiés distincts ; Proxmox impose d'abord l'absence de route et de DNS Internet depuis IA-CORE. | Le sas porte LAN/tailnet et l'identité ; CORE n'accepte que l'appel d'inférence du sas et l'accès minimal au stockage interne. |
+| D-030 | L'interface V1 est mono-utilisateur, accessible en HTTPS sur LAN et tailnet, avec compte local et identité tailnet additionnelle à distance. | Initialisation du secret dans le navigateur, stockage Argon2id, sessions sécurisées et aucune exposition publique directe du moteur. |
+| D-031 | Le corpus cible le code et l'infrastructure, avec licences strictement réutilisables, et les calculs longs peuvent fonctionner en continu après gates. | Priorité à Python, shells, Web, SQL, Docker, Linux et réseau ; monitoring et arrêt sûr obligatoires. |
 
 ## Orientations provisoires
 
@@ -38,8 +44,8 @@ Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confir
 |---|---|---|
 | P-001 | Préférer une Research Gateway qui appelle les API externes puis dépose les résultats. | Comparaison formelle avec un dépôt MCP direct, politique de sortie, fournisseurs et budget. |
 | P-002 | Candidat : deux services MCP séparés, Collector externe et Knowledge interne. Invariant ferme : aucune identité, aucun droit de lecture et aucun processus de confiance partagé entre ingress externe et consultation interne. | Topologie réseau, authentification, protocoles, nombre exact de services et disponibilité. |
-| P-003 | Candidat CORE : decoder-only, 81 444 480 paramètres. | Langues, corpus, tokenizer, contexte, benchmark miniature et objectifs de qualité. |
-| P-004 | Architecture hybride : modèle principal créé de zéro + RAG + éventuels petits modèles spécialisés. | Politique autorisant ou non un moteur d'embeddings RAG et un reranker pré-entraînés, séparés de CORE-80M. |
+| P-003 | **SUPERSEDED par D-026.** Candidat historique CORE-80M : decoder-only, 81 444 480 paramètres. | Conservé pour la traçabilité et les tests historiques. |
+| P-004 | **Partiellement confirmé par D-027 et D-028.** Architecture hybride : modèle principal créé de zéro + RAG + petit moteur d'embeddings local autorisé. | Le reranker et le moteur d'index restent à valider par benchmark. |
 | P-005 | Copier le dataset actif sur un stockage local rapide du ML350. | Inventaire réel des contrôleurs, disques, volumes et débits. |
 
 ## Décisions ouvertes majeures
