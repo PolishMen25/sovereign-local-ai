@@ -62,6 +62,9 @@ génère pas une réponse d'IA.
 - PyTorch `2.13.0+cpu` et NumPy `2.5.2` ont été vérifiés contre leurs locks puis
   installés hors ligne dans un runtime isolé ; CUDA est indisponible et non
   compilé, et quatre tests CPU ciblés passent dans ce runtime ;
+- après cette installation, CORE ne présente aucune route par défaut ; une
+  résolution DNS externe et une connexion TCP directe de contrôle vers Internet
+  sont refusées ;
 - un checkpoint CORE-MINI a été produit après 20 étapes puis repris 5 étapes
   sur Linux avec les contrôles stricts actuels ; la compatibilité d'un ancien
   checkpoint historique reste un test séparé ;

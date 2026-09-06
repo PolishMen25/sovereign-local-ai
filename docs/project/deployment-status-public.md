@@ -70,6 +70,8 @@ production.
 
 - PyTorch CPU et NumPy ont été vérifiés contre leurs locks, réinjectés hors
   ligne dans CORE et validés sans CUDA ni ROCm ;
+- après cette réinjection, CORE ne possède pas de route par défaut ; les tests
+  DNS externe et TCP direct vers Internet ont été refusés ;
 - CUDA et ROCm ne font pas partie du runtime ;
 - CORE-80M s'est historiquement instancié en CPU avec son nombre candidat exact ;
 - CORE-700M possède une configuration et un comptage exacts, sans instanciation
