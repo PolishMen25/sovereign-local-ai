@@ -53,7 +53,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - Collector de conversations write-only vers RAW ;
 - stockage durable Synology monté par SMB 3.1.1 chiffré sur l'hôte de calcul,
   activé au démarrage et fourni à CORE par un point de montage contrôlé ; une
-  écriture temporaire suivie de sa suppression a réussi depuis CORE ;
+  écriture temporaire suivie de sa suppression et un aller-retour synthétique
+  vérifié par empreinte ont réussi depuis CORE ; CORE ne conserve pas le secret
+  SMB ;
 - passerelle Web authentifiée déployée avec Argon2id, CSRF, `/v1/chat` réel vers
   BOOTSTRAP et mémoire SQLite locale exportable/supprimable ; première
   configuration propriétaire encore requise ;

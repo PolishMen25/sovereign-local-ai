@@ -50,7 +50,7 @@ génère pas une réponse d'IA.
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
 | RAG hybride | Module local testé, non déployé | SQLite, FTS5, vecteurs finis fournis hors module, score hybride et provenance | Aucun moteur d'embeddings vérifié installé, aucun catalogue réel indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
-| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage et accès lecture/écriture vérifié depuis CORE via un point de montage contrôlé | Aucune restauration complète, réplication de mémoire ou test de droits négatifs documenté |
+| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé | Aucune restauration complète de conversation, catalogue, index ou checkpoint ; réplication de mémoire et test de droits négatifs restent à faire |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif dans la passerelle | Masquage de secrets, empreintes, historique, export et suppression avec reçu sans contenu | Pas encore placée sur le stockage durable ni raccordée au RAG |
@@ -121,7 +121,8 @@ génère pas une réponse d'IA.
 - le stockage durable Synology est monté avec SMB 3.1.1 chiffré sur l'hôte de
   calcul, activé au démarrage puis fourni au conteneur CORE par un point de
   montage contrôlé ; une écriture de contrôle temporaire suivie de sa
-  suppression a réussi depuis CORE.
+  suppression et un aller-retour synthétique vérifié par empreinte ont réussi
+  depuis CORE ; le conteneur ne conserve pas le secret SMB.
 
 Le relais HTTPS et le coffre restent des preuves opérationnelles réversibles de
 phase 0. Ils ne valident ni l'orientation P-002, ni la topologie cible, ni un

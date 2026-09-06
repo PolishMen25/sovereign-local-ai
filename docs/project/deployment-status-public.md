@@ -47,8 +47,9 @@ compte, ni secret, ni chemin d'administration.
 - **Stockage : partage Synology monté et persistant.** L'arborescence durable
   est accessible au conteneur CORE depuis un montage hôte SMB 3.1.1 chiffré,
   activé au démarrage et contrôlé par un compte de service limité. Une écriture
-  temporaire suivie de sa suppression a été validée depuis CORE ; aucune
-  restauration complète n'est encore revendiquée.
+  temporaire suivie de sa suppression et un aller-retour synthétique vérifié
+  par empreinte ont été validés depuis CORE ; aucune restauration complète de
+  donnée applicative n'est encore revendiquée.
 - **Zone CORE : invitée non privilégiée active.** Le runtime PyTorch/NumPy CPU
   est installé hors ligne et les flux sont bornés. Aucun poids ni service de
   génération CORE n'est actif ; le test d'isolation après redémarrage reste à
