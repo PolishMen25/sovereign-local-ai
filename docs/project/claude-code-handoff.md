@@ -126,9 +126,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 ## Ce qui ne fonctionne pas encore
 
 - aucun poids linguistique CORE utile ;
-- le runtime PyTorch/NumPy CPU n'est pas présent dans le conteneur CORE lors de
-  la dernière vérification ; les locks et la procédure offline existent, mais
-  le bundle vérifié doit être réinjecté avant tout benchmark ou entraînement ;
+- le runtime PyTorch/NumPy CPU a été vérifié puis réinjecté hors ligne dans
+  CORE ; CUDA est indisponible et non compilé. Aucun entraînement long n'est
+  autorisé sans les gates corpus, tokenizer et benchmark ;
 - aucun tokenizer ou corpus final approuvé ;
 - aucun entraînement `authorized-text` n'a été exécuté de bout en bout avec
   PyTorch et un bundle réel approuvé : le chemin est implémenté et couvert par

@@ -55,10 +55,9 @@ compte, ni secret, ni chemin d'administration.
   et d'index lexical ont été vérifiées et restaurées dans des fichiers de
   contrôle, sans remplacement de la base applicative active.
 - **Zone CORE : invitée non privilégiée active.** Les flux et le stockage sont
-  bornés. Les locks du runtime PyTorch/NumPy CPU sont présents dans le dépôt,
-  mais le runtime n'est plus installé dans le conteneur observé. Aucun poids ni
-  service de génération CORE n'est actif ; le bundle doit être réinjecté hors
-  ligne avant benchmark ou entraînement.
+  bornés. Le runtime PyTorch/NumPy CPU, reconstruit depuis des wheels vérifiés,
+  est installé hors ligne et a passé son smoke test CPU. Aucun poids ni service
+  de génération CORE n'est actif.
 
 Ces éléments restent des preuves opérationnelles réversibles de phase 0. Ils ne
 valident ni l'orientation P-002, ni la topologie cible, ni un gate de mise en
@@ -66,9 +65,8 @@ production.
 
 ## Preuves techniques actuelles
 
-- les locks de PyTorch CPU et NumPy sont versionnés et vérifiables hors ligne ;
-  le runtime lui-même est absent du conteneur CORE observé et doit être
-  réinjecté depuis un bundle vérifié ;
+- PyTorch CPU et NumPy ont été vérifiés contre leurs locks, réinjectés hors
+  ligne dans CORE et validés sans CUDA ni ROCm ;
 - CUDA et ROCm ne font pas partie du runtime ;
 - CORE-80M s'est historiquement instancié en CPU avec son nombre candidat exact ;
 - CORE-700M possède une configuration et un comptage exacts, sans instanciation

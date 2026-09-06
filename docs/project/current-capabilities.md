@@ -39,11 +39,11 @@ génère pas une réponse d'IA.
 
 | Composant | État exact | Ce qui fonctionne | Limite actuelle |
 | --- | --- | --- | --- |
-| Runtime tensoriel CPU hors ligne | Locks et procédure vérifiés, absent du conteneur CORE actuel | Les versions candidates PyTorch `2.13.0+cpu` et NumPy `2.5.2` sont verrouillées par empreinte, sans dépendance CUDA/ROCm | Le bundle binaire vérifié doit être réinjecté hors ligne avant tout entraînement ou checkpoint ; ce n'est pas un assistant |
+| Runtime tensoriel CPU hors ligne | Installé et vérifié dans le conteneur CORE | PyTorch `2.13.0+cpu` et NumPy `2.5.2` ont été réinjectés depuis des wheels vérifiés ; CUDA est indisponible et non compilé | Runtime technique isolé, pas un assistant ni des poids CORE |
 | Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur, conserve localement les échanges masqués et peut joindre des références lexicales avec provenance | Modèle tiers temporaire, pas CORE ; aucun outil ou agent, aucun RAG sémantique ; première configuration propriétaire encore requise |
 | CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes puis reprise de 5 étapes jusqu'à l'étape 25 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité d'un ancien checkpoint historique encore à confirmer |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
-| Zone de calcul CORE | Invité non privilégié actif | Stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution | Le runtime tensoriel CPU n'est pas présent dans le conteneur actuel ; aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
+| Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
 | CORE-700M | Architecture candidate et comptage exact vérifié | Configuration de 691 160 320 paramètres ; CORE-80M reste une référence historique | Aucune instanciation complète mesurée, aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
@@ -59,9 +59,9 @@ génère pas une réponse d'IA.
 
 ## Vérifications confirmées
 
-- les locks du bundle PyTorch CPU et NumPy sont versionnés ; lors de la dernière
-  vérification du conteneur CORE, l'interpréteur système ne disposait pas encore
-  de ces paquets et aucun entraînement n'a donc été lancé ;
+- PyTorch `2.13.0+cpu` et NumPy `2.5.2` ont été vérifiés contre leurs locks puis
+  installés hors ligne dans un runtime isolé ; CUDA est indisponible et non
+  compilé, et quatre tests CPU ciblés passent dans ce runtime ;
 - un checkpoint CORE-MINI a été produit après 20 étapes puis repris 5 étapes
   sur Linux avec les contrôles stricts actuels ; la compatibilité d'un ancien
   checkpoint historique reste un test séparé ;
