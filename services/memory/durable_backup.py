@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sqlite3
 import tempfile
 from typing import Any
@@ -62,7 +63,9 @@ def create_backup(source: Path, destination_directory: Path) -> dict[str, Any]:
     if not destination.is_dir():
         raise ValueError("backup destination is invalid")
 
-    with tempfile.NamedTemporaryFile(prefix="memory-", suffix=".sqlite3", dir=destination, delete=False) as handle:
+    # SQLite must never build its working file directly on SMB/CIFS: network
+    # locking can stall a backup.  Build locally, then copy the final bytes.
+    with tempfile.NamedTemporaryFile(prefix="memory-", suffix=".sqlite3", dir=source.parent, delete=False) as handle:
         temporary = Path(handle.name)
     try:
         with closing(sqlite3.connect(source)) as source_connection, closing(sqlite3.connect(temporary)) as target_connection:
@@ -71,7 +74,12 @@ def create_backup(source: Path, destination_directory: Path) -> dict[str, Any]:
         digest = _sha256(temporary)
         filename = f"memory-{_utc_now()}-{digest[:16]}.sqlite3"
         artifact = destination / filename
-        os.replace(temporary, artifact)
+        staged_artifact = destination / f"{filename}.tmp"
+        with temporary.open("rb") as input_handle, staged_artifact.open("wb") as output_handle:
+            shutil.copyfileobj(input_handle, output_handle, length=1024 * 1024)
+            output_handle.flush()
+            os.fsync(output_handle.fileno())
+        os.replace(staged_artifact, artifact)
         manifest = artifact.with_suffix(".json")
         document = {
             "schema_version": SCHEMA_VERSION,
