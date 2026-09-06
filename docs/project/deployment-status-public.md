@@ -36,7 +36,8 @@ compte, ni secret, ni chemin d'administration.
 - **Interface Web du projet : déployée derrière le HTTPS privé.** Argon2id,
   sessions, CSRF, mémoire SQLite locale, historique, export, suppression et
   client llama.cpp loopback fonctionnent. L'initialisation du compte
-  propriétaire reste à effectuer ; la mémoire n'est pas encore répliquée.
+  propriétaire reste à effectuer ; la mémoire est sauvegardée périodiquement
+  sur le stockage durable avec vérification d'empreinte.
 - **Agents : configuration seulement.** Les 60 profils sont tous `draft` et
   aucun agent n'est actif.
 - **Orchestrateur et autorisations : préparation seulement.** Les validateurs

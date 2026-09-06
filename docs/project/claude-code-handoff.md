@@ -137,7 +137,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   gates à prouver.
 - aucune restauration complète, test négatif de droits ni test de persistance
   après redémarrage intégral n'est encore terminé ;
-- la mémoire de la passerelle reste locale et n'est pas répliquée sur le NAS.
+- la mémoire active reste locale, mais une sauvegarde SQLite périodique
+  vérifiée est déposée sur le NAS ; une restauration de remplacement reste
+  manuelle et doit arrêter proprement la passerelle.
 
 ## Ordre de reprise recommandé
 

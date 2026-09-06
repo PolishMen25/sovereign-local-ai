@@ -5,7 +5,7 @@ After=local-fs.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/sovereign/app
-ExecStart=/usr/bin/python3 -B tools/backup_conversation_memory.py backup --source /var/lib/sovereign-gateway/memory.sqlite3 --destination-directory /mnt/sovereign-memory/backups
+ExecStart=/usr/bin/python3 -B -m tools.backup_conversation_memory backup --source /var/lib/sovereign-gateway/memory.sqlite3 --destination-directory /mnt/sovereign-memory/backups
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes
