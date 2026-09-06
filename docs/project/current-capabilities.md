@@ -1,6 +1,6 @@
 # Capacités réellement disponibles
 
-Dernière vérification : 2026-09-02.
+Dernière vérification : 2026-09-06.
 
 Ce document est la source de vérité publique sur l'état exécutable du projet.
 Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
@@ -18,12 +18,11 @@ et ne possède aucun savoir linguistique. CORE-700M n'est pas entraîné et aucu
 tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
 n'existe encore pour CORE.
 
-Un runner CPU/NUMA synthétique et fail-closed est maintenant implémenté pour
-produire une preuve répétée d'un placement externe. Son préflight réel a passé
-les contrôles de source, runtime, placement et sockets ; le premier run a mis
-en évidence un doublon d'option entre runner et wrapper, désormais corrigé et
-testé localement. Les deux preuves A/B doivent encore être rejouées après
-déploiement de cette correction ; le gate G4 reste ouvert.
+Un runner CPU/NUMA synthétique et fail-closed a produit deux preuves répétées
+de trois runs sur le même commit et workload. Le placement A a une médiane
+supérieure de 3,8 % à B sur ce mini-test. Ce résultat descriptif ne vaut ni
+choix de placement final, ni estimation de durée CORE-700M ; le gate G4 reste
+ouvert.
 
 CORE-MINI possède maintenant un second chemin, nommé explicitement
 `authorized-text`. La validation du bundle, la tokenisation, le contrat, le
@@ -43,7 +42,7 @@ génère pas une réponse d'IA.
 | Runtime tensoriel CPU hors ligne | Installé et vérifié | PyTorch `2.13.0+cpu` et NumPy `2.5.2` dans un environnement isolé, acquis par empreintes et installés sans index réseau ; aucune dépendance CUDA/ROCm | Runtime technique, pas un assistant |
 | Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur et conserve localement les échanges masqués | Modèle tiers temporaire, aucun RAG/outil/agent, pas CORE ; première configuration propriétaire encore requise et mémoire non répliquée |
 | CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes puis reprise de 5 étapes jusqu'à l'étape 25 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité d'un ancien checkpoint historique encore à confirmer |
-| Runner CORE-MINI NUMA | Implémenté, préflight réel validé, sans preuve A/B acceptée | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, répétitions fraîches et preuve publique minimisée | Correction d'argument testée localement à redéployer ; aucun comparateur multi-placement ni mesure complète pour G4 |
+| Runner CORE-MINI NUMA | Deux preuves A/B répétées produites | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et preuve publique minimisée | Comparateur strict, mesures mémoire/NUMA élargies et décision G4 encore absents |
 | Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne, stockage de travail local et flux réseau fortement bornés ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
 | CORE-700M | Architecture candidate et comptage exact vérifié | Configuration de 691 160 320 paramètres ; CORE-80M reste une référence historique | Aucune instanciation complète mesurée, aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
@@ -114,9 +113,8 @@ génère pas une réponse d'IA.
 - la passerelle Web propre au projet est installée sur le sas ; son endpoint de
   chat appelle réellement BOOTSTRAP et sa mémoire SQLite locale prend en charge
   historique, export et suppression explicite ;
-- 198 tests locaux passent sur la correction en attente de déploiement ; la
-  révision actuellement installée avait passé 197 tests Linux avant cette
-  correction ;
+- 198 tests passent sur la révision `8071843` déployée, y compris le lock NumPy
+  et la preuve NUMA renforcée ;
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
   refuse les redirections, valide chaque payload en file et ne le supprime
   qu'après écriture atomique et vérification locale d'un reçu concordant ;

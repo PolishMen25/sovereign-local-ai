@@ -76,8 +76,10 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
 - **CONFIRMÉ** — Le préflight du runner NUMA répété a validé l'archive source,
   le runtime CPU hors ligne, le placement externe et le refus des sockets
   Internet. Le premier run réel a ensuite refusé un argument appartenant au
-  wrapper enfant ; le défaut est corrigé et testé localement. Les deux preuves
-  répétées A/B restent à rejouer sur la révision déployée.
+  wrapper enfant ; le défaut est corrigé, déployé et couvert par les tests.
+  Deux preuves A/B de trois répétitions, même commit et même workload ont été
+  produites. La médiane de A est 3,8 % au-dessus de B sur ce mini-test ; cette
+  observation descriptive ne choisit pas encore un placement pour CORE-700M.
 
 Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
 le benchmark NUMA complet avec répétitions et charges plus grandes, ni la

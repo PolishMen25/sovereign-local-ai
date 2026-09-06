@@ -1,6 +1,6 @@
 # État public du déploiement
 
-Dernière vérification : 2026-09-02.
+Dernière vérification : 2026-09-06.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md). Ce résumé reste
@@ -21,9 +21,9 @@ compte, ni secret, ni chemin d'administration.
   explicite `authorized-text` sont implémentés et couverts par les tests locaux,
   mais aucun run `authorized-text` de bout en bout ni reprise du checkpoint
   historique avec ces nouveaux contrôles n'est encore confirmé sur Linux. Le
-  runner NUMA répété est implémenté ; son préflight réel a réussi, puis un
-  défaut d'argument a été détecté et corrigé localement. Les preuves A/B doivent
-  encore être rejouées après redéploiement.
+  runner NUMA répété a produit deux preuves A/B de trois répétitions avec le
+  même commit et workload. A est 3,8 % au-dessus de B en médiane sur ce
+  mini-test ; aucun choix de placement ou délai CORE-700M n'en est déduit.
 - **CORE-700M : conception seulement.** L'architecture candidate et son
   comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
   référence historique ; aucun tokenizer final, corpus approuvé ou poids
@@ -98,7 +98,7 @@ production.
   checkpoint est repris une étape sans modifier sa source ;
 - sa preuve publique ne contient ni hostname, ni modèle ou liste CPU, ni
   commande ou chemin. Elle porte sur un seul placement ; aucune comparaison
-  multi-placement conforme, mesure mémoire ou série complète de compteurs NUMA
+  multi-placement strict, mesure mémoire ou série complète de compteurs NUMA
   ne permet encore d'extrapoler CORE-700M.
 
 ## Non revendiqué
@@ -106,7 +106,7 @@ production.
 Le projet ne revendique pas encore : entraînement sur un corpus réel approuvé,
 poids linguistiques CORE, modèle conversationnel CORE, RAG sémantique, agents
 autonomes, interface utilisateur finale, authentification de production, gate
-réseau achevé, preuve NUMA multi-placement acceptée ou entraînement CORE-700M.
+réseau achevé, décision NUMA G4 acceptée ou entraînement CORE-700M.
 Le service BOOTSTRAP privé est une démonstration bornée, pas un service CORE de
 production.
 
