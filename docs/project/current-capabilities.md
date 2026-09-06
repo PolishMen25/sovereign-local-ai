@@ -48,9 +48,9 @@ génère pas une réponse d'IA.
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
-| RAG | Index lexical local déployé | SQLite/FTS5 indexe les documents Markdown explicitement approuvés de la révision installée ; la route de chat reçoit des extraits bornés et des citations avec provenance | Aucun moteur d'embeddings vérifié, aucun index sémantique ; les conversations, RAW et VALIDATED ne sont pas indexés |
+| RAG | Index lexical local déployé et sauvegardé | SQLite/FTS5 indexe les documents Markdown explicitement approuvés de la révision installée ; la route de chat reçoit des extraits bornés et des citations avec provenance ; une sauvegarde SQLite périodique vérifiée est déposée sur le NAS | Aucun moteur d'embeddings vérifié, aucun index sémantique ; les conversations, RAW et VALIDATED ne sont pas indexés |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
-| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé | Aucune restauration complète de conversation, catalogue, index ou checkpoint ; réplication de mémoire et test de droits négatifs restent à faire |
+| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé ; mémoire et index lexical sont sauvegardés et restaurés dans des fichiers de contrôle vérifiés | Le remplacement d'une base active et la restauration d'un checkpoint CORE restent à prouver ; le test de droits négatifs reste à faire |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif avec sauvegarde durable | Masquage de secrets, empreintes, historique, export, suppression avec reçu sans contenu et sauvegarde SQLite vérifiée vers le NAS | Pas encore raccordée au RAG ; restauration applicative de remplacement reste manuelle |
@@ -116,6 +116,9 @@ génère pas une réponse d'IA.
 - le service d'index local a construit la base SQLite/FTS5 depuis les vingt
   documents Markdown livrés avec la révision installée ; une recherche lexicale
   locale a renvoyé des documents et leurs empreintes de provenance ;
+- une sauvegarde de l'index lexical a été créée puis vérifiée et restaurée dans
+  un fichier de contrôle, avec empreinte identique ; ce fichier de contrôle a
+  été supprimé sans remplacer la base active ;
 - 198 tests passent sur la révision `8071843` déployée, y compris le lock NumPy
   et la preuve NUMA renforcée ;
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
