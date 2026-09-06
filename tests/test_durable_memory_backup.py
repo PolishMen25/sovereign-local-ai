@@ -17,9 +17,13 @@ class DurableMemoryBackupTests(unittest.TestCase):
         self.root = test_root / f"durable-memory-{uuid4().hex}"
         self.root.mkdir()
         self.database = self.root / "memory.sqlite3"
-        with sqlite3.connect(self.database) as connection:
+        connection = sqlite3.connect(self.database)
+        try:
             connection.execute("CREATE TABLE messages (content TEXT NOT NULL)")
             connection.execute("INSERT INTO messages(content) VALUES(?)", ("message de test",))
+            connection.commit()
+        finally:
+            connection.close()
         self.backups = self.root / "backups"
 
     def tearDown(self) -> None:
@@ -46,3 +50,19 @@ class DurableMemoryBackupTests(unittest.TestCase):
         manifest_path.write_text(json.dumps(document), encoding="utf-8")
         with self.assertRaises(ValueError):
             verify_backup(artifact, manifest_path)
+
+    def test_catalogue_backup_uses_a_distinct_schema_and_name(self) -> None:
+        manifest = create_backup(
+            self.database,
+            self.backups,
+            artifact_prefix="knowledge-index",
+            schema_version="knowledge-index-backup.v1",
+        )
+        artifact = self.backups / manifest["artifact"]
+        self.assertTrue(artifact.name.startswith("knowledge-index-"))
+        self.assertEqual(
+            manifest,
+            verify_backup(artifact, artifact.with_suffix(".json"), schema_version="knowledge-index-backup.v1"),
+        )
+        with self.assertRaises(ValueError):
+            verify_backup(artifact, artifact.with_suffix(".json"))

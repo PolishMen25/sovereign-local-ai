@@ -26,6 +26,12 @@ avec la révision installée. Il ne lit pas RAW, VALIDATED, le partage Synology
 ou les conversations. Toute extension vers un corpus personnel ou validé exige
 un manifeste et une approbation distincts.
 
+`sovereign-knowledge-backup.timer` sauvegarde ensuite cet index toutes les
+trente minutes vers le montage de sauvegarde dédié. Le manifeste porte seulement
+son nom, sa taille et son empreinte ; il ne recopie ni contenu indexé ni
+conversation. La restauration est une opération opérateur vérifiée, distincte
+du remplacement de la base en service.
+
 ## Contrats disponibles
 
 - `GET /healthz` et `GET /v1/setup-status` : état minimal sans secret ;

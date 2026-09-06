@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Sovereign Local AI lexical knowledge backup
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=true
+Unit=sovereign-knowledge-backup.service
+
+[Install]
+WantedBy=timers.target

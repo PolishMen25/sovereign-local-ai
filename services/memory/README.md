@@ -27,3 +27,9 @@ python3 -B tools/backup_conversation_memory.py backup \
 Le montage durable de la passerelle et son ordonnanceur restent une opération
 de déploiement distincte. Une conversation ne devient jamais un corpus
 d'entraînement par cette sauvegarde.
+
+La primitive de copie SQLite accepte aussi un préfixe et un schéma de manifeste
+spécifiques pour un autre artefact local, afin de ne jamais confondre une
+sauvegarde de mémoire et une sauvegarde de catalogue RAG. Le seul consommateur
+actuel est l'outil opérateur `backup_knowledge_index.py` ; aucun de ces outils
+n'est exposé par HTTP ou MCP.

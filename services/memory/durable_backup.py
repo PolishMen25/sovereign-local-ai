@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -15,6 +16,7 @@ from typing import Any
 
 
 SCHEMA_VERSION = "private-memory-backup.v1"
+ARTIFACT_PREFIX = re.compile(r"^[a-z0-9][a-z0-9-]{0,47}$")
 
 
 def _utc_now() -> str:
@@ -53,8 +55,23 @@ def _check_sqlite(path: Path) -> None:
         raise ValueError("sqlite integrity check failed")
 
 
-def create_backup(source: Path, destination_directory: Path) -> dict[str, Any]:
+def _backup_identity(artifact_prefix: str, schema_version: str) -> tuple[str, str]:
+    if not isinstance(artifact_prefix, str) or ARTIFACT_PREFIX.fullmatch(artifact_prefix) is None:
+        raise ValueError("backup artifact prefix is invalid")
+    if not isinstance(schema_version, str) or not 1 <= len(schema_version) <= 80:
+        raise ValueError("backup schema version is invalid")
+    return artifact_prefix, schema_version
+
+
+def create_backup(
+    source: Path,
+    destination_directory: Path,
+    *,
+    artifact_prefix: str = "memory",
+    schema_version: str = SCHEMA_VERSION,
+) -> dict[str, Any]:
     """Create an atomic SQLite backup and a content-free manifest."""
+    artifact_prefix, schema_version = _backup_identity(artifact_prefix, schema_version)
     source = _require_database(source)
     destination = destination_directory.resolve()
     destination.mkdir(parents=True, exist_ok=True)
@@ -72,7 +89,7 @@ def create_backup(source: Path, destination_directory: Path) -> dict[str, Any]:
             source_connection.backup(target_connection)
         _check_sqlite(temporary)
         digest = _sha256(temporary)
-        filename = f"memory-{_utc_now()}-{digest[:16]}.sqlite3"
+        filename = f"{artifact_prefix}-{_utc_now()}-{digest[:16]}.sqlite3"
         artifact = destination / filename
         staged_artifact = destination / f"{filename}.tmp"
         with temporary.open("rb") as input_handle, staged_artifact.open("wb") as output_handle:
@@ -82,7 +99,7 @@ def create_backup(source: Path, destination_directory: Path) -> dict[str, Any]:
         os.replace(staged_artifact, artifact)
         manifest = artifact.with_suffix(".json")
         document = {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": schema_version,
             "artifact": filename,
             "sha256": digest,
             "bytes": artifact.stat().st_size,
@@ -93,7 +110,13 @@ def create_backup(source: Path, destination_directory: Path) -> dict[str, Any]:
         temporary.unlink(missing_ok=True)
 
 
-def verify_backup(artifact: Path, manifest: Path) -> dict[str, Any]:
+def verify_backup(
+    artifact: Path,
+    manifest: Path,
+    *,
+    schema_version: str = SCHEMA_VERSION,
+) -> dict[str, Any]:
+    _, schema_version = _backup_identity("memory", schema_version)
     artifact = _require_database(artifact)
     try:
         document = json.loads(manifest.read_text(encoding="utf-8"))
@@ -101,7 +124,7 @@ def verify_backup(artifact: Path, manifest: Path) -> dict[str, Any]:
         raise ValueError("backup manifest is invalid") from error
     if not isinstance(document, dict) or set(document) != {"schema_version", "artifact", "sha256", "bytes"}:
         raise ValueError("backup manifest fields are invalid")
-    if document.get("schema_version") != SCHEMA_VERSION or document.get("artifact") != artifact.name:
+    if document.get("schema_version") != schema_version or document.get("artifact") != artifact.name:
         raise ValueError("backup manifest identity is invalid")
     if not isinstance(document.get("sha256"), str) or len(document["sha256"]) != 64:
         raise ValueError("backup manifest digest is invalid")
@@ -113,9 +136,15 @@ def verify_backup(artifact: Path, manifest: Path) -> dict[str, Any]:
     return document
 
 
-def restore_backup(artifact: Path, manifest: Path, destination: Path) -> dict[str, Any]:
+def restore_backup(
+    artifact: Path,
+    manifest: Path,
+    destination: Path,
+    *,
+    schema_version: str = SCHEMA_VERSION,
+) -> dict[str, Any]:
     """Restore a verified artifact through SQLite's backup API, atomically."""
-    document = verify_backup(artifact, manifest)
+    document = verify_backup(artifact, manifest, schema_version=schema_version)
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
