@@ -20,6 +20,12 @@ par MCP. Le service écoute uniquement sur loopback. L'accès HTTPS LAN
 ou tailnet doit être réalisé par un reverse proxy approuvé ; ne jamais modifier
 `SOVEREIGN_WEB_HOST` pour exposer directement le serveur Python.
 
+`sovereign-knowledge-index.service` construit avant le démarrage de la
+passerelle un index lexical local depuis les seuls documents Markdown livrés
+avec la révision installée. Il ne lit pas RAW, VALIDATED, le partage Synology
+ou les conversations. Toute extension vers un corpus personnel ou validé exige
+un manifeste et une approbation distincts.
+
 ## Contrats disponibles
 
 - `GET /healthz` et `GET /v1/setup-status` : état minimal sans secret ;

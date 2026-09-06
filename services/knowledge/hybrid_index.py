@@ -90,7 +90,7 @@ class HybridKnowledgeIndex:
         title: str,
         content: str,
         provenance_id: str,
-        embedding: Iterable[float],
+        embedding: Iterable[float] | None,
     ) -> None:
         document_id = _validated_identifier(document_id, "document_id")
         provenance_id = _validated_identifier(provenance_id, "provenance_id")
@@ -98,7 +98,7 @@ class HybridKnowledgeIndex:
             raise ValueError("title is invalid")
         if not isinstance(content, str) or not 1 <= len(content) <= MAX_TEXT_CHARS:
             raise ValueError("content is invalid")
-        vector = _normalized_vector(embedding)
+        vector = None if embedding is None else _normalized_vector(embedding)
         with closing(self._connect()) as connection, connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute("DELETE FROM validated_chunks_fts WHERE document_id = ?", (document_id,))
@@ -107,7 +107,7 @@ class HybridKnowledgeIndex:
                 "VALUES(?,?,?,?,?,?) ON CONFLICT(document_id) DO UPDATE SET "
                 "title=excluded.title,content=excluded.content,provenance_id=excluded.provenance_id,"
                 "embedding_dimensions=excluded.embedding_dimensions,embedding=excluded.embedding",
-                (document_id, title, content, provenance_id, len(vector), _encode_vector(vector)),
+                (document_id, title, content, provenance_id, 0 if vector is None else len(vector), b"" if vector is None else _encode_vector(vector)),
             )
             connection.execute(
                 "INSERT INTO validated_chunks_fts(document_id,title,content) VALUES(?,?,?)",
@@ -149,6 +149,8 @@ class HybridKnowledgeIndex:
                 lexical_score = 1.0 / (1.0 + lexical_order[row["document_id"]])
             vector_score = 0.0
             if normalized_query is not None:
+                if row["embedding_dimensions"] == 0:
+                    continue
                 if row["embedding_dimensions"] != len(normalized_query):
                     continue
                 stored = _decode_vector(row["embedding"], row["embedding_dimensions"])
@@ -173,4 +175,3 @@ class HybridKnowledgeIndex:
             "hits": hits,
             "truncated": len(ranked) > limit,
         }
-

@@ -16,11 +16,15 @@ caractères. Les bases d'authentification et de mémoire sont placées sous le
 répertoire opérateur `SOVEREIGN_WEB_STATE`. Le client BOOTSTRAP refuse toute URL
 autre que loopback, tout proxy et toute redirection.
 
-Le RAG hybride, les profils d'agents et les actions confirmables ne sont pas
-encore raccordés à la route de chat. Une absence d'Argon2id ou du runtime local
-provoque un refus sûr ; aucun fournisseur distant n'est utilisé.
+La route de chat interroge aussi, quand il est présent, un index SQLite/FTS5
+local de documents explicitement approuvés. Les extraits sont bornés, leur
+provenance est renvoyée dans `citations` et ils sont présentés au modèle comme
+des données non exécutables. Ce premier niveau est lexical : aucun vecteur n'est
+fabriqué et aucun moteur d'embeddings n'est encore installé. Les profils
+d'agents et les actions confirmables ne sont pas raccordés. Une absence
+d'Argon2id ou du runtime local provoque un refus sûr ; aucun fournisseur distant
+n'est utilisé.
 
 Le service ne doit jamais écouter directement sur le LAN. Un reverse proxy
 HTTPS approuvé porte l'accès LAN ou tailnet, tandis que le processus Python
 reste sur `127.0.0.1`.
-

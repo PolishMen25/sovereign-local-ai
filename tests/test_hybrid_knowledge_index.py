@@ -1,14 +1,15 @@
 from pathlib import Path
-import tempfile
 import unittest
 
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
+from tests._temp_support import sovereign_temporary_directory
 
 
 class HybridKnowledgeIndexTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.index = HybridKnowledgeIndex(Path(self.temporary.name) / "knowledge.sqlite3")
+        self.temporary = sovereign_temporary_directory()
+        temporary_path = self.temporary.__enter__()
+        self.index = HybridKnowledgeIndex(Path(temporary_path) / "knowledge.sqlite3")
         self.index.initialize()
         self.index.upsert_validated(
             document_id="storage-001",
@@ -26,7 +27,7 @@ class HybridKnowledgeIndexTests(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
-        self.temporary.cleanup()
+        self.temporary.__exit__(None, None, None)
 
     def test_hybrid_search_returns_provenance(self) -> None:
         result = self.index.search("stockage modèles", query_embedding=[1.0, 0.0, 0.0])
@@ -38,6 +39,19 @@ class HybridKnowledgeIndexTests(unittest.TestCase):
         result = self.index.search("route Internet", query_embedding=None)
         self.assertEqual("lexical", result["mode"])
         self.assertEqual("network-001", result["hits"][0]["document_id"])
+
+    def test_lexical_document_is_not_presented_as_a_vector(self) -> None:
+        self.index.upsert_validated(
+            document_id="lexical-001",
+            title="Référence textuelle",
+            content="Cette référence ne possède pas encore de vecteur validé.",
+            provenance_id="approved-lexical-v1",
+            embedding=None,
+        )
+        lexical = self.index.search("vecteur validé", query_embedding=None)
+        self.assertEqual("lexical-001", lexical["hits"][0]["document_id"])
+        hybrid = self.index.search("vecteur validé", query_embedding=[1.0, 0.0, 0.0])
+        self.assertNotIn("lexical-001", [hit["document_id"] for hit in hybrid["hits"]])
 
     def test_invalid_or_non_finite_embeddings_are_refused(self) -> None:
         with self.assertRaises(ValueError):

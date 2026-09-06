@@ -29,10 +29,12 @@ compte, ni secret, ni chemin d'administration.
   comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
   référence historique ; aucun tokenizer final, corpus approuvé ou poids
   CORE-700M utilisable n'existe.
-- **MCP Knowledge et RAG : implémentation locale partielle.** MCP expose en
-  `stdio` l'état, la recherche lexicale et une provenance exacte. Un index
-  hybride SQLite/FTS5/vecteurs est testé, sans moteur d'embeddings installé ni
-  données réelles indexées.
+- **MCP Knowledge et RAG : recherche locale avec provenance.** MCP expose en
+  `stdio` l'état, la recherche lexicale et une provenance exacte. La passerelle
+  peut indexer les documents Markdown approuvés de sa révision, joindre des
+  extraits bornés à BOOTSTRAP et retourner les citations. Aucun moteur
+  d'embeddings ni index sémantique n'est installé ; conversations, RAW et
+  VALIDATED restent hors de cet index.
 - **Interface Web du projet : déployée derrière le HTTPS privé.** Argon2id,
   sessions, CSRF, mémoire SQLite locale, historique, export, suppression et
   client llama.cpp loopback fonctionnent. L'initialisation du compte

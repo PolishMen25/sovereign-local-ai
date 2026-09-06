@@ -28,6 +28,11 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(payload["engine"], "BOOTSTRAP")
         self.assertEqual(json.loads(json.dumps(payload))["status"], "error")
 
+    def test_response_keeps_bounded_retrieval_citations(self) -> None:
+        citations = [{"document_id": "project:status.md", "title": "Statut", "provenance_id": "project-sha256:abc"}]
+        payload = response("req-123456", "coordination", "completed", "ok", citations=citations)
+        self.assertEqual(citations, payload["citations"])
+
 
 if __name__ == "__main__":
     unittest.main()

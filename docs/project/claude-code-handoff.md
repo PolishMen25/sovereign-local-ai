@@ -111,8 +111,11 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   CORE-80M conservé comme référence historique ;
 - passerelle Web mono-utilisateur, authentification Argon2id, sessions, CSRF,
   mémoire conversationnelle masquée, export et suppression explicite ;
-- catalogue RAG hybride local SQLite/FTS5/vecteurs et capacités MCP étroites de
-  recherche/provenance, testés mais pas encore alimentés ni raccordés au chat ;
+- index RAG lexical SQLite/FTS5 alimentable depuis les documents Markdown
+  explicitement approuvés de la révision installée ; la route de chat BOOTSTRAP
+  peut recevoir des extraits bornés et renvoyer les citations avec provenance.
+  Aucun vecteur synthétique, moteur d'embeddings, document RAW, VALIDATED ou
+  conversation ne rejoint cet index ;
 - Collector forcé sur loopback et relais Codex sans URL d'installation codée
   en dur ;
 - relais Codex refusant toute redirection HTTP et validant le payload en file,
@@ -130,7 +133,7 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - aucun runtime de génération CORE actif ;
 - `/v1/chat` appelle réellement BOOTSTRAP et nomme le moteur ; la réponse reste
   JSON non progressive et ne doit pas être confondue avec CORE ;
-- aucun catalogue RAG réel, agent actif, RBAC final ou streaming de réponse ;
+- aucun RAG sémantique, agent actif, RBAC final ou streaming de réponse ;
 - aucun choix de placement ni décision G4 n'est encore accepté ; les deux
   preuves et leur comparaison servent seulement d'observation descriptive ;
 - l'isolation réseau complète et les restaurations de production restent des
