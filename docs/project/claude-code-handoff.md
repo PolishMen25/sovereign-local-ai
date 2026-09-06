@@ -47,8 +47,8 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   archive source et runtime offline vérifiés, contrôle INET flux/datagrammes
   fail-closed et répétitions bornées ; le doublon d'option a été corrigé,
   déployé et testé. Les preuves A/B ont produit trois répétitions chacune sur
-  le même commit et workload ; A est 3,8 % au-dessus de B en médiane, sans
-  décision de placement ;
+  le même commit et workload ; un comparateur strict les a vérifiées. A est
+  3,8 % au-dessus de B en médiane, sans décision de placement ;
 - prototype MCP Knowledge `stdio` sur trois notices synthétiques ;
 - Collector de conversations write-only vers RAW ;
 - stockage chiffré validé avec des données synthétiques ;
@@ -127,9 +127,8 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - `/v1/chat` appelle réellement BOOTSTRAP et nomme le moteur ; la réponse reste
   JSON non progressive et ne doit pas être confondue avec CORE ;
 - aucun catalogue RAG réel, agent actif, RBAC final ou streaming de réponse ;
-- aucun comparateur multi-placement strict ni décision G4 n'est encore
-  implémenté ; les deux preuves répétées servent seulement d'observation
-  descriptive ;
+- aucun choix de placement ni décision G4 n'est encore accepté ; les deux
+  preuves et leur comparaison servent seulement d'observation descriptive ;
 - l'isolation réseau complète et les restaurations de production restent des
   gates à prouver.
 - le client SMB est installé et le partage NAS existe, mais aucun secret local,
@@ -138,22 +137,20 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 ## Ordre de reprise recommandé
 
-1. implémenter un comparateur strict des deux preuves existantes avant toute
-   conclusion de placement ;
-2. finaliser le secret SMB hors chat, le montage, les tests positifs/négatifs de
+1. finaliser le secret SMB hors chat, le montage, les tests positifs/négatifs de
    droits et une restauration depuis le stockage durable ;
-3. terminer la première configuration du compte propriétaire dans l'interface ;
-4. confirmer la compatibilité d'un checkpoint CORE-MINI historique sur le
+2. terminer la première configuration du compte propriétaire dans l'interface ;
+3. confirmer la compatibilité d'un checkpoint CORE-MINI historique sur le
    nœud CPU avec le vérificateur offline ;
-5. définir puis approuver les sources, licences, langues et exclusions du
+4. définir puis approuver les sources, licences, langues et exclusions du
    corpus ;
-6. produire un tokenizer expérimental depuis le seul split `train`, évaluer sa
+5. produire un tokenizer expérimental depuis le seul split `train`, évaluer sa
    qualité, puis faire approuver séparément son SHA-256 exact ;
-7. exécuter le premier mini-entraînement `authorized-text` avec le bundle exact
+6. exécuter le premier mini-entraînement `authorized-text` avec le bundle exact
    approuvé et conserver checkpoint, journal de métriques et lignée ;
-8. évaluer ce run, vérifier sa reprise hors ligne, puis exporter un bundle
+7. évaluer ce run, vérifier sa reprise hors ligne, puis exporter un bundle
    d'inférence borné et vérifié ;
-9. seulement après les gates, raccorder génération CORE, RAG, authentification,
+8. seulement après les gates, raccorder génération CORE, RAG, authentification,
    interface et profils d'agents.
 
 ## État de travail à vérifier avant reprise

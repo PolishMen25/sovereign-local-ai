@@ -78,8 +78,9 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
   Internet. Le premier run réel a ensuite refusé un argument appartenant au
   wrapper enfant ; le défaut est corrigé, déployé et couvert par les tests.
   Deux preuves A/B de trois répétitions, même commit et même workload ont été
-  produites. La médiane de A est 3,8 % au-dessus de B sur ce mini-test ; cette
-  observation descriptive ne choisit pas encore un placement pour CORE-700M.
+  produites puis vérifiées par un comparateur strict. La médiane de A est 3,8 %
+  au-dessus de B sur ce mini-test ; cette observation descriptive ne choisit
+  pas encore un placement pour CORE-700M.
 
 Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
 le benchmark NUMA complet avec répétitions et charges plus grandes, ni la

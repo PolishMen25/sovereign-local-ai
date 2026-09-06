@@ -22,8 +22,9 @@ compte, ni secret, ni chemin d'administration.
   mais aucun run `authorized-text` de bout en bout ni reprise du checkpoint
   historique avec ces nouveaux contrôles n'est encore confirmé sur Linux. Le
   runner NUMA répété a produit deux preuves A/B de trois répétitions avec le
-  même commit et workload. A est 3,8 % au-dessus de B en médiane sur ce
-  mini-test ; aucun choix de placement ou délai CORE-700M n'en est déduit.
+  même commit et workload, vérifiées par un comparateur strict. A est 3,8 % au-
+  dessus de B en médiane sur ce mini-test ; aucun choix de placement ou délai
+  CORE-700M n'en est déduit.
 - **CORE-700M : conception seulement.** L'architecture candidate et son
   comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
   référence historique ; aucun tokenizer final, corpus approuvé ou poids
