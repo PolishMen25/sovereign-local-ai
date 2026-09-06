@@ -64,5 +64,13 @@ class DurableMemoryBackupTests(unittest.TestCase):
             manifest,
             verify_backup(artifact, artifact.with_suffix(".json"), schema_version="knowledge-index-backup.v1"),
         )
+        restored = self.root / "knowledge-restored.sqlite3"
+        result = restore_backup(
+            artifact,
+            artifact.with_suffix(".json"),
+            restored,
+            schema_version="knowledge-index-backup.v1",
+        )
+        self.assertEqual("knowledge-index-backup.v1", result["schema_version"])
         with self.assertRaises(ValueError):
             verify_backup(artifact, artifact.with_suffix(".json"))

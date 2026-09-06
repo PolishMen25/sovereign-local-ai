@@ -144,6 +144,7 @@ def restore_backup(
     schema_version: str = SCHEMA_VERSION,
 ) -> dict[str, Any]:
     """Restore a verified artifact through SQLite's backup API, atomically."""
+    _, schema_version = _backup_identity("memory", schema_version)
     document = verify_backup(artifact, manifest, schema_version=schema_version)
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -158,6 +159,6 @@ def restore_backup(
         if _sha256(temporary) != document["sha256"]:
             raise ValueError("restored backup digest does not match")
         os.replace(temporary, destination)
-        return {"schema_version": SCHEMA_VERSION, "restored_sha256": document["sha256"], "bytes": document["bytes"]}
+        return {"schema_version": schema_version, "restored_sha256": document["sha256"], "bytes": document["bytes"]}
     finally:
         temporary.unlink(missing_ok=True)
