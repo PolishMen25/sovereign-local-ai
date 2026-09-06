@@ -25,6 +25,9 @@ compte, ni secret, ni chemin d'administration.
   même commit et workload, vérifiées par un comparateur strict. A est 3,8 % au-
   dessus de B en médiane sur ce mini-test ; aucun choix de placement ou délai
   CORE-700M n'en est déduit.
+  Un checkpoint synthétique frais de vingt étapes est désormais copié sur le
+  stockage durable, restauré dans un fichier de contrôle et repris offline avec
+  succès à l'étape 21.
 - **CORE-700M : conception seulement.** L'architecture candidate et son
   comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
   référence historique ; aucun tokenizer final, corpus approuvé ou poids

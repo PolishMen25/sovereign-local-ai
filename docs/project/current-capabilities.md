@@ -41,7 +41,7 @@ génère pas une réponse d'IA.
 | --- | --- | --- | --- |
 | Runtime tensoriel CPU hors ligne | Installé et vérifié dans le conteneur CORE | PyTorch `2.13.0+cpu` et NumPy `2.5.2` ont été réinjectés depuis des wheels vérifiés ; CUDA est indisponible et non compilé | Runtime technique isolé, pas un assistant ni des poids CORE |
 | Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur, conserve localement les échanges masqués et peut joindre des références lexicales avec provenance | Modèle tiers temporaire, pas CORE ; aucun outil ou agent, aucun RAG sémantique ; première configuration propriétaire encore requise |
-| CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes puis reprise de 5 étapes jusqu'à l'étape 25 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité d'un ancien checkpoint historique encore à confirmer |
+| CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes, checkpoint durable vérifié, restauration de contrôle et reprise offline jusqu'à l'étape 21 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; aucun checkpoint CORE-700M |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
 | Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
 | CORE-700M | Architecture candidate et comptage exact vérifié | Configuration de 691 160 320 paramètres ; CORE-80M reste une référence historique | Aucune instanciation complète mesurée, aucun tokenizer final, corpus approuvé ou poids |
@@ -50,7 +50,7 @@ génère pas une réponse d'IA.
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
 | RAG | Index lexical local déployé et sauvegardé | SQLite/FTS5 indexe les documents Markdown explicitement approuvés de la révision installée ; la route de chat reçoit des extraits bornés et des citations avec provenance ; une sauvegarde SQLite périodique vérifiée est déposée sur le NAS | Aucun moteur d'embeddings vérifié, aucun index sémantique ; les conversations, RAW et VALIDATED ne sont pas indexés |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
-| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé ; mémoire et index lexical sont sauvegardés et restaurés dans des fichiers de contrôle vérifiés | Le remplacement d'une base active et la restauration d'un checkpoint CORE restent à prouver ; le test de droits négatifs reste à faire |
+| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé ; mémoire, index lexical et checkpoint CORE-MINI sont sauvegardés et restaurés avec empreintes vérifiées | Le remplacement d'une base active, la restauration d'un checkpoint CORE-700M et le test de droits négatifs restent à faire |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif avec sauvegarde durable | Masquage de secrets, empreintes, historique, export, suppression avec reçu sans contenu et sauvegarde SQLite vérifiée vers le NAS | Pas encore raccordée au RAG ; restauration applicative de remplacement reste manuelle |
@@ -121,6 +121,10 @@ génère pas une réponse d'IA.
 - une sauvegarde de l'index lexical a été créée puis vérifiée et restaurée dans
   un fichier de contrôle, avec empreinte identique ; ce fichier de contrôle a
   été supprimé sans remplacer la base active ;
+- un run CORE-MINI synthétique frais de vingt étapes a produit un checkpoint,
+  copié vers le stockage durable puis restauré dans un fichier de contrôle avec
+  la même empreinte ; le vérificateur offline a repris cette copie à l'étape 21
+  et l'a déclarée compatible CPU-only, réseau désactivé ;
 - 198 tests passent sur la révision `8071843` déployée, y compris le lock NumPy
   et la preuve NUMA renforcée ;
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur

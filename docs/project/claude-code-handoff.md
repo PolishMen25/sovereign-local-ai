@@ -142,8 +142,10 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - l'isolation réseau complète et les restaurations de production restent des
   gates à prouver.
 - mémoire et index lexical ont été sauvegardés, vérifiés et restaurés dans des
-  fichiers de contrôle supprimés ensuite ; le remplacement d'une base active,
-  la restauration d'un checkpoint, les droits négatifs et la persistance après
+  fichiers de contrôle supprimés ensuite ; un checkpoint CORE-MINI synthétique
+  est copié sur le stockage durable, restauré dans un fichier de contrôle puis
+  repris offline avec succès. Le remplacement d'une base active, la restauration
+  d'un checkpoint CORE-700M, les droits négatifs et la persistance après
   redémarrage intégral restent à terminer ;
 - la mémoire active reste locale, mais une sauvegarde SQLite périodique
   vérifiée est déposée sur le NAS ; une restauration de remplacement reste
