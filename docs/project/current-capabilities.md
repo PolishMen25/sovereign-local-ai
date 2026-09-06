@@ -43,14 +43,14 @@ génère pas une réponse d'IA.
 | Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur et conserve localement les échanges masqués | Modèle tiers temporaire, aucun RAG/outil/agent, pas CORE ; première configuration propriétaire encore requise et mémoire non répliquée |
 | CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes puis reprise de 5 étapes jusqu'à l'étape 25 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; compatibilité d'un ancien checkpoint historique encore à confirmer |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
-| Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne, stockage de travail local et flux réseau fortement bornés ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
+| Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
 | CORE-700M | Architecture candidate et comptage exact vérifié | Configuration de 691 160 320 paramètres ; CORE-80M reste une référence historique | Aucune instanciation complète mesurée, aucun tokenizer final, corpus approuvé ou poids |
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
 | RAG hybride | Module local testé, non déployé | SQLite, FTS5, vecteurs finis fournis hors module, score hybride et provenance | Aucun moteur d'embeddings vérifié installé, aucun catalogue réel indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
-| Synology | Partage durable préparé sur le NAS | Arborescence RAW/VALIDATED/modèles/sauvegardes créée ; compte de service dédié et client SMB préparés | Aucun montage, secret local ou unité de montage actifs et aucune restauration validée |
+| Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage et accès lecture/écriture vérifié depuis CORE via un point de montage contrôlé | Aucune restauration complète, réplication de mémoire ou test de droits négatifs documenté |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif dans la passerelle | Masquage de secrets, empreintes, historique, export et suppression avec reçu sans contenu | Pas encore placée sur le stockage durable ni raccordée au RAG |
@@ -118,7 +118,10 @@ génère pas une réponse d'IA.
 - le relais HTTPS du Collector répond en mode `write-only` ; son expéditeur
   refuse les redirections, valide chaque payload en file et ne le supprime
   qu'après écriture atomique et vérification locale d'un reçu concordant ;
-- le partage Synology existe, mais il n'est pas monté dans le conteneur de calcul.
+- le stockage durable Synology est monté avec SMB 3.1.1 chiffré sur l'hôte de
+  calcul, activé au démarrage puis fourni au conteneur CORE par un point de
+  montage contrôlé ; une écriture de contrôle temporaire suivie de sa
+  suppression a réussi depuis CORE.
 
 Le relais HTTPS et le coffre restent des preuves opérationnelles réversibles de
 phase 0. Ils ne valident ni l'orientation P-002, ni la topologie cible, ni un

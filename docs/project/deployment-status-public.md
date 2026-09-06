@@ -44,9 +44,11 @@ compte, ni secret, ni chemin d'administration.
   profils, outils et confirmations ne sont pas encore raccordés au chat.
 - **Collector : ingress write-only actif.** Son endpoint HTTPS de santé répond ;
   une entrée acceptée reste `RAW` et n'est jamais promue automatiquement.
-- **Stockage : partage Synology préparé, non monté.** L'arborescence durable et
-  le client SMB existent, mais le secret local et l'unité de montage ne sont
-  pas actifs. Aucune restauration n'est revendiquée.
+- **Stockage : partage Synology monté et persistant.** L'arborescence durable
+  est accessible au conteneur CORE depuis un montage hôte SMB 3.1.1 chiffré,
+  activé au démarrage et contrôlé par un compte de service limité. Une écriture
+  temporaire suivie de sa suppression a été validée depuis CORE ; aucune
+  restauration complète n'est encore revendiquée.
 - **Zone CORE : invitée non privilégiée active.** Le runtime PyTorch/NumPy CPU
   est installé hors ligne et les flux sont bornés. Aucun poids ni service de
   génération CORE n'est actif ; le test d'isolation après redémarrage reste à

@@ -51,7 +51,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   3,8 % au-dessus de B en médiane, sans décision de placement ;
 - prototype MCP Knowledge `stdio` sur trois notices synthétiques ;
 - Collector de conversations write-only vers RAW ;
-- stockage chiffré validé avec des données synthétiques ;
+- stockage durable Synology monté par SMB 3.1.1 chiffré sur l'hôte de calcul,
+  activé au démarrage et fourni à CORE par un point de montage contrôlé ; une
+  écriture temporaire suivie de sa suppression a réussi depuis CORE ;
 - passerelle Web authentifiée déployée avec Argon2id, CSRF, `/v1/chat` réel vers
   BOOTSTRAP et mémoire SQLite locale exportable/supprimable ; première
   configuration propriétaire encore requise ;
@@ -131,14 +133,14 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   preuves et leur comparaison servent seulement d'observation descriptive ;
 - l'isolation réseau complète et les restaurations de production restent des
   gates à prouver.
-- le client SMB est installé et le partage NAS existe, mais aucun secret local,
-  montage durable, test négatif de droits ou restauration n'est terminé ;
+- aucune restauration complète, test négatif de droits ni test de persistance
+  après redémarrage intégral n'est encore terminé ;
 - la mémoire de la passerelle reste locale et n'est pas répliquée sur le NAS.
 
 ## Ordre de reprise recommandé
 
-1. finaliser le secret SMB hors chat, le montage, les tests positifs/négatifs de
-   droits et une restauration depuis le stockage durable ;
+1. tester la persistance du montage après redémarrage contrôlé, les droits
+   négatifs et une restauration depuis le stockage durable ;
 2. terminer la première configuration du compte propriétaire dans l'interface ;
 3. confirmer la compatibilité d'un checkpoint CORE-MINI historique sur le
    nœud CPU avec le vérificateur offline ;
