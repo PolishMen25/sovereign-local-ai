@@ -9,3 +9,21 @@ Le chemin SQLite est fixé par l'opérateur et n'est jamais fourni par une
 requête. Cette mémoire n'est ni un corpus d'entraînement ni une connaissance
 validée. Aucune opération ne promeut une conversation vers `VALIDATED`.
 
+## Sauvegarde durable
+
+`tools/backup_conversation_memory.py` est un outil opérateur, jamais exposé
+par HTTP ou MCP. Il réalise une copie SQLite cohérente malgré le journal WAL,
+génère un manifeste sans contenu (nom d'artefact, taille et SHA-256), vérifie
+l'artefact puis restaure uniquement après cette vérification. Les destinations
+restent des chemins fixés par l'opérateur ; une restauration vers une base en
+service doit être précédée d'un arrêt contrôlé du service concerné.
+
+```bash
+python3 -B tools/backup_conversation_memory.py backup \
+  --source /var/lib/sovereign-gateway/memory.sqlite3 \
+  --destination-directory /mnt/sovereign-memory/backups
+```
+
+Le montage durable de la passerelle et son ordonnanceur restent une opération
+de déploiement distincte. Une conversation ne devient jamais un corpus
+d'entraînement par cette sauvegarde.
