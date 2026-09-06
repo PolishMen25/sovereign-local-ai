@@ -1,0 +1,23 @@
+[Unit]
+Description=Sovereign Local AI private memory backup
+After=local-fs.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sovereign/app
+ExecStart=/usr/bin/python3 -B tools/backup_conversation_memory.py backup --source /var/lib/sovereign-gateway/memory.sqlite3 --destination-directory /mnt/sovereign-memory/backups
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadOnlyPaths=/opt/sovereign/app
+ReadWritePaths=/var/lib/sovereign-gateway /mnt/sovereign-memory/backups

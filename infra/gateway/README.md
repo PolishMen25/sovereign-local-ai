@@ -12,8 +12,11 @@ et contient un jeton de première installation aléatoire d'au moins 32
 caractères. Le propriétaire saisit ce jeton et choisit son mot de passe dans le
 navigateur ; le mot de passe n'est jamais envoyé dans Git ou un journal.
 
-La mémoire SQLite reste dans `/var/lib/sovereign-gateway` jusqu'à activation du
-stockage durable. Le service écoute uniquement sur loopback. L'accès HTTPS LAN
+La mémoire SQLite reste active dans `/var/lib/sovereign-gateway`. Lorsqu'un
+montage de sauvegarde dédié est fourni, `sovereign-memory-backup.timer` appelle
+un outil local de copie SQLite cohérente toutes les quinze minutes. Le manifeste
+de sauvegarde ne contient aucun message ; l'outil n'est exposé ni par HTTP ni
+par MCP. Le service écoute uniquement sur loopback. L'accès HTTPS LAN
 ou tailnet doit être réalisé par un reverse proxy approuvé ; ne jamais modifier
 `SOVEREIGN_WEB_HOST` pour exposer directement le serveur Python.
 
@@ -25,4 +28,3 @@ ou tailnet doit être réalisé par un reverse proxy approuvé ; ne jamais modif
 - `POST /v1/chat` : réponse du moteur local avec champ `engine` obligatoire ;
 - `GET /v1/conversations` et export : mémoire privée authentifiée ;
 - `DELETE /v1/conversations/{id}` : suppression avec reçu d'audit sans contenu.
-
