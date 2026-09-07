@@ -186,6 +186,30 @@ Le runner refuse notamment :
 - une sortie existante, un alias de fichier ou toute erreur qui révélerait un
   chemin dans le résultat public.
 
+## Revérification opérationnelle du 2026-09-07
+
+La preuve `proof-5e26f4a2-2cee-4fa7-a9ab-0d800dcc5237` a terminé trois
+répétitions sous la révision `6cebad1`, avec checkpoints et reprise vérifiés.
+Pour CORE-MINI synthétique, batch 1, séquence 32, 32 threads, 6 étapes dont
+1 de chauffe, le débit médian est de 860,88 tokens/s (minimum 751,45 ;
+maximum 926,16 ; écart-type population 72,08). Ce run seul ne remplace
+pas une comparaison A/B ni le gate CORE-700M.
+
+Le lanceur précédent utilisait `PYTHONPATH` : ses paquets étaient présents
+mais invisibles aux enfants Python en mode `-I`, qui ignore cette variable.
+Un `venv` standard réutilisant les paquets hors ligne contrôlés via un fichier
+`.pth` a permis les imports isolés de NumPy 2.5.2 et PyTorch 2.13.0+cpu.
+Le Python système est conservé. Le changement du chemin d'import dans
+`6cebad1` ne suffisait donc pas à résoudre cette panne ; le lanceur possédait
+déjà une initialisation pour l'exécution directe.
+
+Prérequis de relancement : archive Git de la release exécutée avec préfixe
+`source/`, parent du répertoire de preuves déjà créé, contrat distinguant les
+nœuds mémoire autorisés des nœuds visés par la politique `bind`, et imports
+validés avec le même interpréteur en mode `-I`. Le benchmark a été exécuté
+comme service systemd indépendant de SSH avec refus des sockets INET.
+Les chemins, contrats et journaux privés restent hors Git.
+
 ## Limites et gate G4
 
 Même conforme, cet artefact reste une **preuve répétée miniature et
