@@ -154,6 +154,11 @@ Pour CORE-MINI, le manifeste et le tokenizer doivent déclarer exactement
 candidat de **32 000 unités** destiné à la cible CORE-700M est incompatible avec
 CORE-MINI et le harness le refusera.
 
+`derive_core_mini_manifest.py` produit le manifeste 4 096 distinct à partir du
+manifeste d'entraînement déjà approuvé. Il conserve les empreintes et les splits
+mais crée un `corpus_id` séparé ; le tokenizer MINI ne peut donc pas être pris
+pour le candidat 32k de CORE-700M.
+
 ```bash
 python -B -m tools.train_core_mini \
   --config configs/models/core-mini.candidate.json \
