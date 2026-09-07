@@ -14,9 +14,9 @@ pas CORE-700M.
 
 Le checkpoint CORE-MINI actuel prouve que l'entraînement CPU, la sauvegarde et
 la reprise fonctionnent. Il a appris sur des identifiants de tokens synthétiques
-et ne possède aucun savoir linguistique. CORE-700M n'est pas entraîné et aucun
-tokenizer final, poids linguistique, moteur de génération ou chat bout en bout
-n'existe encore pour CORE.
+et ne possède aucun savoir linguistique. CORE-700M possède vingt étapes
+techniques CPU liées à un tokenizer 32k `candidate_core` ; ce n'est pas un
+modèle linguistique utilisable ni un moteur de chat.
 
 Un runner CPU/NUMA synthétique et fail-closed a produit deux preuves répétées
 de trois runs sur le même commit et workload. Le placement A a une médiane
@@ -44,9 +44,9 @@ génère pas une réponse d'IA.
 | CORE-MINI-1M | Entraînement `authorized-text` borné et reprise vérifiés | Modèle de 1 328 256 paramètres ; 50 étapes sur le corpus approuvé, checkpoint durable, puis reprise contrôlée de 10 étapes jusqu'à 60 avec journal continu et empreintes ; modes explicitement séparés | 60 étapes ne produisent pas un assistant : aucune évaluation linguistique ni question CORE possible ; aucun checkpoint CORE-700M |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
 | Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution ; deux paliers CORE-700M exécutés | Aucun service de génération CORE ; preuve d'isolation après redémarrage reste à compléter |
-| CORE-700M | Dix étapes CPU et reprise réelle vérifiées | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé ; étapes 1 à 10 avec deux reprises et checkpoints durables. Le second palier a mesuré 5,79 tokens/s avec 4 cœurs, batch 1 et séquence 64 | Dix étapes ne produisent pas un assistant ; cette mesure de pipeline unique n'est ni un benchmark NUMA ni une estimation de durée, aucune évaluation linguistique ni moteur de chat CORE |
+| CORE-700M | Vingt étapes CPU et reprise réelle vérifiées | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé ; étapes 1 à 20 continues avec checkpoints durables aux étapes 10 et 20. Le palier initial a mesuré 5,79 tokens/s avec 4 cœurs, batch 1 et séquence 64 ; le palier 11→20 est fixé sur NUMA 0 avec ces mêmes quatre cœurs | Vingt étapes ne produisent pas un assistant ; le palier NUMA 0 est une mesure de placement unique, pas un benchmark comparatif ni une estimation de durée. Aucune évaluation linguistique ou génération CORE n'est validée |
 | Corpus / tokenizer | Candidat 32k traçable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et promotion `experimental` → `candidate_core` avec reçu | Qualité, couverture française et passage à l'échelle restent à traiter |
-| Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
+| Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucune génération CORE validée ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
 | RAG | Recherche lexicale locale approuvée, avec gate de reconstruction | L'index SQLite/FTS5 fournit à BOOTSTRAP des extraits bornés et citations depuis quatre documents internes approuvés ; toute reconstruction exige un manifeste exact, son empreinte et une référence d'audit | Aucun moteur d'embeddings, index sémantique, conversation, RAW ou VALIDATED n'est indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |

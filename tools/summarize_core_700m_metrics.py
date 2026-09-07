@@ -37,18 +37,27 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     if not records:
         raise ValueError("CORE-700M metrics are empty")
     timed = [record for record in records if isinstance(record.get("elapsed_seconds"), (int, float)) and not isinstance(record.get("elapsed_seconds"), bool) and record["elapsed_seconds"] > 0]
+    # A controlled resume appends to the same durable journal but restarts its
+    # stage clock at zero.  Report only the final monotonic stage: joining two
+    # clocks would manufacture a throughput which no execution actually had.
+    final_stage: list[dict[str, Any]] = []
+    for record in timed:
+        if final_stage and float(record["elapsed_seconds"]) <= float(final_stage[-1]["elapsed_seconds"]):
+            final_stage = [record]
+        else:
+            final_stage.append(record)
     result: dict[str, Any] = {
         "schema_version": "core-700m-metrics-summary.v1",
         "steps": len(records),
         "last_loss": float(records[-1]["loss"]),
-        "timed_steps": len(timed),
+        "timed_steps": len(final_stage),
     }
-    if timed:
-        first_elapsed = float(timed[0]["elapsed_seconds"])
-        last_elapsed = float(timed[-1]["elapsed_seconds"])
+    if final_stage:
+        first_elapsed = float(final_stage[0]["elapsed_seconds"])
+        last_elapsed = float(final_stage[-1]["elapsed_seconds"])
         elapsed = last_elapsed - first_elapsed
         if elapsed > 0:
-            result["measured_tokens_per_second"] = sum(record["tokens"] for record in timed[1:]) / elapsed
+            result["measured_tokens_per_second"] = sum(record["tokens"] for record in final_stage[1:]) / elapsed
     return result
 
 
