@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +40,22 @@ def atomic_save(torch: Any, path: Path, payload: dict[str, Any]) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     torch.save(payload, temporary)
     os.replace(temporary, path)
+
+
+def metric_record(*, step: int, loss: float, tokens: int, elapsed_seconds: float, cpu_seconds: float) -> dict[str, Any]:
+    """Return a content-free, measurable CPU training metric."""
+    if type(step) is not int or step < 1 or type(tokens) is not int or tokens < 1:
+        raise ValueError("CORE-700M metric fields are invalid")
+    if not all(isinstance(value, float) and value >= 0.0 for value in (loss, elapsed_seconds, cpu_seconds)):
+        raise ValueError("CORE-700M metric values are invalid")
+    return {
+        "schema_version": "core-700m-metric.v1",
+        "step": step,
+        "loss": loss,
+        "tokens": tokens,
+        "elapsed_seconds": elapsed_seconds,
+        "cpu_seconds": cpu_seconds,
+    }
 
 
 def load_resume(torch: Any, path: Path, *, contract: dict[str, Any]) -> tuple[dict[str, Any], int]:
@@ -92,6 +109,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     metrics_path = args.output_dir / "metrics.jsonl"
     if args.resume is None and metrics_path.exists():
         raise ValueError("CORE-700M metrics already exist; use --resume")
+    stage_started = time.perf_counter()
+    stage_cpu_started = time.process_time()
     with metrics_path.open("a", encoding="utf-8") as metrics:
         for step in range(start_step, start_step + args.steps):
             rows = authorized_text_token_rows(bundle, step=step, batch_size=args.batch_size, sequence_length=args.sequence_length, seed=args.seed)
@@ -103,7 +122,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
-            metrics.write(json.dumps({"schema_version": "core-700m-metric.v1", "step": step + 1, "loss": float(loss.detach()), "tokens": args.batch_size * args.sequence_length}, sort_keys=True) + "\n")
+            metrics.write(json.dumps(metric_record(
+                step=step + 1,
+                loss=float(loss.detach()),
+                tokens=args.batch_size * args.sequence_length,
+                elapsed_seconds=time.perf_counter() - stage_started,
+                cpu_seconds=time.process_time() - stage_cpu_started,
+            ), sort_keys=True) + "\n")
             metrics.flush()
     final_step = start_step + args.steps
     checkpoint = args.output_dir / f"core-700m-step-{final_step:06d}.pt"

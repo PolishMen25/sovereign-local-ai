@@ -5,7 +5,7 @@ import shutil
 import unittest
 import uuid
 
-from tools.train_core_700m import load_preflight
+from tools.train_core_700m import load_preflight, metric_record
 
 
 def bundle() -> SimpleNamespace:
@@ -19,6 +19,13 @@ def bundle() -> SimpleNamespace:
 
 
 class Core700RunnerTests(unittest.TestCase):
+    def test_metric_is_content_free_and_measurable(self) -> None:
+        metric = metric_record(step=2, loss=1.5, tokens=64, elapsed_seconds=2.0, cpu_seconds=1.0)
+        self.assertEqual("core-700m-metric.v1", metric["schema_version"])
+        self.assertNotIn("content", metric)
+        with self.assertRaises(ValueError):
+            metric_record(step=0, loss=1.0, tokens=1, elapsed_seconds=0.0, cpu_seconds=0.0)
+
     def test_matching_preflight_is_required(self) -> None:
         candidate = bundle()
         receipt = {
