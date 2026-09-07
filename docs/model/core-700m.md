@@ -9,6 +9,11 @@ La source machine est
 Le compteur relit cette configuration et refuse toute divergence entre
 l'architecture et le bloc `parameter_count`.
 
+Le préflight commun relit également une seule copie bornée de ses octets,
+refuse les clés JSON dupliquées et les nombres non finis, puis conserve son
+SHA-256 avec le comptage exact. Cette vérification n'alloue pas le modèle et ne
+constitue ni une mesure RAM ni une autorisation d'entraînement.
+
 ## Architecture et comptage exact
 
 | Élément | Définition | Paramètres |
@@ -41,4 +46,3 @@ Le corpus vise prioritairement Python, PowerShell, Bash,
 JavaScript/TypeScript, HTML/CSS, SQL, Docker, Linux et réseau, avec du français
 et de l'anglais technique. Une source ambiguë, non traçable ou incompatible
 avec la politique de réutilisation est refusée.
-

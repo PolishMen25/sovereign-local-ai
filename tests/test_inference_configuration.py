@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from services.inference.configuration import (
     MAXIMUM_MODEL_CONFIG_BYTES,
+    load_core_candidate_configuration,
     load_core_mini_configuration,
 )
 from tests._temp_support import sovereign_temporary_directory
@@ -21,6 +22,7 @@ DEFAULT_CONFIG = (
     / "models"
     / "core-mini.candidate.json"
 )
+CORE_700_CONFIG = Path(__file__).parents[1] / "configs" / "models" / "core-700m.candidate.json"
 
 
 class CountingPath:
@@ -69,6 +71,17 @@ class InferenceConfigurationTests(unittest.TestCase):
             oversized_path.write_bytes(b" " * (MAXIMUM_MODEL_CONFIG_BYTES + 1))
             with self.assertRaisesRegex(ValueError, "bounded"):
                 load_core_mini_configuration(oversized_path)
+
+    def test_core_700m_preflight_is_strict_without_allocating_the_model(self) -> None:
+        document, config, digest = load_core_candidate_configuration(CORE_700_CONFIG)
+        self.assertEqual("CORE-700M", document["name"])
+        self.assertEqual(691_160_320, count_parameters(config)["total_trainable"])
+        self.assertEqual(digest, hashlib.sha256(CORE_700_CONFIG.read_bytes()).hexdigest())
+        with sovereign_temporary_directory() as temporary_directory:
+            duplicate_path = Path(temporary_directory) / "duplicate-core.json"
+            duplicate_path.write_bytes(b'{"name":"CORE-700M",' + CORE_700_CONFIG.read_bytes()[1:])
+            with self.assertRaisesRegex(ValueError, "strict JSON"):
+                load_core_candidate_configuration(duplicate_path)
 
     def test_self_consistent_giant_candidate_is_refused_before_torch_or_model_build(self) -> None:
         document = json.loads(DEFAULT_CONFIG.read_text(encoding="utf-8"))
