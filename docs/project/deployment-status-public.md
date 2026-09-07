@@ -30,8 +30,9 @@ compte, ni secret, ni chemin d'administration.
   succès à l'étape 21.
 - **CORE-700M : préparation contrôlée.** L'architecture candidate et son
   comptage exact de 691 160 320 paramètres sont versionnés. Le corpus initial
-  anglais technique est approuvé ; le tokenizer 32k est promouvable vers
-  `candidate_core` avec reçu d'empreintes. Aucun tokenizer final ni poids
+  anglais technique est approuvé ; le tokenizer 32k est promu en
+  `candidate_core` avec reçu d'empreintes et préflight sans allocation. Aucun
+  tokenizer final ni poids
   CORE-700M utilisable n'existe.
 - **MCP Knowledge et RAG : recherche locale avec provenance.** MCP expose en
   `stdio` l'état, la recherche lexicale et une provenance exacte. La passerelle

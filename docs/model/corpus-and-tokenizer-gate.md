@@ -50,6 +50,24 @@ Il contient 44 enregistrements d'entraînement, 109 de validation et 2 423 de
 test. Ce premier lot est anglais technique ; il ne valide pas encore la
 couverture française ni un tokenizer final pour CORE-700M.
 
+## Tokenizer CORE-700M candidat le 2026-09-07
+
+Le Byte-BPE 32k créé hors ligne depuis le seul split `train` a atteint
+exactement 32 000 unités, avec 31 740 fusions et un seuil de fréquence `1`.
+Son artefact source `experimental` a pour empreinte
+`c1a506f71d2b2a17054aa531deccb6826d79e852dec13b674bd037126a5a98bb`.
+Après validation de sa lignée, il a été promu en artefact distinct
+`candidate_core`, d'empreinte
+`6f7509737b7af73077c76756c12b2454fed83dc8f04e5159f717298b60a4821c`.
+Le reçu de promotion a pour empreinte
+`583ad7c9e79cdbbec66844a9c434be3ac7f2a97a415a25362f7d884ab6cd2894`.
+
+Le préflight non allouant lie ce candidat au manifeste ci-dessus, au split
+`train` `a34d50ab83d899137ab50d43bd1dac41e9cf0dff076b56693e39dd69c4b467bb`
+et à la configuration CORE-700M de 691 160 320 paramètres. Cette validation ne
+crée pas de poids, ne lance pas d'entraînement et ne rend pas le tokenizer
+final ou multilingue.
+
 ## Contrat versionné
 
 [`schemas/training-corpus-manifest.schema.json`](../../schemas/training-corpus-manifest.schema.json)
