@@ -37,6 +37,12 @@ Les paliers candidats sont 10 millions, 100 millions, 1 milliard puis au plus
 8 milliards de tokens. Chaque passage exige une approbation liée aux empreintes
 du corpus, du tokenizer, du code, du runtime et du checkpoint précédent.
 
+Avant toute allocation des poids, le préflight
+[`preflight_core_700m_tokenizer.py`](../../tools/preflight_core_700m_tokenizer.py)
+exige un tokenizer `candidate_core`, le split `train` exact et un vocabulaire
+de 32 000 unités correspondant à la configuration CORE-700M. Il ne crée aucun
+tenseur du modèle et ne déclenche aucun entraînement.
+
 Un palier est interrompu en cas de perte non finie ou divergente, reprise
 invalide, espace insuffisant, pression mémoire dangereuse, seuil thermique
 dépassé ou échec des évaluations. Les seuils matériels exacts proviennent du
