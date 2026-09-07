@@ -44,6 +44,16 @@ class InferenceTokenizerTests(unittest.TestCase):
         tokenizer = ByteBpeTokenizer.from_document(artifact())
         self.assertEqual(tokenizer.encode("Cafe\u0301"), tokenizer.encode("Café"))
 
+    def test_minimum_frequency_one_is_a_valid_deterministic_contract(self) -> None:
+        result = train_byte_bpe(["rare merge sequence"], 270, minimum_frequency=1)
+        document = experimental_tokenizer_document(
+            training_corpus_id="corpus-approved-tokenizer",
+            training_corpus_sha256="a" * 64,
+            result=result,
+            minimum_frequency=1,
+        )
+        self.assertEqual(document["minimum_frequency"], 1)
+
     def test_encoder_replays_merge_rank_instead_of_greedy_matching(self) -> None:
         tokens = list(canonical_byte_tokens()) + ["6162", "616263"]
         document = {

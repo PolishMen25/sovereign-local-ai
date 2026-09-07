@@ -118,8 +118,8 @@ def train_byte_bpe(
             "vocabulary_size must be between 260 and "
             f"{MAXIMUM_VOCABULARY_SIZE}"
         )
-    if type(minimum_frequency) is not int or not 2 <= minimum_frequency <= 1_000_000_000:
-        fail("minimum_frequency must be an integer between 2 and 1000000000")
+    if type(minimum_frequency) is not int or not 1 <= minimum_frequency <= 1_000_000_000:
+        fail("minimum_frequency must be an integer between 1 and 1000000000")
 
     if isinstance(texts, (str, bytes)):
         fail("texts must be an iterable of strings, not a single string")
@@ -248,7 +248,7 @@ def validate_tokenizer_document(document: Any) -> dict[str, Any]:
         fail("invalid tokenizer training_corpus_sha256")
     if (
         type(document["minimum_frequency"]) is not int
-        or not 2 <= document["minimum_frequency"] <= 1_000_000_000
+        or not 1 <= document["minimum_frequency"] <= 1_000_000_000
     ):
         fail("invalid tokenizer minimum_frequency")
     if document["maximum_token_bytes"] != MAXIMUM_TOKEN_BYTES:

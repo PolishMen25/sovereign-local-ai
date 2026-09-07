@@ -99,6 +99,8 @@ manifeste approuvé, du split `train`, du vocabulaire et des empreintes ; elle
 produit un reçu séparé liant les deux versions. `approved_core_v1` reste
 réservé à une décision ultérieure. Le prototype est borné à 32 768 unités et
 son algorithme d'apprentissage naïf n'est pas encore adapté à un grand corpus.
+Pour un corpus réduit, le seuil minimal de fréquence `1` est admis, consigné dans
+l'artefact et doit rester explicite dans le reçu de promotion.
 La configuration candidate est
 [`configs/tokenizers/byte-bpe-v0.candidate.json`](../../configs/tokenizers/byte-bpe-v0.candidate.json).
 
