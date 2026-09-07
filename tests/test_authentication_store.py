@@ -1,9 +1,9 @@
 from pathlib import Path
 import hashlib
-import tempfile
 import unittest
 
 from services.web.authentication import AuthenticationStore
+from tests._temp_support import sovereign_temporary_directory
 
 
 class FakeArgon2idHasher:
@@ -16,15 +16,16 @@ class FakeArgon2idHasher:
 
 class AuthenticationStoreTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = sovereign_temporary_directory()
+        temporary_path = self.temporary.__enter__()
         self.store = AuthenticationStore(
-            Path(self.temporary.name) / "auth.sqlite3",
+            Path(temporary_path) / "auth.sqlite3",
             hasher=FakeArgon2idHasher(),
         )
         self.store.initialize()
 
     def tearDown(self) -> None:
-        self.temporary.cleanup()
+        self.temporary.__exit__(None, None, None)
 
     def test_first_run_owner_and_csrf_bound_session(self) -> None:
         self.assertTrue(self.store.setup_required())
@@ -43,6 +44,9 @@ class AuthenticationStoreTests(unittest.TestCase):
             self.store.validate_session(
                 session["session_token"], csrf_token="wrong", require_csrf=True
             )
+        details = self.store.session_details(session["session_token"])
+        self.assertEqual("owner", details["username"])
+        self.assertEqual(session["csrf_token"], details["csrf_token"])
 
     def test_password_is_never_stored_in_plaintext_and_setup_is_single_use(self) -> None:
         password = "unique-owner-password-123"

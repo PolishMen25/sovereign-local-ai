@@ -22,6 +22,19 @@ MAX_BODY_BYTES = 1_048_576
 CONVERSATION_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 PROFILE_ID = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
+STATIC_ROOT = Path(__file__).with_name("static")
+STATIC_FILES = {
+    "/": ("index.html", "text/html; charset=utf-8"),
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+}
+WEB_PROFILES = (
+    {
+        "profile_id": "coordination",
+        "display_name": "Coordination",
+        "description": "Assistant général local. Les 60 profils du catalogue restent désactivés tant que leurs gates ne sont pas validés.",
+    },
+)
 
 INDEX_HTML = """<!doctype html><html lang='fr'><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -101,6 +114,7 @@ def response(
     engine: str = "unavailable",
     conversation_id: str = "unavailable",
     citations: list[dict[str, Any]] | None = None,
+    rag_mode: str = "lexical",
 ) -> dict[str, Any]:
     return {
         "schema_version": "local-assistant-response.v1",
@@ -112,6 +126,7 @@ def response(
         "answer": answer,
         "citations": citations or [],
         "proposals": [],
+        "rag_mode": rag_mode,
     }
 
 
@@ -148,6 +163,18 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.send_bytes(status, encoded, "application/json; charset=utf-8", extra_headers=extra_headers)
 
+    def send_event_stream(self, events: list[tuple[str, dict[str, Any]]]) -> None:
+        payload = b"".join(
+            f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False, separators=(',', ':'))}\n\n".encode("utf-8")
+            for event, data in events
+        )
+        self.send_bytes(
+            200,
+            payload,
+            "text/event-stream; charset=utf-8",
+            extra_headers={"X-Accel-Buffering": "no"},
+        )
+
     def read_json(self) -> dict[str, Any]:
         if self.headers.get_content_type() != "application/json":
             raise TypeError("unsupported media type")
@@ -172,14 +199,13 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         )
 
     def do_GET(self) -> None:
-        if self.path == "/":
-            self.send_bytes(200, INDEX_HTML.encode(), "text/html; charset=utf-8")
-            return
-        if self.path == "/app.css":
-            self.send_bytes(200, APP_CSS.encode(), "text/css; charset=utf-8")
-            return
-        if self.path == "/app.js":
-            self.send_bytes(200, (APP_JS + CITATION_UI_JS).encode(), "text/javascript; charset=utf-8")
+        static = STATIC_FILES.get(self.path)
+        if static is not None:
+            filename, content_type = static
+            try:
+                self.send_bytes(200, (STATIC_ROOT / filename).read_bytes(), content_type)
+            except OSError:
+                self.send_json(503, {"error": "interface_unavailable"})
             return
         if self.path == "/healthz":
             self.send_json(200, {"status": "ok", "mode": "loopback-gateway", "engine": self.state.runtime.engine})
@@ -191,6 +217,17 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.require_session()
         except PermissionError:
             self.send_json(401, {"error": "unauthorized"})
+            return
+        if self.path == "/v1/session":
+            try:
+                session = self.state.authentication.session_details(self.session_token())
+            except PermissionError:
+                self.send_json(401, {"error": "unauthorized"})
+                return
+            self.send_json(200, {**session, "engine": self.state.runtime.engine, "rag_mode": "lexical"})
+            return
+        if self.path == "/v1/profiles":
+            self.send_json(200, {"profiles": list(WEB_PROFILES)})
             return
         if self.path == "/v1/conversations":
             self.send_json(200, {"conversations": self.state.memory.list_conversations()})
@@ -258,6 +295,9 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         except ValueError:
             self.send_json(422, {"error": "invalid_request"})
             return
+        if request_value.get("profile_id", "coordination") != "coordination":
+            self.send_json(422, {"error": "unknown_profile"})
+            return
         conversation_id = request_value.get("conversation_id")
         if conversation_id is None:
             conversation_id = self.state.memory.create_conversation(title=request_value["message"][:80])
@@ -267,20 +307,20 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             messages = [{"role": "system", "content": "Tu es BOOTSTRAP, moteur local temporaire distinct de CORE-700M. Tu n'as ni outil ni accès Internet. Réponds clairement sans prétendre être CORE."}]
             citations: list[dict[str, Any]] = []
             try:
-                retrieval = self.state.knowledge.search(request_value["message"], query_embedding=None, limit=3)
+                retrieval = self.state.knowledge.search(request_value["message"], query_embedding=None, limit=2)
             except ValueError:
                 retrieval = {"hits": []}
             citations = [
                 {
-                    "document_id": hit["document_id"],
-                    "title": hit["title"],
+                    "document_id": str(hit["document_id"])[:160],
+                    "title": str(hit["title"])[:300],
                     "provenance_id": hit["provenance_id"],
                 }
                 for hit in retrieval["hits"]
             ]
             if retrieval["hits"]:
                 references = "\n\n".join(
-                    f"[Référence {index + 1}: {hit['title']} | {hit['provenance_id']}]\n{hit['summary']}"
+                    f"[Référence {index + 1}: {str(hit['title'])[:240]} | {hit['provenance_id']}]\n{str(hit['summary'])[:600]}"
                     for index, hit in enumerate(retrieval["hits"])
                 )
                 messages.append(
@@ -299,10 +339,20 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             return
         except RuntimeError:
             payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "error", "Le moteur BOOTSTRAP local est indisponible.", engine=self.state.runtime.engine, conversation_id=conversation_id)
-            self.send_json(503, payload)
+            if "text/event-stream" in self.headers.get("Accept", ""):
+                payload["error"] = "runtime_unavailable"
+                self.send_event_stream([("error", payload)])
+            else:
+                self.send_json(503, payload)
             return
         payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "completed", answer, engine=self.state.runtime.engine, conversation_id=conversation_id, citations=citations)
-        self.send_json(200, payload)
+        if "text/event-stream" in self.headers.get("Accept", ""):
+            self.send_event_stream([
+                ("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "lexical"}),
+                ("completed", payload),
+            ])
+        else:
+            self.send_json(200, payload)
 
     def do_DELETE(self) -> None:
         match = re.fullmatch(r"/v1/conversations/([A-Za-z0-9_-]{8,80})", self.path)

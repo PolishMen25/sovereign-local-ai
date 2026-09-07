@@ -1,14 +1,15 @@
 [Unit]
-Description=Sovereign Local AI approved project knowledge index
+Description=Sovereign Local AI approved knowledge index rebuild template
 After=local-fs.target
-Before=sovereign-gateway-web.service
 
 [Service]
 Type=oneshot
 User=sovereign
 Group=sovereign
 WorkingDirectory=/opt/sovereign/app
-ExecStart=/usr/bin/python3 -B -m tools.build_project_knowledge_index --source-directory docs --database /var/lib/sovereign-gateway/knowledge.sqlite3
+# Deliberately no automatic build. An operator must pass a candidate manifest,
+# its exact SHA-256 and a durable approval reference to the CLI.
+ExecStart=/usr/bin/false
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes
@@ -25,6 +26,3 @@ LockPersonality=yes
 MemoryDenyWriteExecute=yes
 ReadOnlyPaths=/opt/sovereign/app
 ReadWritePaths=/var/lib/sovereign-gateway
-
-[Install]
-WantedBy=multi-user.target

@@ -1,19 +1,20 @@
 from pathlib import Path
-import tempfile
 import unittest
 
 from services.memory.store import MemoryStore
+from tests._temp_support import sovereign_temporary_directory
 
 
 class MemoryStoreTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.database = Path(self.temporary.name) / "memory.sqlite3"
+        self.temporary = sovereign_temporary_directory()
+        temporary_path = self.temporary.__enter__()
+        self.database = Path(temporary_path) / "memory.sqlite3"
         self.store = MemoryStore(self.database)
         self.store.initialize()
 
     def tearDown(self) -> None:
-        self.temporary.cleanup()
+        self.temporary.__exit__(None, None, None)
 
     def test_round_trip_redacts_secret_and_preserves_digest(self) -> None:
         conversation_id = self.store.create_conversation(conversation_id="conversation_001")

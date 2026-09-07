@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from services.web.app import authorize, parse_chat, response
+from services.web.app import WEB_PROFILES, authorize, parse_chat, response
 
 
 class WebAppTests(unittest.TestCase):
@@ -32,6 +32,13 @@ class WebAppTests(unittest.TestCase):
         citations = [{"document_id": "project:status.md", "title": "Statut", "provenance_id": "project-sha256:abc"}]
         payload = response("req-123456", "coordination", "completed", "ok", citations=citations)
         self.assertEqual(citations, payload["citations"])
+
+    def test_web_exposes_only_the_safe_coordination_profile(self) -> None:
+        self.assertEqual(["coordination"], [profile["profile_id"] for profile in WEB_PROFILES])
+        self.assertIn("désactivés", WEB_PROFILES[0]["description"])
+
+    def test_response_reports_retrieval_mode(self) -> None:
+        self.assertEqual("lexical", response("req-123456", "coordination", "completed", "ok")["rag_mode"])
 
 
 if __name__ == "__main__":

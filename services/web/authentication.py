@@ -140,6 +140,21 @@ class AuthenticationStore:
         }
 
     def validate_session(self, token: str, *, csrf_token: str | None = None, require_csrf: bool = False) -> str:
+        return self.session_details(token, csrf_token=csrf_token, require_csrf=require_csrf)["username"]
+
+    def session_details(
+        self,
+        token: str,
+        *,
+        csrf_token: str | None = None,
+        require_csrf: bool = False,
+    ) -> dict[str, str]:
+        """Return only the data needed by the same-origin interface.
+
+        The raw session token is deliberately never returned or persisted in the
+        browser.  The CSRF value is returned only after the HttpOnly cookie has
+        proved possession of the session.
+        """
         if not isinstance(token, str) or not 32 <= len(token) <= 256:
             raise PermissionError("session is invalid")
         token_sha256 = hashlib.sha256(token.encode("ascii", errors="ignore")).hexdigest()
@@ -152,7 +167,11 @@ class AuthenticationStore:
             raise PermissionError("session is invalid")
         if require_csrf and (not isinstance(csrf_token, str) or not secrets.compare_digest(row["csrf_token"], csrf_token)):
             raise PermissionError("csrf token is invalid")
-        return str(row["username"])
+        return {
+            "username": str(row["username"]),
+            "csrf_token": str(row["csrf_token"]),
+            "expires_at": str(row["expires_at"]),
+        }
 
     def logout(self, token: str) -> None:
         if not isinstance(token, str) or not 32 <= len(token) <= 256:
@@ -160,4 +179,3 @@ class AuthenticationStore:
         token_sha256 = hashlib.sha256(token.encode("ascii", errors="ignore")).hexdigest()
         with closing(self._connect()) as connection, connection:
             connection.execute("DELETE FROM sessions WHERE token_sha256 = ?", (token_sha256,))
-

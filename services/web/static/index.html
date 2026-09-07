@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Sovereign — Chat local</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Sovereign, accueil"><span class="brand-mark" aria-hidden="true">S</span> Sovereign <span class="brand-detail">AI locale</span></a>
+    <div class="session-actions"><span id="username"></span><button id="logout" class="quiet" type="button" hidden>Se déconnecter</button></div>
+  </header>
+  <div class="status-bar"><span class="status-dot" aria-hidden="true"></span><span id="status" role="status" aria-live="polite">Connexion à votre assistant…</span></div>
+  <div id="notice" class="notice" role="alert" hidden></div>
+  <main id="main">
+    <section id="setup" class="auth-card" aria-labelledby="setup-heading" hidden>
+      <p class="eyebrow">Première connexion</p>
+      <h1 id="setup-heading">Votre espace, votre assistant.</h1>
+      <p class="muted">Créez votre compte privé pour accéder au chat et à vos conversations.</p>
+      <form id="setup-form">
+        <label for="setup-token">Code d’installation</label>
+        <input id="setup-token" type="password" autocomplete="off" minlength="32" required aria-describedby="setup-token-help">
+        <p id="setup-token-help" class="field-help">Le code d’installation est fourni par l’administrateur du serveur.</p>
+        <label for="setup-user">Nom d’utilisateur</label>
+        <input id="setup-user" autocomplete="username" autocapitalize="none" pattern="[a-z][a-z0-9_-]{2,31}" minlength="3" maxlength="32" required aria-describedby="username-help">
+        <p id="username-help" class="field-help">3 à 32 caractères : lettres minuscules, chiffres, tirets. Commencez par une lettre.</p>
+        <label for="setup-password">Mot de passe</label>
+        <input id="setup-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required aria-describedby="password-help">
+        <p id="password-help" class="field-help">Au moins 12 caractères, dont 8 caractères différents.</p>
+        <label for="setup-password-confirm">Confirmer le mot de passe</label>
+        <input id="setup-password-confirm" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
+        <button id="setup-button" type="submit">Créer mon compte</button>
+      </form>
+    </section>
+    <section id="login" class="auth-card" aria-labelledby="login-heading" hidden>
+      <p class="eyebrow">Espace privé</p>
+      <h1 id="login-heading">Retrouvez votre assistant.</h1>
+      <p class="muted">Connectez-vous pour poursuivre vos conversations.</p>
+      <form id="login-form">
+        <label for="login-user">Nom d’utilisateur</label>
+        <input id="login-user" autocomplete="username" autocapitalize="none" maxlength="32" required>
+        <label for="login-password">Mot de passe</label>
+        <input id="login-password" type="password" autocomplete="current-password" maxlength="256" required>
+        <button id="login-button" type="submit">Se connecter</button>
+      </form>
+    </section>
+    <section id="workspace" class="workspace" aria-label="Votre chat local" hidden>
+      <aside class="sidebar" aria-label="Historique des conversations">
+        <button id="new" type="button">+ Nouvelle conversation</button>
+        <div class="sidebar-heading"><h2>Conversations</h2><button id="history" type="button" class="quiet" aria-label="Actualiser les conversations">Actualiser</button></div>
+        <div id="conversations" class="conversation-list"><p class="muted">Chargement…</p></div>
+        <p class="sidebar-note">Votre historique est conservé sur votre serveur. Les conversations ne réentraînent pas automatiquement le modèle.</p>
+      </aside>
+      <div class="chat-panel">
+        <header class="chat-header">
+          <div><h1 id="conversation-title">Nouvelle conversation</h1><p id="engine-info" class="muted"></p></div>
+          <div class="conversation-actions"><button id="export" class="quiet" type="button" disabled>Exporter</button><button id="delete" class="quiet danger" type="button" disabled>Supprimer</button></div>
+        </header>
+        <div id="messages" class="messages" role="log" aria-label="Messages" aria-live="polite" aria-relevant="additions text" tabindex="0">
+          <div id="welcome" class="welcome"><p class="eyebrow">Prêt à vous aider</p><h2>Que voulez-vous faire aujourd’hui ?</h2><p>Posez une question, préparez un projet ou demandez de l’aide sur du code.</p></div>
+        </div>
+        <form id="chat-form" class="composer">
+          <div class="profile-row"><label for="profile">Profil de l’assistant</label><select id="profile"><option value="coordination">Coordination</option></select></div>
+          <p id="profile-description" class="field-help"></p>
+          <label class="sr-only" for="message">Votre message</label>
+          <textarea id="message" rows="3" maxlength="12000" placeholder="Écrivez votre message…" required aria-describedby="composer-help"></textarea>
+          <div class="composer-footer"><p id="composer-help" class="field-help">Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</p><button id="send" type="submit">Envoyer</button></div>
+        </form>
+      </div>
+    </section>
+  </main>
+  <dialog id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-help">
+    <h2 id="delete-heading">Supprimer cette conversation ?</h2>
+    <p id="delete-help">Ses messages seront retirés de l’historique actif. Les sauvegardes suivent leur propre durée de conservation.</p>
+    <p id="delete-title" class="muted"></p>
+    <div class="dialog-actions"><button id="delete-cancel" class="quiet" type="button">Annuler</button><button id="delete-confirm" class="danger-button" type="button">Supprimer la conversation</button></div>
+  </dialog>
+  <noscript><p class="notice">Activez JavaScript pour utiliser le chat local.</p></noscript>
+</body>
+</html>

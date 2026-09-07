@@ -1,18 +1,19 @@
 from pathlib import Path
-import tempfile
 import unittest
 
 from services.orchestrator.confirmations import ConfirmationLedger, canonical_payload_sha256
+from tests._temp_support import sovereign_temporary_directory
 
 
 class ConfirmationLedgerTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.ledger = ConfirmationLedger(Path(self.temporary.name) / "confirmations.sqlite3")
+        self.temporary = sovereign_temporary_directory()
+        self.temporary_path = self.temporary.__enter__()
+        self.ledger = ConfirmationLedger(Path(self.temporary_path) / "confirmations.sqlite3")
         self.ledger.initialize()
 
     def tearDown(self) -> None:
-        self.temporary.cleanup()
+        self.temporary.__exit__(None, None, None)
 
     def test_exact_proposal_requires_owner_and_is_consumed_once(self) -> None:
         digest = canonical_payload_sha256({"service": "approved-service"})
