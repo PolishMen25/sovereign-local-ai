@@ -128,6 +128,9 @@ génère pas une réponse d'IA.
   atomiquement depuis quatre documents versionnés (capacités, décisions,
   architecture et modèle de menace) ; son empreinte de contenu est
   `f2176bce068c4da8eb89cb0ef615c3d2a36a33756d4da7f345cbbdaa30189de5` ;
+- la sauvegarde durable de cet index approuvé a été restaurée dans un fichier
+  de contrôle isolé ; le vérificateur a confirmé son empreinte, puis le fichier
+  de contrôle a été supprimé sans remplacer la base active ;
 - un run CORE-MINI synthétique frais de vingt étapes a produit un checkpoint,
   copié vers le stockage durable puis restauré dans un fichier de contrôle avec
   la même empreinte ; le vérificateur offline a repris cette copie à l'étape 21
