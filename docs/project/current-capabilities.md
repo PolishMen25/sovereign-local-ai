@@ -1,6 +1,6 @@
 # Capacités réellement disponibles
 
-Dernière vérification : 2026-09-06.
+Dernière vérification : 2026-09-07.
 
 Ce document est la source de vérité publique sur l'état exécutable du projet.
 Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
@@ -48,13 +48,13 @@ génère pas une réponse d'IA.
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
-| RAG | Index lexical local déployé et sauvegardé | SQLite/FTS5 indexe les documents Markdown explicitement approuvés de la révision installée ; la route de chat reçoit des extraits bornés et des citations avec provenance ; une sauvegarde SQLite périodique vérifiée est déposée sur le NAS | Aucun moteur d'embeddings vérifié, aucun index sémantique ; les conversations, RAW et VALIDATED ne sont pas indexés |
+| RAG | Recherche lexicale locale, avec gate de reconstruction | L'index SQLite/FTS5 existant peut fournir à BOOTSTRAP des extraits bornés et citations ; le nouveau constructeur refuse toute reconstruction sans manifeste exact, empreinte approuvée et référence d'audit | Le manifeste candidat n'est pas encore approuvé ; aucun moteur d'embeddings, index sémantique, conversation, RAW ou VALIDATED n'est indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
 | Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé ; mémoire, index lexical et checkpoint CORE-MINI sont sauvegardés et restaurés avec empreintes vérifiées | Le remplacement d'une base active, la restauration d'un checkpoint CORE-700M et le test de droits négatifs restent à faire |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif avec sauvegarde durable | Masquage de secrets, empreintes, historique, export, suppression avec reçu sans contenu et sauvegarde SQLite vérifiée vers le NAS | Pas encore raccordée au RAG ; restauration applicative de remplacement reste manuelle |
-| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique et `/v1/chat` réel vers llama.cpp avec moteur `BOOTSTRAP` explicite | Première configuration propriétaire et streaming encore à terminer ; aucun moteur CORE |
+| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique réouvrable, export, suppression et `/v1/chat` réel vers llama.cpp ; le navigateur reçoit l'état de génération et le moteur `BOOTSTRAP` explicite | Première configuration propriétaire à terminer ; aucun poids ou moteur CORE |
 | Authentification/RBAC | Argon2id et sessions déployés | Secret propriétaire créé dans le navigateur, jetons de session hachés, cookie sécurisé et CSRF | Compte propriétaire pas encore initialisé ; politiques des agents non raccordées |
 
 ## Vérifications confirmées

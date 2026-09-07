@@ -1,6 +1,6 @@
 # État public du déploiement
 
-Dernière vérification : 2026-09-06.
+Dernière vérification : 2026-09-07.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md). Ce résumé reste
@@ -34,13 +34,15 @@ compte, ni secret, ni chemin d'administration.
   CORE-700M utilisable n'existe.
 - **MCP Knowledge et RAG : recherche locale avec provenance.** MCP expose en
   `stdio` l'état, la recherche lexicale et une provenance exacte. La passerelle
-  peut indexer les documents Markdown approuvés de sa révision, joindre des
-  extraits bornés à BOOTSTRAP et retourner les citations. Aucun moteur
-  d'embeddings ni index sémantique n'est installé ; conversations, RAW et
-  VALIDATED restent hors de cet index.
+  joint les extraits bornés de son index courant à BOOTSTRAP et retourne les
+  citations. Toute reconstruction exige désormais un manifeste exact, son
+  SHA-256 approuvé et une référence d'audit : aucun fichier Markdown n'est
+  ajouté automatiquement. Aucun moteur d'embeddings ni index sémantique n'est
+  installé ; conversations, RAW et VALIDATED restent hors de cet index.
 - **Interface Web du projet : déployée derrière le HTTPS privé.** Argon2id,
-  sessions, CSRF, mémoire SQLite locale, historique, export, suppression et
-  client llama.cpp loopback fonctionnent. L'initialisation du compte
+  sessions, CSRF, mémoire SQLite locale, historique réouvrable, export,
+  suppression et client llama.cpp loopback fonctionnent. Le navigateur affiche
+  explicitement BOOTSTRAP et l'état de la réponse. L'initialisation du compte
   propriétaire reste à effectuer ; la mémoire est sauvegardée périodiquement
   sur le stockage durable avec vérification d'empreinte.
 - **Agents : configuration seulement.** Les 60 profils sont tous `draft` et

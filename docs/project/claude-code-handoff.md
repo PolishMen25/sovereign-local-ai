@@ -1,6 +1,6 @@
 # Reprise Claude Code
 
-Dernière mise à jour : 2026-09-06.
+Dernière mise à jour : 2026-09-07.
 
 Ce document est le point de reprise public et expurgé. Il ne contient ni
 adresse privée, compte, secret, chemin d'administration ou inventaire détaillé.
@@ -134,8 +134,9 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   PyTorch et un bundle réel approuvé : le chemin est implémenté et couvert par
   des tests unitaires et structurels, pas autorisé à produire des poids ;
 - aucun runtime de génération CORE actif ;
-- `/v1/chat` appelle réellement BOOTSTRAP et nomme le moteur ; la réponse reste
-  JSON non progressive et ne doit pas être confondue avec CORE ;
+- `/v1/chat` appelle réellement BOOTSTRAP et nomme le moteur ; l'interface
+  reçoit un flux d'état puis la réponse finale, mais aucun token CORE n'est
+  généré et BOOTSTRAP ne doit pas être confondu avec CORE ;
 - aucun RAG sémantique, agent actif, RBAC final ou streaming de réponse ;
 - aucun choix de placement ni décision G4 n'est encore accepté ; les deux
   preuves et leur comparaison servent seulement d'observation descriptive ;
@@ -150,6 +151,24 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 - la mémoire active reste locale, mais une sauvegarde SQLite périodique
   vérifiée est déposée sur le NAS ; une restauration de remplacement reste
   manuelle et doit arrêter proprement la passerelle.
+
+## Tranche interface et RAG du 2026-09-07
+
+- `services/web/static/` remplace la page prototype par une interface française
+  sans dépendance externe : première configuration, connexion, historique
+  réouvrable, export, suppression, profil `coordination` et citations ;
+- `GET /v1/session` rend uniquement les données nécessaires à la session
+  same-origin ; le cookie reste `HttpOnly` et le jeton CSRF est contrôlé sur les
+  écritures ;
+- seuls le profil `coordination` est exposé et accepté par le chat. Les 60
+  profils du registre sont toujours `draft` ;
+- `tools/build_project_knowledge_index.py` sépare désormais `manifest` et
+  `build`. La construction exige le manifeste exact, son SHA-256 approuvé et
+  une référence d'audit ; elle remplace l'index atomiquement après vérification
+  des octets. Le service de reconstruction automatique a été désactivé ;
+- ne jamais faire approuver automatiquement le manifeste. Préparer un candidat
+  précis, faire valider son empreinte par le propriétaire, puis reconstruire
+  hors de la passerelle et vérifier/restaurer sa sauvegarde.
 
 ## Ordre de reprise recommandé
 
