@@ -1,7 +1,9 @@
 import json
+from pathlib import Path
 import unittest
 
-from services.web.app import WEB_PROFILES, authorize, parse_chat, response
+from services.inference.runtime import LocalInferenceRuntime
+from services.web.app import WEB_PROFILES, WebState, authorize, parse_chat, response
 
 
 class WebAppTests(unittest.TestCase):
@@ -14,6 +16,18 @@ class WebAppTests(unittest.TestCase):
     def test_chat_parser_rejects_wrong_schema(self) -> None:
         with self.assertRaises(ValueError):
             parse_chat(b'{"schema_version":"wrong"}')
+
+    def test_chat_parser_allows_only_known_engines(self) -> None:
+        request = {
+            "schema_version": "local-chat-request.v1",
+            "request_id": "req-123456",
+            "message": "bonjour",
+            "engine": "CORE-700M",
+        }
+        self.assertEqual("CORE-700M", parse_chat(json.dumps(request).encode())["engine"])
+        request["engine"] = "remote"
+        with self.assertRaises(ValueError):
+            parse_chat(json.dumps(request).encode())
 
     def test_response_matches_local_contract(self) -> None:
         payload = response(
@@ -39,6 +53,13 @@ class WebAppTests(unittest.TestCase):
 
     def test_response_reports_retrieval_mode(self) -> None:
         self.assertEqual("lexical", response("req-123456", "coordination", "completed", "ok")["rag_mode"])
+
+    def test_core_engine_is_advertised_but_not_available_without_runtime(self) -> None:
+        state = WebState(None, None, None, LocalInferenceRuntime("CORE-700M", Path("missing.pt")), None, "x" * 32)
+        engines = state.engines()
+        self.assertTrue(engines[0]["available"])
+        self.assertEqual("CORE-700M", engines[1]["engine"])
+        self.assertFalse(engines[1]["available"])
 
 
 if __name__ == "__main__":

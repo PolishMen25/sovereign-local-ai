@@ -16,6 +16,7 @@ from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
+from services.inference.runtime import LocalInferenceRuntime
 
 
 MAX_BODY_BYTES = 1_048_576
@@ -86,7 +87,7 @@ def parse_chat(body: bytes) -> dict[str, Any]:
     request_value = _strict_json(body)
     if request_value.get("schema_version") != "local-chat-request.v1":
         raise ValueError("unsupported chat request schema")
-    allowed = {"schema_version", "request_id", "conversation_id", "profile_id", "message", "context_refs"}
+    allowed = {"schema_version", "request_id", "conversation_id", "profile_id", "message", "context_refs", "engine"}
     if not set(request_value) <= allowed:
         raise ValueError("chat request contains unknown fields")
     if not isinstance(request_value.get("request_id"), str) or REQUEST_ID.fullmatch(request_value["request_id"]) is None:
@@ -99,6 +100,8 @@ def parse_chat(body: bytes) -> dict[str, Any]:
     profile_id = request_value.get("profile_id", "coordination")
     if not isinstance(profile_id, str) or PROFILE_ID.fullmatch(profile_id) is None:
         raise ValueError("profile_id is invalid")
+    if request_value.get("engine", "BOOTSTRAP") not in {"BOOTSTRAP", "CORE-700M"}:
+        raise ValueError("engine is invalid")
     context_refs = request_value.get("context_refs", [])
     if not isinstance(context_refs, list) or len(context_refs) > 20 or any(not isinstance(item, str) for item in context_refs):
         raise ValueError("context_refs is invalid")
@@ -135,8 +138,26 @@ class WebState:
     authentication: AuthenticationStore
     memory: MemoryStore
     runtime: BootstrapClient
+    core_runtime: LocalInferenceRuntime
     knowledge: HybridKnowledgeIndex
     setup_token: str
+
+    def engines(self) -> list[dict[str, Any]]:
+        core = self.core_runtime.status()
+        return [
+            {
+                "engine": "BOOTSTRAP",
+                "available": True,
+                "selected_by_default": True,
+                "description": "Modèle local provisoire, disponible maintenant.",
+            },
+            {
+                "engine": core.model_name,
+                "available": core.generation_available,
+                "selected_by_default": False,
+                "description": "CORE-700M en préparation : activé seulement après validation des poids et de l'inférence.",
+            },
+        ]
 
 
 class LocalWebHandler(BaseHTTPRequestHandler):
@@ -229,6 +250,9 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         if self.path == "/v1/profiles":
             self.send_json(200, {"profiles": list(WEB_PROFILES)})
             return
+        if self.path == "/v1/engines":
+            self.send_json(200, {"engines": self.state.engines()})
+            return
         if self.path == "/v1/conversations":
             self.send_json(200, {"conversations": self.state.memory.list_conversations()})
             return
@@ -297,6 +321,19 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             return
         if request_value.get("profile_id", "coordination") != "coordination":
             self.send_json(422, {"error": "unknown_profile"})
+            return
+        requested_engine = request_value.get("engine", "BOOTSTRAP")
+        if requested_engine != "BOOTSTRAP":
+            payload = response(
+                request_value["request_id"],
+                request_value.get("profile_id", "coordination"),
+                "error",
+                "CORE-700M n'est pas encore disponible pour le chat : ses poids et son runtime n'ont pas passé les contrôles requis.",
+                engine="CORE-700M",
+                conversation_id=request_value.get("conversation_id", "unavailable"),
+            )
+            payload["error"] = "engine_unavailable"
+            self.send_json(503, payload)
             return
         conversation_id = request_value.get("conversation_id")
         if conversation_id is None:
@@ -389,8 +426,12 @@ def main() -> int:
     memory.initialize()
     knowledge.initialize()
     runtime = BootstrapClient(os.environ.get("SOVEREIGN_BOOTSTRAP_ENDPOINT", "http://127.0.0.1:8080"))
+    core_runtime = LocalInferenceRuntime(
+        "CORE-700M",
+        Path(os.environ.get("SOVEREIGN_CORE_WEIGHTS", "/opt/sovereign/models/core-700m.pt")),
+    )
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
-    server.state = WebState(authentication, memory, runtime, knowledge, setup_token)  # type: ignore[attr-defined]
+    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token)  # type: ignore[attr-defined]
     server.serve_forever()
     return 0
 

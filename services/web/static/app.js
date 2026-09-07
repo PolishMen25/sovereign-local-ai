@@ -77,7 +77,7 @@
   if (typeof document === "undefined") return;
 
   const q = (id) => document.getElementById(id);
-  const state = {csrf: "", conversation: "", engine: "unavailable", ragMode: "", busy: false, profiles: []};
+  const state = {csrf: "", conversation: "", engine: "unavailable", ragMode: "", busy: false, profiles: [], engines: []};
 
   function notice(message = "") {
     q("notice").textContent = message;
@@ -127,7 +127,7 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    for (const id of ["send", "new", "history", "profile", "logout"]) q(id).disabled = busy;
+    for (const id of ["send", "new", "history", "engine", "profile", "logout"]) q(id).disabled = busy;
     for (const button of q("conversations").querySelectorAll("button")) button.disabled = busy;
     q("export").disabled = busy || !state.conversation;
     q("delete").disabled = busy || !state.conversation;
@@ -266,6 +266,28 @@
     describeProfile();
   }
 
+  function describeEngine() {
+    const engine = state.engines.find((item) => item.engine === q("engine").value);
+    q("engine-description").textContent = engine?.description || "";
+  }
+
+  async function loadEngines() {
+    const data = await api("/v1/engines");
+    state.engines = (data.engines || []).filter((item) => item && typeof item.engine === "string" && typeof item.available === "boolean").slice(0, 8);
+    if (!state.engines.length) return;
+    q("engine").replaceChildren();
+    for (const engine of state.engines) {
+      const option = document.createElement("option");
+      option.value = engine.engine;
+      option.textContent = engineLabel(engine.engine) + (engine.available ? "" : " · en préparation");
+      option.disabled = !engine.available;
+      q("engine").append(option);
+    }
+    const defaultEngine = state.engines.find((item) => item.selected_by_default && item.available) || state.engines.find((item) => item.available);
+    if (defaultEngine) q("engine").value = defaultEngine.engine;
+    describeEngine();
+  }
+
   async function enterWorkspace(session) {
     state.csrf = session.csrf_token;
     q("setup").hidden = true;
@@ -275,7 +297,7 @@
     q("username").textContent = session.username || "";
     updateEngine(session.engine, session.rag_mode || "");
     newConversation();
-    const results = await Promise.allSettled([refreshHistory(), loadProfiles()]);
+    const results = await Promise.allSettled([refreshHistory(), loadProfiles(), loadEngines()]);
     for (const result of results) if (result.status === "rejected") notice(errorMessage(result.reason));
   }
 
@@ -317,7 +339,7 @@
     if (state.busy || !message) return;
     notice();
     setBusy(true);
-    const request = {schema_version: "local-chat-request.v1", request_id: crypto.randomUUID().replaceAll("-", ""), profile_id: q("profile").value, message};
+    const request = {schema_version: "local-chat-request.v1", request_id: crypto.randomUUID().replaceAll("-", ""), profile_id: q("profile").value, engine: q("engine").value, message};
     if (state.conversation) request.conversation_id = state.conversation;
     else q("conversation-title").textContent = message.slice(0, 80);
     addMessage("user", message);
@@ -372,6 +394,8 @@
       if (!q("workspace").hidden) q("message").focus();
     }
   });
+
+  q("engine").addEventListener("change", describeEngine);
 
   q("message").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
