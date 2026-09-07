@@ -10,6 +10,7 @@ from services.inference.tokenizer import (
     ByteBpeTokenizer,
     canonical_byte_tokens,
     experimental_tokenizer_document,
+    promote_to_candidate_core,
     train_byte_bpe,
     validate_tokenizer_document,
 )
@@ -86,11 +87,20 @@ class InferenceTokenizerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bounded decode length"):
             tokenizer.decode(itertools.repeat(4, MAXIMUM_DECODE_TOKEN_IDS + 1))
 
-    def test_approved_status_is_refused(self) -> None:
+    def test_candidate_core_is_valid_but_unknown_status_is_refused(self) -> None:
         document = artifact()
+        candidate = promote_to_candidate_core(document)
+        self.assertEqual(candidate["status"], "candidate_core")
+        self.assertEqual(ByteBpeTokenizer.from_document(candidate).encode("Bonjour"), ByteBpeTokenizer.from_document(document).encode("Bonjour"))
+
         document["status"] = "approved"
-        with self.assertRaisesRegex(ValueError, "experimental"):
+        with self.assertRaisesRegex(ValueError, "unsupported tokenizer artifact status"):
             validate_tokenizer_document(document)
+
+    def test_promotion_refuses_a_nonexperimental_source(self) -> None:
+        candidate = promote_to_candidate_core(artifact())
+        with self.assertRaisesRegex(ValueError, "only an experimental"):
+            promote_to_candidate_core(candidate)
 
     def test_noncanonical_or_incomplete_byte_coverage_is_refused(self) -> None:
         noncanonical = artifact()

@@ -1,7 +1,7 @@
-"""Load a bounded, authorized training split and bind its experimental tokenizer.
+"""Load a bounded, authorized training split and bind its tokenizer.
 
 This module performs lineage checks only.  It neither trains a model nor
-promotes the experimental tokenizer to an approved artifact.
+promotes a tokenizer artifact.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from services.inference.tokenizer import (
-    ARTIFACT_STATUS,
+    CANDIDATE_CORE_STATUS,
+    EXPERIMENTAL_STATUS,
     MAXIMUM_ARTIFACT_BYTES,
     ByteBpeTokenizer,
     validate_tokenizer_document,
@@ -204,15 +205,18 @@ def load_authorized_text_bundle(
     tokenizer_bytes = _read_bounded(
         tokenizer_path,
         maximum_bytes=MAXIMUM_ARTIFACT_BYTES,
-        context="experimental tokenizer",
+        context="tokenizer artifact",
     )
     tokenizer_document = _parse_json(
-        tokenizer_bytes, context="experimental tokenizer"
+        tokenizer_bytes, context="tokenizer artifact"
     )
     validate_tokenizer_document(tokenizer_document)
     tokenizer_contract = manifest["tokenizer_contract"]
-    if tokenizer_document["status"] != ARTIFACT_STATUS:
-        fail("authorized-text never promotes the tokenizer artifact")
+    if tokenizer_document["status"] not in {
+        EXPERIMENTAL_STATUS,
+        CANDIDATE_CORE_STATUS,
+    }:
+        fail("authorized-text requires an experimental or candidate_core tokenizer")
     if tokenizer_document["training_corpus_id"] != manifest["corpus_id"]:
         fail("tokenizer corpus id does not match the authorized corpus")
     if tokenizer_document["training_corpus_sha256"] != declared_train["content_sha256"]:

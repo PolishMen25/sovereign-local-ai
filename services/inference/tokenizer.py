@@ -16,7 +16,15 @@ import unicodedata
 
 
 SCHEMA_VERSION = "0.2.0"
-ARTIFACT_STATUS = "experimental"
+EXPERIMENTAL_STATUS = "experimental"
+CANDIDATE_CORE_STATUS = "candidate_core"
+APPROVED_CORE_STATUS = "approved_core_v1"
+# ``ARTIFACT_STATUS`` remains an alias for callers that create fresh BPE
+# artifacts.  A newly trained artifact is never promoted implicitly.
+ARTIFACT_STATUS = EXPERIMENTAL_STATUS
+VALID_ARTIFACT_STATUSES = frozenset(
+    {EXPERIMENTAL_STATUS, CANDIDATE_CORE_STATUS, APPROVED_CORE_STATUS}
+)
 ALGORITHM = "byte_bpe"
 INPUT_ENCODING = "utf-8"
 NORMALIZATION_POLICY_ID = "unicode-nfc-v1"
@@ -188,6 +196,24 @@ def experimental_tokenizer_document(
     return document
 
 
+def promote_to_candidate_core(document: Any) -> dict[str, Any]:
+    """Return a validated candidate-core copy of one experimental artifact.
+
+    Promotion intentionally changes only the lifecycle status.  Provenance and
+    the ordered BPE graph remain byte-for-byte represented by the source
+    document; the caller is responsible for persisting the separate receipt
+    that binds both artifact hashes to an approved corpus manifest.
+    """
+
+    validated = validate_tokenizer_document(document)
+    if validated["status"] != EXPERIMENTAL_STATUS:
+        fail("only an experimental tokenizer can be promoted to candidate_core")
+    promoted = dict(validated)
+    promoted["status"] = CANDIDATE_CORE_STATUS
+    validate_tokenizer_document(promoted)
+    return promoted
+
+
 def _require_canonical_token(value: Any, context: str) -> str:
     if not isinstance(value, str) or not HEX_TOKEN.fullmatch(value):
         fail(f"{context} must be canonical lowercase hexadecimal bytes")
@@ -200,8 +226,8 @@ def validate_tokenizer_document(document: Any) -> dict[str, Any]:
         fail(f"tokenizer artifact keys must be exactly {sorted(DOCUMENT_KEYS)}")
     if document["schema_version"] != SCHEMA_VERSION:
         fail("unsupported tokenizer schema_version")
-    if document["status"] != ARTIFACT_STATUS:
-        fail("tokenizer artifact must remain experimental")
+    if document["status"] not in VALID_ARTIFACT_STATUSES:
+        fail("unsupported tokenizer artifact status")
     if document["algorithm"] != ALGORITHM:
         fail("unsupported tokenizer algorithm")
     if document["input_encoding"] != INPUT_ENCODING:
@@ -272,7 +298,7 @@ def validate_tokenizer_document(document: Any) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class ByteBpeTokenizer:
-    """Immutable runtime view of a validated experimental artifact."""
+    """Immutable runtime view of a validated Byte-BPE artifact."""
 
     _document_json: str
     _tokens_hex: tuple[str, ...]

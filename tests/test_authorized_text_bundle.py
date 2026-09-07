@@ -8,6 +8,7 @@ import uuid
 
 from services.inference.tokenizer import (
     experimental_tokenizer_document,
+    promote_to_candidate_core,
     train_byte_bpe,
 )
 from tools.authorized_text_bundle import load_authorized_text_bundle
@@ -246,9 +247,17 @@ class AuthorizedTextBundleTests(unittest.TestCase):
                     manifest_path=paths[0], train_jsonl_path=paths[1], tokenizer_path=paths[2]
                 )
 
-    def test_tokenizer_must_be_experimental_linked_to_train_and_exact_vocab(self) -> None:
+    def test_candidate_core_tokenizer_is_linked_to_train_and_exact_vocab(self) -> None:
         train = record("train-1", "Tokenizer lié.")
         manifest, tokenizer, _, _, _ = build_documents(train)
+
+        candidate = promote_to_candidate_core(tokenizer)
+        with workspace_directory() as temporary:
+            paths = write_inputs(temporary, manifest, candidate, train)
+            bundle = load_authorized_text_bundle(
+                manifest_path=paths[0], train_jsonl_path=paths[1], tokenizer_path=paths[2]
+            )
+        self.assertEqual(bundle.tokenizer_status, "candidate_core")
 
         wrong_lineage = dict(tokenizer)
         wrong_lineage["training_corpus_sha256"] = "f" * 64
@@ -270,7 +279,7 @@ class AuthorizedTextBundleTests(unittest.TestCase):
     def test_tokenizer_schema_or_status_tampering_is_refused(self) -> None:
         train = record("train-1", "Artefact strict.")
         manifest, tokenizer, _, _, _ = build_documents(train)
-        for field, value in (("schema_version", "0.1.0"), ("status", "approved")):
+        for field, value in (("schema_version", "0.1.0"), ("status", "approved_core_v1")):
             tampered = dict(tokenizer)
             tampered[field] = value
             with self.subTest(field=field), workspace_directory() as temporary:

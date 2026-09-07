@@ -1,6 +1,6 @@
 # Gate corpus et tokenizer
 
-**Statut : préparation de J3, aucune approbation de corpus.**
+**Statut : corpus initial approuvé ; tokenizer 32k en promotion contrôlée.**
 
 Ce projet ne lance pas d'entraînement linguistique tant qu'un corpus, son
 tokenizer et son autorisation ne sont pas explicitement approuvés. Le
@@ -93,17 +93,18 @@ Son état runtime est immuable et les tailles de texte et de décodage sont
 bornées. Un encode/decode déterministe est donc testable hors ligne sans faire
 de cet artefact un tokenizer approuvé.
 
-Le résultat reste marqué `experimental` : ni le corpus, ni la politique finale,
-ni les 32 000 unités candidates ne sont approuvés. Le prototype est borné à
-32 768 unités et son algorithme d'apprentissage naïf n'est pas encore adapté à
-un grand corpus. Le producteur et le chargeur utilisent désormais l'empreinte
-exacte de la partition `train`, sans autoriser pour autant un entraînement
-linguistique. La configuration candidate est
+Un entraînement Byte-BPE produit toujours d'abord un artefact `experimental`.
+Une promotion distincte peut le rendre `candidate_core` après vérification du
+manifeste approuvé, du split `train`, du vocabulaire et des empreintes ; elle
+produit un reçu séparé liant les deux versions. `approved_core_v1` reste
+réservé à une décision ultérieure. Le prototype est borné à 32 768 unités et
+son algorithme d'apprentissage naïf n'est pas encore adapté à un grand corpus.
+La configuration candidate est
 [`configs/tokenizers/byte-bpe-v0.candidate.json`](../../configs/tokenizers/byte-bpe-v0.candidate.json).
 
 L'option ci-dessous est obligatoire avant d'alimenter un entraînement
 linguistique. Elle refuse un corpus synthétique, une gouvernance en attente,
-une autorisation absente et un tokenizer non approuvé.
+une autorisation absente et un contrat tokenizer non approuvé.
 
 ```bash
 python3 -B tools/validate_training_corpus_manifest.py \
@@ -119,8 +120,8 @@ suivants sont indissociables :
 
 - `--authorized-manifest` : manifeste `0.2.0` autorisé ;
 - `--authorized-train-jsonl` : octets exacts du seul split `train` ;
-- `--authorized-tokenizer` : tokenizer expérimental construit depuis ce même
-  split et portant le même contrat de normalisation.
+- `--authorized-tokenizer` : tokenizer `experimental` ou `candidate_core`
+  construit depuis ce même split et portant le même contrat de normalisation.
 
 Le chargeur vérifie notamment les autorisations distinctes, les tailles,
 comptes et SHA-256, les identifiants de corpus, la provenance, la normalisation
@@ -157,8 +158,9 @@ linguistique autorisé n'a été exécuté et aucun poids CORE utile n'a été p
 
 ## Ce qui reste à décider
 
-Le candidat de 32 000 unités est une hypothèse de travail, pas le tokenizer
-final. Avant le gate G3, le propriétaire doit approuver :
+Le candidat 32k peut être promu `candidate_core` pour CORE-700M, mais n'est pas
+un tokenizer final ou multilingue. Avant le gate G3, le propriétaire doit encore
+approuver :
 
 1. les sources, licences, consentements et exclusions ;
 2. la proportion français/anglais/code/documentation et les domaines visés ;

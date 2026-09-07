@@ -28,9 +28,10 @@ compte, ni secret, ni chemin d'administration.
   Un checkpoint synthétique frais de vingt étapes est désormais copié sur le
   stockage durable, restauré dans un fichier de contrôle et repris offline avec
   succès à l'étape 21.
-- **CORE-700M : conception seulement.** L'architecture candidate et son
-  comptage exact de 691 160 320 paramètres sont versionnés. CORE-80M reste une
-  référence historique ; aucun tokenizer final, corpus approuvé ou poids
+- **CORE-700M : préparation contrôlée.** L'architecture candidate et son
+  comptage exact de 691 160 320 paramètres sont versionnés. Le corpus initial
+  anglais technique est approuvé ; le tokenizer 32k est promouvable vers
+  `candidate_core` avec reçu d'empreintes. Aucun tokenizer final ni poids
   CORE-700M utilisable n'existe.
 - **MCP Knowledge et RAG : recherche locale avec provenance.** MCP expose en
   `stdio` l'état, la recherche lexicale et une provenance exacte. La passerelle
@@ -83,8 +84,9 @@ production.
   complète mesurée ni poids ;
 - le cycle CORE-MINI entraînement → checkpoint → reprise a réussi sur Linux
   avec 20 étapes puis 5 étapes de reprise sous les contrôles stricts actuels ;
-- le manifeste et le tokenizer expérimentaux sont maintenant liés au seul
-  split `train` par taille, compte et SHA-256 ;
+- le manifeste est lié au seul split `train` par taille, compte et SHA-256 ;
+  le contrat tokenizer accepte `experimental` pour les essais et
+  `candidate_core` pour la préparation CORE, avec refus des autres états ;
 - la configuration CORE-MINI est lue, validée et hachée depuis une unique copie
   bornée, avec architecture et comptage exacts ; les erreurs CLI publiques
   n'exposent pas les chemins fournis ;
