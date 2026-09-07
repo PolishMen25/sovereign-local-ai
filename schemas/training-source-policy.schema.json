@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/training-source-policy/v1/schema.json",
+  "title": "Politique candidate de sources pour CORE",
+  "description": "Politique sans contenu ni URL privée. Elle ne constitue pas une approbation de corpus ou d'entraînement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_id", "status", "target_languages", "priority_domains", "allowed_licenses", "excluded_content", "review_requirements"],
+  "properties": {
+    "schema_version": {"const": "training-source-policy.v1"},
+    "policy_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,62}$"},
+    "status": {"const": "candidate"},
+    "target_languages": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"enum": ["fr", "en"]}, "uniqueItems": true},
+    "priority_domains": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"enum": ["software-development", "systems-administration", "networking"]}, "uniqueItems": true},
+    "allowed_licenses": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"enum": ["0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "ISC", "MIT", "Unlicense"]}, "uniqueItems": true},
+    "excluded_content": {"type": "array", "minItems": 1, "items": {"enum": ["credentials", "personal-data", "private-conversations", "proprietary-content", "unknown-license"]}, "uniqueItems": true},
+    "review_requirements": {"type": "array", "minItems": 1, "items": {"enum": ["license-verified", "provenance-verified", "content-sha256", "human-approval"]}, "uniqueItems": true}
+  }
+}

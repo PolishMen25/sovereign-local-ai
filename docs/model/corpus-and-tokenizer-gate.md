@@ -11,6 +11,26 @@ structurels, mais aucun entraînement PyTorch de bout en bout n'a encore été
 exécuté avec ce chemin. Il reste bloqué en pratique tant que les trois artefacts
 exacts et leur approbation ne sont pas réunis.
 
+## Politique de sources candidate
+
+La politique versionnée
+[`core-v1-source-policy.candidate.json`](../../configs/corpus/core-v1-source-policy.candidate.json)
+traduit les choix actuels du propriétaire : français et anglais, priorité au
+développement logiciel, à l'administration système et au réseau, et licences
+strictement permissives (`MIT`, `Apache-2.0`, familles BSD, `ISC`, `CC0-1.0`,
+`0BSD` et `Unlicense`).
+
+Elle exclut les conversations privées, données personnelles, identifiants,
+contenus propriétaires et licences inconnues. Elle impose pour chaque futur
+paquet une licence, une provenance, une empreinte et une revue humaine. Elle
+reste `candidate` : elle ne télécharge rien, n'approuve aucune source et
+n'autorise ni tokenizer final ni entraînement.
+
+```bash
+python3 -B tools/validate_training_source_policy.py \
+  configs/corpus/core-v1-source-policy.candidate.json
+```
+
 ## Contrat versionné
 
 [`schemas/training-corpus-manifest.schema.json`](../../schemas/training-corpus-manifest.schema.json)

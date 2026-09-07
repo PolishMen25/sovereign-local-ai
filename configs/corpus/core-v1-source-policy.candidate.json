@@ -1,0 +1,10 @@
+{
+  "schema_version": "training-source-policy.v1",
+  "policy_id": "core-v1-fr-en-permissive",
+  "status": "candidate",
+  "target_languages": ["fr", "en"],
+  "priority_domains": ["software-development", "systems-administration", "networking"],
+  "allowed_licenses": ["0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "ISC", "MIT", "Unlicense"],
+  "excluded_content": ["credentials", "personal-data", "private-conversations", "proprietary-content", "unknown-license"],
+  "review_requirements": ["license-verified", "provenance-verified", "content-sha256", "human-approval"]
+}
