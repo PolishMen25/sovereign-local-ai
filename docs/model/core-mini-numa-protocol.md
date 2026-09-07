@@ -1,15 +1,18 @@
 # Protocole de preuve répétée CORE-MINI sur placement NUMA
 
 **Statut : PROVISOIRE — phase 0. Le runner et ses contrats sont implémentés ;
-aucune preuve conforme issue du nœud CPU n'est encore documentée.**
+deux preuves A/B de trois répétitions ont été produites et comparées. Elles
+restent une observation miniature descriptive, sans décision de placement pour
+CORE-700M.**
 
 Ce protocole définit une preuve bornée pour **un seul placement externe** de
 CORE-MINI-1M. Il permet de répéter un workload synthétique comparable sans
 publier l'identité de la machine ni sa topologie détaillée. Il n'autorise ni
 entraînement long, ni exposition réseau, ni choix de placement pour CORE-700M.
 
-Le passage NUMA préliminaire déjà documenté avec une seule répétition n'est pas
-une preuve conforme à ce protocole.
+Les preuves A/B existantes n'épuisent pas le protocole : elles ne mesurent pas
+encore les charges élargies, la pression mémoire ni les compteurs NUMA requis
+pour fermer G4.
 
 L'implémentation de référence est `tools/core_mini_numa_benchmark.py`. Elle
 produit une preuve publique conforme à
