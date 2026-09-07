@@ -31,6 +31,25 @@ python3 -B tools/validate_training_source_policy.py \
   configs/corpus/core-v1-source-policy.candidate.json
 ```
 
+## Corpus initial approuvé le 2026-09-07
+
+Le propriétaire a approuvé un corpus technique initial, distinct des
+conversations privées et limité à trois archives Git figées : `psf/requests`
+à `dae7ef63b4df6eded86637f251fc4e3a06c3b479` (Apache-2.0),
+`pallets/flask` à `d318b683471101618febed18996405ad26462110`
+(BSD-3-Clause), et `moby/moby` à
+`2280567b60633e2a4ac8723961bc1f351e71e099` (Apache-2.0).
+
+Les archives RAW sont conservées avec les empreintes respectives
+`55999922723576238c243ca02183f2c367c9b0c197a3c1afc671b35c2daf96c2`,
+`d9e95f6100bb2479247da4b8055b80a52ef8c059cd74ade5b7df46ce01033d77`
+et `8aa8d4cda384a4aff4dacc04195feade22d237e4eb7987c9053ac06209431fe3`.
+Le manifeste validé du corpus est
+`ad199338663ae96bedd341aeec8ac4eec6db78d5e503c19e784e7b621b643985`.
+Il contient 44 enregistrements d'entraînement, 109 de validation et 2 423 de
+test. Ce premier lot est anglais technique ; il ne valide pas encore la
+couverture française ni un tokenizer final pour CORE-700M.
+
 ## Contrat versionné
 
 [`schemas/training-corpus-manifest.schema.json`](../../schemas/training-corpus-manifest.schema.json)
