@@ -41,7 +41,7 @@ génère pas une réponse d'IA.
 | --- | --- | --- | --- |
 | Runtime tensoriel CPU hors ligne | Installé et vérifié dans le conteneur CORE | PyTorch `2.13.0+cpu` et NumPy `2.5.2` ont été réinjectés depuis des wheels vérifiés ; CUDA est indisponible et non compilé | Runtime technique isolé, pas un assistant ni des poids CORE |
 | Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur, conserve localement les échanges masqués et peut joindre des références lexicales avec provenance | Modèle tiers temporaire, pas CORE ; aucun outil ou agent, aucun RAG sémantique ; première configuration propriétaire encore requise |
-| CORE-MINI-1M | Harness synthétique validé ; chemin `authorized-text` structurellement testé | Modèle de 1 328 256 paramètres ; run strict de 20 étapes, checkpoint durable vérifié, restauration de contrôle et reprise offline jusqu'à l'étape 21 ; modes explicitement séparés | Aucun run `authorized-text` de bout en bout, aucun langage appris, aucune question possible ; aucun checkpoint CORE-700M |
+| CORE-MINI-1M | Entraînement `authorized-text` borné et reprise vérifiés | Modèle de 1 328 256 paramètres ; 50 étapes sur le corpus approuvé, checkpoint durable, puis reprise contrôlée de 10 étapes jusqu'à 60 avec journal continu et empreintes ; modes explicitement séparés | 60 étapes ne produisent pas un assistant : aucune évaluation linguistique ni question CORE possible ; aucun checkpoint CORE-700M |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
 | Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
 | CORE-700M | Préflight candidat vérifié | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé et préflight sans allocation | Aucune instanciation complète mesurée, aucun tokenizer final ni poids |
@@ -65,9 +65,10 @@ génère pas une réponse d'IA.
 - après cette installation, CORE ne présente aucune route par défaut ; une
   résolution DNS externe et une connexion TCP directe de contrôle vers Internet
   sont refusées ;
-- un checkpoint CORE-MINI a été produit après 20 étapes puis repris 5 étapes
-  sur Linux avec les contrôles stricts actuels ; la compatibilité d'un ancien
-  checkpoint historique reste un test séparé ;
+- un entraînement CORE-MINI `authorized-text` de 50 étapes a produit un
+  checkpoint durable, puis a repris 10 étapes jusqu'à l'étape 60 sur Linux ;
+  les métriques restent continues et liées au même corpus et tokenizer. Ce
+  palier prouve la reprise technique, pas une capacité conversationnelle ;
 - CORE-80M s'est historiquement instancié en RAM CPU avec son nombre exact de paramètres ; CORE-700M possède seulement un comptage exact local et n'a pas encore été instancié sur le nœud ;
 - le harness et la future inférence partagent maintenant la même définition
   CPU-only du decoder, sans modifier le format des checkpoints existants ;
