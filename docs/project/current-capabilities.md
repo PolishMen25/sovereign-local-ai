@@ -43,8 +43,8 @@ génère pas une réponse d'IA.
 | Chat BOOTSTRAP | CLI et passerelle HTTPS privée fonctionnelles | Qwen2.5-1.5B-Instruct Q4_K_M génère réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur, conserve localement les échanges masqués et peut joindre des références lexicales avec provenance | Modèle tiers temporaire, pas CORE ; aucun outil ou agent, aucun RAG sémantique ; première configuration propriétaire encore requise |
 | CORE-MINI-1M | Entraînement `authorized-text` borné et reprise vérifiés | Modèle de 1 328 256 paramètres ; 50 étapes sur le corpus approuvé, checkpoint durable, puis reprise contrôlée de 10 étapes jusqu'à 60 avec journal continu et empreintes ; modes explicitement séparés | 60 étapes ne produisent pas un assistant : aucune évaluation linguistique ni question CORE possible ; aucun checkpoint CORE-700M |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
-| Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution | Aucun poids, service de génération CORE ou entraînement long ; preuve d'isolation après redémarrage encore à compléter |
-| CORE-700M | Préflight candidat vérifié | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé et préflight sans allocation | Aucune instanciation complète mesurée, aucun tokenizer final ni poids |
+| Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution ; deux paliers CORE-700M exécutés | Aucun service de génération CORE ; preuve d'isolation après redémarrage reste à compléter |
+| CORE-700M | Deux étapes CPU et reprise réelles vérifiées | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé ; étape 1 puis reprise contrôlée jusqu'à l'étape 2 avec deux checkpoints durables | Deux étapes ne produisent pas un assistant ; aucun benchmark de débit/NUMA validé, aucune évaluation linguistique ni moteur de chat CORE |
 | Corpus / tokenizer | Candidat 32k traçable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et promotion `experimental` → `candidate_core` avec reçu | Qualité, couverture française et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
@@ -54,7 +54,7 @@ génère pas une réponse d'IA.
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif avec sauvegarde durable | Masquage de secrets, empreintes, historique, export, suppression avec reçu sans contenu et sauvegarde SQLite vérifiée vers le NAS | Pas encore raccordée au RAG ; restauration applicative de remplacement reste manuelle |
-| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique réouvrable, export, suppression et `/v1/chat` réel vers llama.cpp ; le navigateur reçoit l'état de génération et le moteur `BOOTSTRAP` explicite | Première configuration propriétaire à terminer ; aucun poids ou moteur CORE |
+| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique réouvrable, export, suppression et `/v1/chat` réel vers llama.cpp ; BOOTSTRAP est explicite et le sélecteur prépare CORE-700M sans l’activer prématurément | Le sélecteur CORE reste bloqué tant qu’un runtime de génération et ses contrôles ne sont pas validés |
 | Authentification/RBAC | Argon2id et sessions déployés | Secret propriétaire créé dans le navigateur, jetons de session hachés, cookie sécurisé et CSRF | Compte propriétaire pas encore initialisé ; politiques des agents non raccordées |
 
 ## Vérifications confirmées
@@ -69,7 +69,10 @@ génère pas une réponse d'IA.
   checkpoint durable, puis a repris 10 étapes jusqu'à l'étape 60 sur Linux ;
   les métriques restent continues et liées au même corpus et tokenizer. Ce
   palier prouve la reprise technique, pas une capacité conversationnelle ;
-- CORE-80M s'est historiquement instancié en RAM CPU avec son nombre exact de paramètres ; CORE-700M possède seulement un comptage exact local et n'a pas encore été instancié sur le nœud ;
+- CORE-700M a été instancié et entraîné sur CPU pour une étape réelle, puis
+  restauré depuis ce checkpoint et entraîné jusqu'à l'étape 2 ; les deux
+  checkpoints sont persistés. Ce test prouve le chemin technique, pas la
+  qualité du modèle ni une capacité conversationnelle ;
 - le harness et la future inférence partagent maintenant la même définition
   CPU-only du decoder, sans modifier le format des checkpoints existants ;
 - le trainer et le vérificateur lisent, valident et hachent la configuration
