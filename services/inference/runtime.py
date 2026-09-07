@@ -55,6 +55,11 @@ class LocalInferenceRuntime:
     def status(self) -> RuntimeStatus:
         weights_present = self.weights_path.is_file()
         ready = self._inputs_ready()
+        if ready and self._model is None:
+            try:
+                self._load()
+            except InferenceUnavailable:
+                return RuntimeStatus(state="checkpoint_refused", backend="cpu_only", model_name=self.model_name, weights_present=weights_present, generation_available=False)
         return RuntimeStatus(
             state="ready_experimental" if ready and self._model is not None else ("checkpoint_pending_validation" if ready else ("weights_detected_runtime_disabled" if weights_present else "awaiting_local_weights")),
             backend="cpu_only", model_name=self.model_name, weights_present=weights_present,
