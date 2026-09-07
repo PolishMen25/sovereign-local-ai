@@ -16,6 +16,7 @@ from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
+from services.web.core_client import CoreClient
 from services.inference.runtime import LocalInferenceRuntime
 
 
@@ -138,12 +139,17 @@ class WebState:
     authentication: AuthenticationStore
     memory: MemoryStore
     runtime: BootstrapClient
-    core_runtime: LocalInferenceRuntime
+    core_runtime: Any
     knowledge: HybridKnowledgeIndex
     setup_token: str
 
     def engines(self) -> list[dict[str, Any]]:
-        core = self.core_runtime.status()
+        try:
+            core = self.core_runtime.status()
+            available = bool(core.get("available", False)) if isinstance(core, dict) else core.generation_available
+            state = core.get("state", "unavailable") if isinstance(core, dict) else core.state
+        except RuntimeError:
+            available, state = False, "unavailable"
         return [
             {
                 "engine": "BOOTSTRAP",
@@ -152,10 +158,10 @@ class WebState:
                 "description": "Modèle local provisoire, disponible maintenant.",
             },
             {
-                "engine": core.model_name,
-                "available": core.generation_available,
+                "engine": "CORE-700M",
+                "available": available,
                 "selected_by_default": False,
-                "description": "CORE-700M en préparation : activé seulement après validation des poids et de l'inférence.",
+                "description": "CORE-700M expérimental : disponible seulement si son checkpoint et sa provenance sont validés (état : " + str(state) + ").",
             },
         ]
 
@@ -323,18 +329,6 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.send_json(422, {"error": "unknown_profile"})
             return
         requested_engine = request_value.get("engine", "BOOTSTRAP")
-        if requested_engine != "BOOTSTRAP":
-            payload = response(
-                request_value["request_id"],
-                request_value.get("profile_id", "coordination"),
-                "error",
-                "CORE-700M n'est pas encore disponible pour le chat : ses poids et son runtime n'ont pas passé les contrôles requis.",
-                engine="CORE-700M",
-                conversation_id=request_value.get("conversation_id", "unavailable"),
-            )
-            payload["error"] = "engine_unavailable"
-            self.send_json(503, payload)
-            return
         conversation_id = request_value.get("conversation_id")
         if conversation_id is None:
             conversation_id = self.state.memory.create_conversation(title=request_value["message"][:80])
@@ -369,23 +363,28 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                     }
                 )
             messages.extend({"role": item["role"], "content": item["content"]} for item in history if item["role"] in {"user", "assistant"})
-            answer = self.state.runtime.generate(messages)
+            if requested_engine == "CORE-700M":
+                answer = self.state.core_runtime.generate(request_value["message"])
+                selected_engine = "CORE-700M"
+            else:
+                answer = self.state.runtime.generate(messages)
+                selected_engine = self.state.runtime.engine
             self.state.memory.append_message(conversation_id, role="assistant", content=answer)
         except KeyError:
             self.send_json(404, {"error": "conversation_not_found"})
             return
         except RuntimeError:
-            payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "error", "Le moteur BOOTSTRAP local est indisponible.", engine=self.state.runtime.engine, conversation_id=conversation_id)
+            payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "error", "Le moteur local demandé est indisponible ou son checkpoint a été refusé.", engine=requested_engine, conversation_id=conversation_id)
             if "text/event-stream" in self.headers.get("Accept", ""):
                 payload["error"] = "runtime_unavailable"
                 self.send_event_stream([("error", payload)])
             else:
                 self.send_json(503, payload)
             return
-        payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "completed", answer, engine=self.state.runtime.engine, conversation_id=conversation_id, citations=citations)
+        payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "completed", answer, engine=selected_engine, conversation_id=conversation_id, citations=citations)
         if "text/event-stream" in self.headers.get("Accept", ""):
             self.send_event_stream([
-                ("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "lexical"}),
+                ("metadata", {"conversation_id": conversation_id, "engine": selected_engine, "rag_mode": "lexical"}),
                 ("completed", payload),
             ])
         else:
@@ -426,10 +425,10 @@ def main() -> int:
     memory.initialize()
     knowledge.initialize()
     runtime = BootstrapClient(os.environ.get("SOVEREIGN_BOOTSTRAP_ENDPOINT", "http://127.0.0.1:8080"))
-    core_runtime = LocalInferenceRuntime(
-        "CORE-700M",
-        Path(os.environ.get("SOVEREIGN_CORE_WEIGHTS", "/opt/sovereign/models/core-700m.pt")),
-    )
+    core_token = os.environ.get("SOVEREIGN_CORE_TOKEN", "")
+    core_runtime: Any = LocalInferenceRuntime("CORE-700M", Path("/nonexistent-core-checkpoint"))
+    if len(core_token) >= 32:
+        core_runtime = CoreClient(os.environ.get("SOVEREIGN_CORE_ENDPOINT", "http://192.168.0.143:8790"), core_token)
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token)  # type: ignore[attr-defined]
     server.serve_forever()
