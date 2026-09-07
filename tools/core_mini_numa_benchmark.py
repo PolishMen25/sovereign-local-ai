@@ -34,6 +34,11 @@ import uuid
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# The benchmark is started by a transient systemd unit, whose working directory
+# is not the repository.  Make the repository importable explicitly rather than
+# relying on the caller's current directory.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 TRAINER = PROJECT_ROOT / "tools" / "train_core_mini.py"
 SUMMARIZER = PROJECT_ROOT / "tools" / "summarize_training_metrics.py"
 VERIFIER = PROJECT_ROOT / "tools" / "verify_core_checkpoint_compatibility.py"

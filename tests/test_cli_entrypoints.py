@@ -30,6 +30,23 @@ class CliEntrypointTests(unittest.TestCase):
                 self.assertEqual(completed.returncode, 0, completed.stderr)
                 self.assertIn("usage:", completed.stdout.lower())
 
+    def test_numa_benchmark_entrypoint_is_independent_of_working_directory(self) -> None:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(PROJECT_ROOT / "tools" / "core_mini_numa_benchmark.py"),
+                "--help",
+            ],
+            cwd=PROJECT_ROOT.parent,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("usage:", completed.stdout.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
