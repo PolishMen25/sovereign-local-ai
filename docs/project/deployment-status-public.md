@@ -34,11 +34,14 @@ compte, ni secret, ni chemin d'administration.
   CORE-700M utilisable n'existe.
 - **MCP Knowledge et RAG : recherche locale avec provenance.** MCP expose en
   `stdio` l'état, la recherche lexicale et une provenance exacte. La passerelle
-  joint les extraits bornés de son index courant à BOOTSTRAP et retourne les
-  citations. Toute reconstruction exige désormais un manifeste exact, son
-  SHA-256 approuvé et une référence d'audit : aucun fichier Markdown n'est
-  ajouté automatiquement. Aucun moteur d'embeddings ni index sémantique n'est
-  installé ; conversations, RAW et VALIDATED restent hors de cet index.
+  joint les extraits bornés de son index approuvé à BOOTSTRAP et retourne les
+  citations. Le premier manifeste `project-internal-v1` couvre quatre documents
+  internes versionnés et porte l'empreinte de contenu
+  `f2176bce068c4da8eb89cb0ef615c3d2a36a33756d4da7f345cbbdaa30189de5`.
+  Toute reconstruction exige un manifeste exact, son SHA-256 approuvé et une
+  référence d'audit : aucun fichier Markdown n'est ajouté automatiquement.
+  Aucun moteur d'embeddings ni index sémantique n'est installé ; conversations,
+  RAW et VALIDATED restent hors de cet index.
 - **Interface Web du projet : déployée derrière le HTTPS privé.** Argon2id,
   sessions, CSRF, mémoire SQLite locale, historique réouvrable, export,
   suppression et client llama.cpp loopback fonctionnent. Le navigateur affiche

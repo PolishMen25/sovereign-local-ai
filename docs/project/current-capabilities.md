@@ -48,7 +48,7 @@ génère pas une réponse d'IA.
 | Corpus / tokenizer | Prototype expérimental rejouable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et validation stricte | Aucun corpus ou tokenizer final approuvé ; qualité et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucun poids ou génération CORE ; BOOTSTRAP utilise un runtime séparé |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
-| RAG | Recherche lexicale locale, avec gate de reconstruction | L'index SQLite/FTS5 existant peut fournir à BOOTSTRAP des extraits bornés et citations ; le nouveau constructeur refuse toute reconstruction sans manifeste exact, empreinte approuvée et référence d'audit | Le manifeste candidat n'est pas encore approuvé ; aucun moteur d'embeddings, index sémantique, conversation, RAW ou VALIDATED n'est indexé |
+| RAG | Recherche lexicale locale approuvée, avec gate de reconstruction | L'index SQLite/FTS5 fournit à BOOTSTRAP des extraits bornés et citations depuis quatre documents internes approuvés ; toute reconstruction exige un manifeste exact, son empreinte et une référence d'audit | Aucun moteur d'embeddings, index sémantique, conversation, RAW ou VALIDATED n'est indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
 | Synology | Stockage durable monté et persistant sur l'hôte de calcul | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé ; mémoire, index lexical et checkpoint CORE-MINI sont sauvegardés et restaurés avec empreintes vérifiées | Le remplacement d'une base active, la restauration d'un checkpoint CORE-700M et le test de droits négatifs restent à faire |
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
@@ -124,6 +124,10 @@ génère pas une réponse d'IA.
 - une sauvegarde de l'index lexical a été créée puis vérifiée et restaurée dans
   un fichier de contrôle, avec empreinte identique ; ce fichier de contrôle a
   été supprimé sans remplacer la base active ;
+- le manifeste RAG interne `project-internal-v1` a été approuvé et reconstruit
+  atomiquement depuis quatre documents versionnés (capacités, décisions,
+  architecture et modèle de menace) ; son empreinte de contenu est
+  `f2176bce068c4da8eb89cb0ef615c3d2a36a33756d4da7f345cbbdaa30189de5` ;
 - un run CORE-MINI synthétique frais de vingt étapes a produit un checkpoint,
   copié vers le stockage durable puis restauré dans un fichier de contrôle avec
   la même empreinte ; le vérificateur offline a repris cette copie à l'étape 21
