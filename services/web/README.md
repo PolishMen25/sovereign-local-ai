@@ -28,3 +28,46 @@ n'est utilisé.
 Le service ne doit jamais écouter directement sur le LAN. Un reverse proxy
 HTTPS approuvé porte l'accès LAN ou tailnet, tandis que le processus Python
 reste sur `127.0.0.1`.
+
+## Interface disponible
+
+Les fichiers statiques locaux de `services/web/static/` fournissent la première
+configuration, la connexion, l'historique réouvrable, l'export et la
+suppression. Ils n'utilisent ni bibliothèque distante, ni stockage de mot de
+passe ou de conversation dans le navigateur.
+
+Après connexion, le navigateur lit seulement :
+
+- `GET /v1/session` pour l'identité de session, le CSRF et l'état du moteur ;
+- `GET /v1/profiles`, qui n'expose actuellement que `coordination` ;
+- les routes de conversation déjà authentifiées.
+
+Les 60 profils versionnés restent `draft` et sont refusés par `/v1/chat`.
+Une réponse de chat peut être demandée avec `Accept: text/event-stream` : le
+serveur publie l'état de génération puis la réponse finale. BOOTSTRAP ne diffuse
+pas encore les tokens individuellement.
+
+## Reconstruction contrôlée de l'index
+
+`tools.build_project_knowledge_index` n'indexe plus récursivement un dossier au
+démarrage. La procédure requiert un manifeste candidat, son empreinte et une
+référence de validation hors dépôt :
+
+```bash
+python3 -B -m tools.build_project_knowledge_index manifest \
+  --source-directory docs \
+  --document project/current-capabilities.md \
+  --output /var/lib/sovereign-gateway/knowledge.candidate.json
+
+# Après approbation humaine de l'empreinte affichée :
+python3 -B -m tools.build_project_knowledge_index build \
+  --source-directory docs \
+  --manifest /var/lib/sovereign-gateway/knowledge.candidate.json \
+  --approved-manifest-sha256 '<empreinte-approuvee>' \
+  --approval-reference '<reference-audit>' \
+  --database /var/lib/sovereign-gateway/knowledge.sqlite3
+```
+
+La seconde commande compare les octets de chaque source, puis remplace la base
+SQLite atomiquement. Elle doit être exécutée lorsque la passerelle est arrêtée
+proprement ; elle ne valide, ne télécharge ni ne promeut aucune donnée elle-même.
