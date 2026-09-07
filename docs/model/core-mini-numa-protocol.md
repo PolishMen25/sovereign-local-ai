@@ -210,6 +210,15 @@ validés avec le même interpréteur en mode `-I`. Le benchmark a été exécut�
 comme service systemd indépendant de SSH avec refus des sockets INET.
 Les chemins, contrats et journaux privés restent hors Git.
 
+Une seconde preuve comparable,
+`proof-c40e4682-0063-4eea-aa28-e119dc303977`, a été exécutée avec le même
+workload et la même session de benchmark. Sa médiane est de 906,51 tokens/s,
+contre 860,88 tokens/s pour la première. L'artefact de comparaison local
+`core-mini-numa-comparison.v1` donne un ratio A/B de `0,9497`, soit B environ
+5,3 % au-dessus de A sur ce test miniature. Cette différence est descriptive :
+elle ne choisit pas encore une allocation pour CORE-700M et devra être
+confirmée avec des charges, durées et mesures mémoire plus représentatives.
+
 ## Limites et gate G4
 
 Même conforme, cet artefact reste une **preuve répétée miniature et
