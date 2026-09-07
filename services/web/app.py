@@ -428,7 +428,7 @@ def main() -> int:
     core_token = os.environ.get("SOVEREIGN_CORE_TOKEN", "")
     core_runtime: Any = LocalInferenceRuntime("CORE-700M", Path("/nonexistent-core-checkpoint"))
     if len(core_token) >= 32:
-        core_runtime = CoreClient(os.environ.get("SOVEREIGN_CORE_ENDPOINT", "http://192.168.0.143:8790"), core_token)
+        core_runtime = CoreClient(os.environ.get("SOVEREIGN_CORE_ENDPOINT", "http://192.168.0.143:9000"), core_token)
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token)  # type: ignore[attr-defined]
     server.serve_forever()

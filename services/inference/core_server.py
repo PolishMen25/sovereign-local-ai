@@ -44,7 +44,9 @@ def main() -> int:
     token = os.environ.get("SOVEREIGN_CORE_TOKEN", "")
     if len(token) < 32: raise SystemExit("SOVEREIGN_CORE_TOKEN must contain at least 32 characters")
     runtime = LocalInferenceRuntime("CORE-700M", Path(os.environ["SOVEREIGN_CORE_WEIGHTS"]), config_path=Path(os.environ["SOVEREIGN_CORE_CONFIG"]), tokenizer_path=Path(os.environ["SOVEREIGN_CORE_TOKENIZER"]), manifest_path=Path(os.environ["SOVEREIGN_CORE_MANIFEST"]), preflight_path=Path(os.environ["SOVEREIGN_CORE_PREFLIGHT"]))
-    server = ThreadingHTTPServer(("192.168.0.143", int(os.environ.get("SOVEREIGN_CORE_PORT", "8790"))), Handler)
+    # Port 9000 is the sole gateway-to-CORE flow allowed by the existing
+    # container firewall policy.  Do not add an alternate listener.
+    server = ThreadingHTTPServer(("192.168.0.143", int(os.environ.get("SOVEREIGN_CORE_PORT", "9000"))), Handler)
     server.runtime, server.token = runtime, token  # type: ignore[attr-defined]
     server.serve_forever(); return 0
 

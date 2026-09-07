@@ -10,7 +10,7 @@ class CoreClient:
     engine = "CORE-700M"
 
     def __init__(self, endpoint: str, token: str) -> None:
-        if not endpoint.startswith("http://192.168.0.143:") or len(token) < 32:
+        if endpoint != "http://192.168.0.143:9000" or len(token) < 32:
             raise ValueError("CORE client requires the private CORE endpoint and a token")
         self.endpoint, self.token = endpoint.rstrip("/"), token
 
