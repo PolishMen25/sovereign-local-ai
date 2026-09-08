@@ -445,8 +445,12 @@ class ByteBpeTokenizer:
         if len(payload) > MAXIMUM_RUNTIME_TEXT_BYTES:
             fail("text exceeds the bounded runtime tokenizer size")
         sequence = [f"{byte:02x}" for byte in payload]
+        present_pairs = set(zip(sequence, sequence[1:]))
         for left, right in self._merges:
+            if (left, right) not in present_pairs:
+                continue
             sequence = merge_sequence(sequence, (left, right), left + right)
+            present_pairs = set(zip(sequence, sequence[1:]))
 
         ids_by_token = {
             token: index

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a candidate-core tokenizer against CORE-700M without allocation."""
+"""Verify a candidate-core tokenizer against a candidate CORE model without allocation."""
 
 from __future__ import annotations
 
@@ -23,22 +23,20 @@ DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "models" / "core-700m.candidate.json
 def preflight(
     *, config_path: Path, manifest_path: Path, train_jsonl_path: Path, tokenizer_path: Path
 ) -> dict[str, Any]:
-    """Bind one 32k candidate_core artifact to the unallocated CORE config."""
+    """Bind one candidate-core artifact to the unallocated CORE config."""
 
     document, config, config_sha256 = load_core_candidate_configuration(config_path)
-    if document["name"] != "CORE-700M":
-        raise ValueError("CORE-700M tokenizer preflight requires the CORE-700M configuration")
     bundle = load_authorized_text_bundle(
         manifest_path=manifest_path,
         train_jsonl_path=train_jsonl_path,
         tokenizer_path=tokenizer_path,
     )
     if bundle.tokenizer_status != "candidate_core":
-        raise ValueError("CORE-700M tokenizer preflight requires candidate_core status")
+        raise ValueError("CORE tokenizer preflight requires candidate_core status")
     if bundle.tokenizer_vocabulary_size != config.vocabulary_size:
-        raise ValueError("candidate_core tokenizer vocabulary does not match CORE-700M")
+        raise ValueError("candidate_core tokenizer vocabulary does not match CORE")
     return {
-        "schema_version": "core-700m-tokenizer-preflight.v1",
+        "schema_version": f"{document['name'].lower()}-tokenizer-preflight.v1",
         "model_name": document["name"],
         "model_config_sha256": config_sha256,
         "model_parameters": document["parameter_count"]["total_trainable"],

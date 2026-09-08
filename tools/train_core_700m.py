@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a bounded CPU-only CORE-700M stage from candidate-core text artifacts."""
+"""Run a bounded CPU-only candidate CORE stage from candidate-core text artifacts."""
 
 from __future__ import annotations
 
@@ -24,14 +24,16 @@ from tools.train_core_mini import authorized_text_token_rows
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "models" / "core-700m.candidate.json"
 
 
-def load_preflight(path: Path, *, config_sha256: str, bundle: Any) -> dict[str, Any]:
+def load_preflight(
+    path: Path, *, model_name: str, config_sha256: str, bundle: Any
+) -> dict[str, Any]:
     try:
         receipt = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError("CORE-700M preflight receipt is unavailable") from error
-    expected = {"schema_version": "core-700m-tokenizer-preflight.v1", "model_name": "CORE-700M", "model_config_sha256": config_sha256, "tokenizer_status": "candidate_core", "tokenizer_sha256": bundle.tokenizer_sha256, "tokenizer_vocabulary_size": bundle.tokenizer_vocabulary_size, "corpus_id": bundle.corpus_id, "manifest_sha256": bundle.manifest_sha256, "train_split_sha256": bundle.train_sha256}
+        raise ValueError("CORE preflight receipt is unavailable") from error
+    expected = {"schema_version": f"{model_name.lower()}-tokenizer-preflight.v1", "model_name": model_name, "model_config_sha256": config_sha256, "tokenizer_status": "candidate_core", "tokenizer_sha256": bundle.tokenizer_sha256, "tokenizer_vocabulary_size": bundle.tokenizer_vocabulary_size, "corpus_id": bundle.corpus_id, "manifest_sha256": bundle.manifest_sha256, "train_split_sha256": bundle.train_sha256}
     if not isinstance(receipt, dict) or any(receipt.get(key) != value for key, value in expected.items()):
-        raise ValueError("CORE-700M preflight receipt does not match the authorized inputs")
+        raise ValueError("CORE preflight receipt does not match the authorized inputs")
     return receipt
 
 
@@ -42,14 +44,17 @@ def atomic_save(torch: Any, path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def metric_record(*, step: int, loss: float, tokens: int, elapsed_seconds: float, cpu_seconds: float) -> dict[str, Any]:
+def metric_record(
+    *, model_name: str = "CORE-700M", step: int, loss: float, tokens: int,
+    elapsed_seconds: float, cpu_seconds: float,
+) -> dict[str, Any]:
     """Return a content-free, measurable CPU training metric."""
     if type(step) is not int or step < 1 or type(tokens) is not int or tokens < 1:
-        raise ValueError("CORE-700M metric fields are invalid")
+        raise ValueError("CORE metric fields are invalid")
     if not all(isinstance(value, float) and value >= 0.0 for value in (loss, elapsed_seconds, cpu_seconds)):
-        raise ValueError("CORE-700M metric values are invalid")
+        raise ValueError("CORE metric values are invalid")
     return {
-        "schema_version": "core-700m-metric.v1",
+        "schema_version": f"{model_name.lower()}-metric.v1",
         "step": step,
         "loss": loss,
         "tokens": tokens,
@@ -58,39 +63,46 @@ def metric_record(*, step: int, loss: float, tokens: int, elapsed_seconds: float
     }
 
 
-def load_resume(torch: Any, path: Path, *, contract: dict[str, Any]) -> tuple[dict[str, Any], int]:
+def load_resume(
+    torch: Any, path: Path, *, model_name: str, contract: dict[str, Any]
+) -> tuple[dict[str, Any], int]:
     """Load only an exact, CPU checkpoint belonging to this run contract."""
     try:
         checkpoint = torch.load(path, map_location="cpu", weights_only=True)
     except Exception as error:
-        raise RuntimeError("CORE-700M checkpoint cannot be loaded safely") from error
+        raise RuntimeError("CORE checkpoint cannot be loaded safely") from error
     if not isinstance(checkpoint, dict) or set(checkpoint) != {
         "schema_version", "model_name", "step", "contract", "model", "optimizer"
     }:
-        raise RuntimeError("CORE-700M checkpoint envelope is incompatible")
+        raise RuntimeError("CORE checkpoint envelope is incompatible")
     if (
-        checkpoint["schema_version"] != "core-700m-checkpoint.v1"
-        or checkpoint["model_name"] != "CORE-700M"
+        checkpoint["schema_version"] != f"{model_name.lower()}-checkpoint.v1"
+        or checkpoint["model_name"] != model_name
         or checkpoint["contract"] != contract
         or type(checkpoint["step"]) is not int
         or not 1 <= checkpoint["step"] < 10_000
     ):
-        raise RuntimeError("CORE-700M checkpoint contract is incompatible")
+        raise RuntimeError("CORE checkpoint contract is incompatible")
     if not isinstance(checkpoint["model"], dict) or not isinstance(checkpoint["optimizer"], dict):
-        raise RuntimeError("CORE-700M checkpoint state is incomplete")
+        raise RuntimeError("CORE checkpoint state is incomplete")
     return checkpoint, checkpoint["step"]
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
-    if not 1 <= args.steps <= 10_000 or not 1 <= args.batch_size <= 8 or not 2 <= args.sequence_length <= 256:
-        raise ValueError("CORE-700M run limits are invalid")
+    if not 1 <= args.steps <= 10_000 or not 1 <= args.batch_size <= 8 or not 2 <= args.sequence_length <= 512:
+        raise ValueError("CORE run limits are invalid")
     document, config, config_sha256 = load_core_candidate_configuration(args.config)
-    if document["name"] != "CORE-700M":
-        raise ValueError("CORE-700M runner requires the CORE-700M configuration")
+    if document["name"] != args.model_name:
+        raise ValueError("CORE runner model name does not match the configuration")
     bundle = load_authorized_text_bundle(manifest_path=args.manifest, train_jsonl_path=args.train_jsonl, tokenizer_path=args.tokenizer)
     if bundle.tokenizer_status != "candidate_core" or bundle.tokenizer_vocabulary_size != config.vocabulary_size:
-        raise ValueError("CORE-700M requires its exact candidate_core tokenizer")
-    load_preflight(args.preflight_json, config_sha256=config_sha256, bundle=bundle)
+        raise ValueError("CORE requires its exact candidate_core tokenizer")
+    load_preflight(
+        args.preflight_json,
+        model_name=args.model_name,
+        config_sha256=config_sha256,
+        bundle=bundle,
+    )
     torch = require_cpu_torch()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
@@ -100,15 +112,17 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     contract = {"config_sha256": config_sha256, "manifest_sha256": bundle.manifest_sha256, "train_split_sha256": bundle.train_sha256, "tokenizer_sha256": bundle.tokenizer_sha256, "preflight_sha256": hashlib.sha256(args.preflight_json.read_bytes()).hexdigest(), "batch_size": args.batch_size, "sequence_length": args.sequence_length, "threads": args.threads, "seed": args.seed}
     start_step = 0
     if args.resume is not None:
-        checkpoint, start_step = load_resume(torch, args.resume, contract=contract)
+        checkpoint, start_step = load_resume(
+            torch, args.resume, model_name=args.model_name, contract=contract
+        )
         model.load_state_dict(checkpoint["model"], strict=True)
         optimizer.load_state_dict(checkpoint["optimizer"])
     if start_step + args.steps > 10_000:
-        raise ValueError("CORE-700M total step limit is exceeded")
+        raise ValueError("CORE total step limit is exceeded")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = args.output_dir / "metrics.jsonl"
     if args.resume is None and metrics_path.exists():
-        raise ValueError("CORE-700M metrics already exist; use --resume")
+        raise ValueError("CORE metrics already exist; use --resume")
     stage_started = time.perf_counter()
     stage_cpu_started = time.process_time()
     with metrics_path.open("a", encoding="utf-8") as metrics:
@@ -123,6 +137,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             loss.backward()
             optimizer.step()
             metrics.write(json.dumps(metric_record(
+                model_name=args.model_name,
                 step=step + 1,
                 loss=float(loss.detach()),
                 tokens=args.batch_size * args.sequence_length,
@@ -131,14 +146,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             ), sort_keys=True) + "\n")
             metrics.flush()
     final_step = start_step + args.steps
-    checkpoint = args.output_dir / f"core-700m-step-{final_step:06d}.pt"
-    atomic_save(torch, checkpoint, {"schema_version": "core-700m-checkpoint.v1", "model_name": document["name"], "step": final_step, "contract": contract, "model": model.state_dict(), "optimizer": optimizer.state_dict()})
+    checkpoint = args.output_dir / f"{args.model_name.lower()}-step-{final_step:06d}.pt"
+    atomic_save(torch, checkpoint, {"schema_version": f"{args.model_name.lower()}-checkpoint.v1", "model_name": document["name"], "step": final_step, "contract": contract, "model": model.state_dict(), "optimizer": optimizer.state_dict()})
     return {"checkpoint": str(checkpoint), "metrics": str(metrics_path), "steps": final_step}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument("--model-name", default="CORE-700M")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--train-jsonl", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
@@ -155,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         print(json.dumps(run(args), sort_keys=True))
     except (OSError, ValueError, RuntimeError) as error:
-        print(f"CORE-700M training refused: {error}", file=sys.stderr)
+        print(f"CORE training refused: {error}", file=sys.stderr)
         return 1
     return 0
 

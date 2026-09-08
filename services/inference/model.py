@@ -13,6 +13,9 @@ from typing import Any
 from tools.count_core_parameters import CoreConfig, count_parameters
 
 
+EMBEDDING_INITIALIZATION_STD = 0.02
+
+
 def validate_cpu_torch(torch: Any) -> Any:
     """Return *torch* only when it is an explicitly CPU-only build.
 
@@ -145,6 +148,11 @@ def build_model(torch: Any, config: CoreConfig) -> Any:
             super().__init__()
             self.token_embeddings = nn.Embedding(
                 config.vocabulary_size, config.hidden_size, device="cpu"
+            )
+            nn.init.normal_(
+                self.token_embeddings.weight,
+                mean=0.0,
+                std=EMBEDDING_INITIALIZATION_STD,
             )
             self.blocks = nn.ModuleList(
                 DecoderBlock() for _ in range(config.num_hidden_layers)

@@ -26,6 +26,12 @@ class Core700RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             metric_record(step=0, loss=1.0, tokens=1, elapsed_seconds=0.0, cpu_seconds=0.0)
 
+        core_30_metric = metric_record(
+            model_name="CORE-30M", step=2, loss=1.5, tokens=64,
+            elapsed_seconds=2.0, cpu_seconds=1.0,
+        )
+        self.assertEqual("core-30m-metric.v1", core_30_metric["schema_version"])
+
     def test_matching_preflight_is_required(self) -> None:
         candidate = bundle()
         receipt = {
@@ -44,10 +50,10 @@ class Core700RunnerTests(unittest.TestCase):
         try:
             path = directory / "preflight.json"
             path.write_text(json.dumps(receipt), encoding="utf-8")
-            self.assertEqual(load_preflight(path, config_sha256="d" * 64, bundle=candidate)["model_name"], "CORE-700M")
+            self.assertEqual(load_preflight(path, model_name="CORE-700M", config_sha256="d" * 64, bundle=candidate)["model_name"], "CORE-700M")
             receipt["tokenizer_status"] = "experimental"
             path.write_text(json.dumps(receipt), encoding="utf-8")
             with self.assertRaises(ValueError):
-                load_preflight(path, config_sha256="d" * 64, bundle=candidate)
+                load_preflight(path, model_name="CORE-700M", config_sha256="d" * 64, bundle=candidate)
         finally:
             shutil.rmtree(directory)

@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 import unittest
 
-from services.inference.model import build_model, validate_cpu_torch
+from services.inference.model import EMBEDDING_INITIALIZATION_STD, build_model, validate_cpu_torch
 from tools.count_core_parameters import CoreConfig
 from tools.train_core_mini import build_model as training_build_model
 
@@ -36,6 +36,9 @@ class CoreModelBoundaryTests(unittest.TestCase):
 
     def test_training_uses_the_shared_builder(self) -> None:
         self.assertIs(training_build_model, build_model)
+
+    def test_embedding_initialization_scale_is_explicit_and_stable(self) -> None:
+        self.assertEqual(EMBEDDING_INITIALIZATION_STD, 0.02)
 
     def test_shared_builder_rejects_untied_embeddings_before_allocation(self) -> None:
         config = CoreConfig(

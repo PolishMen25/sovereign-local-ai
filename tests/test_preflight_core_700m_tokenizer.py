@@ -8,6 +8,7 @@ from tools.preflight_core_700m_tokenizer import preflight
 
 ROOT = Path(__file__).parents[1]
 CONFIG = ROOT / "configs" / "models" / "core-700m.candidate.json"
+CORE_30_CONFIG = ROOT / "configs" / "models" / "core-30m.candidate.json"
 
 
 def bundle(*, status: str = "candidate_core", vocabulary: int = 32000):
@@ -35,6 +36,20 @@ class Core700TokenizerPreflightTests(unittest.TestCase):
         self.assertEqual(result["model_name"], "CORE-700M")
         self.assertEqual(result["model_parameters"], 691_160_320)
         self.assertEqual(result["tokenizer_status"], "candidate_core")
+
+    def test_core_30m_uses_a_distinct_receipt_schema(self) -> None:
+        with patch(
+            "tools.preflight_core_700m_tokenizer.load_authorized_text_bundle", return_value=bundle()
+        ):
+            result = preflight(
+                config_path=CORE_30_CONFIG,
+                manifest_path=Path("manifest.json"),
+                train_jsonl_path=Path("train.jsonl"),
+                tokenizer_path=Path("tokenizer.json"),
+            )
+        self.assertEqual(result["model_name"], "CORE-30M")
+        self.assertEqual(result["model_parameters"], 29_990_784)
+        self.assertEqual(result["schema_version"], "core-30m-tokenizer-preflight.v1")
 
     def test_invalid_manifest_bundle_refuses_preflight(self) -> None:
         with self.assertRaisesRegex(ValueError, "license"), patch(

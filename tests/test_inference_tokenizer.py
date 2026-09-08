@@ -75,6 +75,26 @@ class InferenceTokenizerTests(unittest.TestCase):
         self.assertEqual(tokenizer.encode("abc"), [4 + 257])
         self.assertEqual(tokenizer.decode([4 + 257]), "abc")
 
+    def test_encoder_skips_absent_merges_without_changing_output(self) -> None:
+        tokens = list(canonical_byte_tokens()) + ["6162", "fffe", "616263"]
+        document = {
+            "schema_version": "0.2.0",
+            "status": "experimental",
+            "algorithm": "byte_bpe",
+            "training_corpus_id": "corpus-absent-merge",
+            "training_corpus_sha256": "c" * 64,
+            "input_encoding": "utf-8",
+            "normalization_policy_id": "unicode-nfc-v1",
+            "special_tokens": ["<pad>", "<bos>", "<eos>", "<unk>"],
+            "tokens_hex": tokens,
+            "merges": [["61", "62"], ["ff", "fe"], ["6162", "63"]],
+            "vocabulary_size": 4 + len(tokens),
+            "minimum_frequency": 2,
+            "maximum_token_bytes": 64,
+        }
+        tokenizer = ByteBpeTokenizer.from_document(document)
+        self.assertEqual(tokenizer.encode("abc"), [4 + 258])
+
     def test_mutating_source_document_does_not_mutate_runtime(self) -> None:
         document = artifact()
         tokenizer = ByteBpeTokenizer.from_document(document)
