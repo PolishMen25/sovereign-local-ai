@@ -11,7 +11,7 @@ from services.inference.tokenizer import (
     promote_to_candidate_core,
     train_byte_bpe,
 )
-from tools.authorized_text_bundle import load_authorized_text_bundle
+from tools.authorized_text_bundle import MAXIMUM_TRAIN_BYTES, load_authorized_text_bundle
 
 
 @contextmanager
@@ -147,6 +147,9 @@ def write_inputs(
 
 
 class AuthorizedTextBundleTests(unittest.TestCase):
+    def test_train_split_limit_covers_the_verified_pilote_v3_split(self) -> None:
+        self.assertEqual(MAXIMUM_TRAIN_BYTES, 512 * 1024 * 1024)
+
     def test_loads_only_authorized_train_and_binds_content_free_lineage(self) -> None:
         train = record("train-1", "Bonjour depuis Lyon.")
         manifest, tokenizer, _, _, _ = build_documents(train)
