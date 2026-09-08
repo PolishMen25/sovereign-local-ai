@@ -118,4 +118,12 @@ class LocalInferenceRuntime:
                     break
                 ids.append(token_id)
                 output.append(token_id)
-        return {"engine": self.model_name, "experimental": True, "answer": self._tokenizer.decode(output), "seed": seed}
+        answer = self._tokenizer.decode(output)
+        # A 20-step checkpoint can be mechanically loadable yet collapse into
+        # one repeated token.  Refuse that output instead of showing gibberish
+        # as if it were an answer.
+        if len(answer) >= 16:
+            for width in (1, 2, 3, 4, 5, 6, 8):
+                if len(answer) >= width * 4 and answer == answer[:width] * (len(answer) // width) + answer[: len(answer) % width]:
+                    raise InferenceUnavailable("CORE quality gate refused repetitive output")
+        return {"engine": self.model_name, "experimental": True, "answer": answer, "seed": seed}

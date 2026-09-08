@@ -33,7 +33,9 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict) or set(payload) != {"prompt", "max_new_tokens", "seed"}: raise ValueError
             result = self.server.runtime.generate(payload["prompt"], max_new_tokens=payload["max_new_tokens"], seed=payload["seed"])  # type: ignore[attr-defined]
         except (ValueError, TypeError): self._send(422, {"error": "invalid_request"}); return
-        except InferenceUnavailable as failure: self._send(503, {"error": "checkpoint_refused", "detail": str(failure)}); return
+        except InferenceUnavailable as failure:
+            code = "quality_gate_failed" if "quality gate" in str(failure) else "checkpoint_refused"
+            self._send(503, {"error": code, "detail": str(failure)}); return
         except RuntimeError: self._send(503, {"error": "runtime_unavailable"}); return
         self._send(200, result)
 

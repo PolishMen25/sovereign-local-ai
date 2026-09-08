@@ -15,6 +15,7 @@
     busy: "L’assistant répond déjà à une demande. Réessayez dans un instant.",
     runtime_unavailable: "Le moteur local est indisponible. Votre historique reste accessible.",
     generation_failed: "Le moteur local n’a pas terminé sa réponse.",
+    quality_gate_failed: "CORE-700M est encore en entraînement : sa sortie a été refusée car elle n’est pas exploitable. Sélectionnez BOOTSTRAP pour obtenir une réponse claire.",
     unknown_profile: "Ce profil d’assistant n’est pas disponible.",
   };
 
