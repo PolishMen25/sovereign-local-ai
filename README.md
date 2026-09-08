@@ -2,7 +2,7 @@
 
 Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du propriétaire. La V1 vise un modèle de langage créé localement, `CORE-700M`, un RAG traçable, des agents logiques et une séparation stricte entre ingestion externe et connaissances internes, sans donner d'accès Internet à IA-CORE. Deux services MCP distincts constituent l'option candidate actuelle, encore soumise à audit.
 
-> État au 2026-09-08 : **socle expérimental contrôlé**. L'interface privée et le moteur BOOTSTRAP sont utilisables ; CORE-700M, le corpus et les composants de connaissance restent soumis à des gates explicites. Ce dépôt ne prétend pas encore fournir une plateforme de production.
+> État au 2026-09-08 : **socle expérimental contrôlé**. L'interface privée et le moteur BOOTSTRAP sont utilisables ; CORE-700M, le corpus et les composants de connaissance restent soumis à des gates explicites. Ce dépôt ne prétend pas encore fournir une plateforme de production. La reprise technique par un autre agent est décrite dans le [handoff public](docs/project/claude-code-handoff.md), sans exposer de détail d'accès.
 
 > **Utilisation actuelle : l'interface privée sert le moteur BOOTSTRAP par
 > défaut.** Il fournit les réponses exploitables. CORE-700M est également

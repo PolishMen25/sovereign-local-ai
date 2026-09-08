@@ -8,6 +8,86 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 `docs/project/current-capabilities.md`, `docs/architecture/overview.md` et
 `docs/security/threat-model.md`.
 
+## Mise à jour consolidée — 2026-09-08
+
+Cette section **remplace les instantanés historiques plus bas dans ce fichier**.
+Ils sont conservés uniquement pour la traçabilité de la tranche du 7 septembre.
+
+### Point de départ
+
+- dépôt : `PolishMen25/sovereign-local-ai` ; branche de travail :
+  `codex/cpu-offline-harness` ;
+- actualiser le HEAD distant et vérifier le diff avant toute modification ;
+- les déploiements sont des archives versionnées : préparer, tester, committer
+  puis déployer une archive vérifiée ; ne jamais modifier directement une
+  release installée ;
+- aucun secret, artefact réel, checkpoint, corpus, identifiant ou détail
+  d'exploitation privé ne doit rejoindre Git.
+
+### État vérifié et limites
+
+- l'interface privée, l'authentification et BOOTSTRAP fonctionnent ; BOOTSTRAP
+  reste le moteur par défaut et le seul chat présenté comme exploitable ;
+- CORE-700M est raccordé en expérimental. Ses premiers paliers démontrent
+  chargement, génération bornée, checkpoint et reprise, mais pas une qualité
+  linguistique : il ne doit jamais être présenté comme assistant utile ;
+- le candidat CORE-30M compte 29 990 784 paramètres. Il permet de valider un
+  apprentissage adapté au corpus disponible avant toute promesse sur CORE-700M ;
+- les correctifs d'initialisation des embeddings et d'encodage BPE sont dans
+  `ccb7c7f`, avec tests. Le runner accepte explicitement son nom de modèle et
+  sa configuration, sans confondre CORE-30M et CORE-700M ;
+- le tokenizer pilote 32k, le manifeste et le split pilote-v3 sont liés par
+  empreintes et préflight ;
+- le catalogue FR/EN est acquis uniquement en RAW. Il dépasse le pilote initial
+  et contient trop peu de français pour être présenté comme corpus final ;
+- mémoire SQLite, index lexical RAG, exports/suppressions de conversation et
+  sauvegardes durables existent. RAG sémantique, agents actifs et RBAC final
+  ne sont pas terminés ;
+- sur cette lignée, la suite complète compte 249 tests verts et un ignoré.
+
+### Invariants à préserver
+
+- CPU-only ; aucun CUDA, ROCm, GPU ou TPU ; IA-CORE sans Internet ;
+- RAW, quarantaine et VALIDATED restent séparés, sans promotion automatique ;
+- les conversations assainies ne deviennent jamais des poids sans manifeste
+  validé et empreintes ;
+- `CC-BY-4.0` et `Etalab-2.0` sont admises avec attribution/provenance ;
+  `CC-BY-SA`, `CC-BY-NC` et `CC-BY-ND` restent refusées ;
+- MCP n'expose ni shell, ni chemin arbitraire, ni accès réseau arbitraire ;
+  une sortie du modèle ne s'auto-confirme jamais pour une action durable.
+
+### Calculs autonomes et reprise sûre
+
+Avant toute action, détecter les calculs autonomes et les laisser finir. Ne
+jamais interrompre un entraînement actif pour une opération de confort. Les
+checkpoints sont nommés sans collision, archivés seulement si la destination
+n'existe pas, puis relus et comparés par SHA-256 côté source et destination ;
+la copie source est toujours conservée.
+
+Le relevé du 8 septembre indique une lignée CORE-700M autonome ayant produit
+un checkpoint durable à l'étape 1 000 et une lignée CORE-30M reprenant l'étape
+110 vers 1 110 avec un archivage serveur vérifié en attente. Ce sont des
+données opérationnelles volatiles : les recontrôler en direct, sans les
+présenter comme mesure de qualité ou de durée.
+
+### Ordre de travail
+
+1. Observer les entraînements actifs ; à leur fin, contrôler métriques,
+   checkpoint et restauration avant tout palier suivant.
+2. Construire une évaluation versionnée pour CORE-30M ; distinguer perte,
+   stabilité et qualité linguistique.
+3. Préparer un corpus français-technique additionnel avec licence, provenance,
+   empreintes et mesure FR/EN ; aucune promotion sans validation propriétaire.
+4. Étendre le RAG seulement à des paquets VALIDATED avec provenance et test de
+   restauration ; ne jamais indexer RAW ou les conversations par défaut.
+5. N'activer un profil ou un outil que lorsque sa politique, ses limites,
+   son audit et sa confirmation humaine sont testés.
+
+En attendant un palier, un agent peut améliorer les tests, la documentation,
+les runbooks, les vérifications de sauvegarde et la grille d'évaluation. Il ne
+peut ni entraîner sans contrat validé, ni contourner un préflight, ni écraser
+un checkpoint, ni acquérir/promouvoir implicitement du contenu.
+
 ## Branche de travail
 
 - dépôt : `PolishMen25/sovereign-local-ai` ;
