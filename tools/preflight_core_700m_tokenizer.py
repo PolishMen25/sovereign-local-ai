@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from services.inference.configuration import load_core_candidate_configuration
 from tools.authorized_text_bundle import load_authorized_text_bundle
+from tools.verify_corpus_approval import verify_corpus_approval
 
 
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "models" / "core-700m.candidate.json"
@@ -25,6 +26,7 @@ def preflight(
 ) -> dict[str, Any]:
     """Bind one 32k candidate_core artifact to the unallocated CORE config."""
 
+    verify_corpus_approval()
     document, config, config_sha256 = load_core_candidate_configuration(config_path)
     if document["name"] != "CORE-700M":
         raise ValueError("CORE-700M tokenizer preflight requires the CORE-700M configuration")

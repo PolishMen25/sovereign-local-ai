@@ -1,5 +1,41 @@
 # Gate corpus et tokenizer
 
+## Approbation propriétaire obligatoire du catalogue candidat
+
+Le catalogue candidat n'est jamais une approbation. Seul le propriétaire peut
+créer et commiter sur la PR le fichier
+`configs/corpus/core-v1-source-policy.approved.json`. Ce geste est la décision
+humaine traçable : une conversation, une sortie de modèle, un message ou un
+outil ne peut ni créer ni simuler cette approbation.
+
+Le fichier est volontairement absent du dépôt tant que le propriétaire ne
+l'ajoute pas lui-même. Son schéma est le suivant : les `sources` reprennent à
+l'identique chaque entrée du candidat, à l'exception du `sha256` remplacé par
+l'empreinte réelle de l'archive reçue. `candidate_policy_commit` identifie le
+commit du catalogue approuvé.
+
+```jsonc
+{
+  "approved_by": "owner identifier", // propriétaire qui décide
+  "approved_at": "2026-09-08T12:00:00Z", // date ISO-8601 de la décision
+  "candidate_policy_commit": "bf690bd", // commit exact du catalogue candidat
+  "sources": [
+    {
+      // copie exacte d'une source du candidat ; aucun ajout, retrait ou changement
+      "name": "Example source",
+      "url": "https://example.invalid/repository",
+      "license_detected": "MIT",
+      "sha256": "64 hexadecimal characters from the received archive"
+    }
+  ]
+}
+```
+
+`tools/verify_corpus_approval.py` compare cette liste au candidat, refuse une
+approbation absente, une empreinte `pending`/`unverified`, une licence hors
+allowlist ou une divergence de source. `tools/preflight_core_700m_tokenizer.py`
+appelle ce vérificateur avant toute autre opération et n'offre aucun bypass.
+
 **Statut : corpus initial approuvé ; tokenizer 32k en promotion contrôlée.**
 
 Ce projet ne lance pas d'entraînement linguistique tant qu'un corpus, son
