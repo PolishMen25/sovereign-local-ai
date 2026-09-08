@@ -87,10 +87,10 @@ class LocalInferenceRuntime:
             checkpoint = torch.load(self.weights_path, map_location="cpu", weights_only=True)
         except Exception as error:
             raise InferenceUnavailable("CORE checkpoint cannot be loaded safely") from error
-        if not isinstance(checkpoint, dict) or set(checkpoint) != {"schema_version", "model_name", "step", "contract", "model", "optimizer"}:
+        if not isinstance(checkpoint, dict) or set(checkpoint) not in ({"schema_version", "model_name", "step", "contract", "model"}, {"schema_version", "model_name", "step", "contract", "model", "optimizer"}):
             raise InferenceUnavailable("CORE checkpoint envelope is incompatible")
         contract = checkpoint.get("contract")
-        if checkpoint.get("schema_version") != "core-700m-checkpoint.v1" or checkpoint.get("model_name") != self.model_name or not isinstance(contract, dict) or any(contract.get(key) != value for key, value in expected.items()) or not isinstance(checkpoint.get("model"), dict):
+        if checkpoint.get("schema_version") not in {"core-700m-checkpoint.v1", "core-700m-inference-checkpoint.v1"} or checkpoint.get("model_name") != self.model_name or not isinstance(contract, dict) or any(contract.get(key) != value for key, value in expected.items()) or not isinstance(checkpoint.get("model"), dict):
             raise InferenceUnavailable("CORE checkpoint provenance is incompatible")
         model = build_model(torch, config)
         try:
