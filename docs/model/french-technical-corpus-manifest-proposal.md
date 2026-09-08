@@ -1,7 +1,17 @@
 # Proposition de manifeste — corpus français-technique
 
-Statut : **brouillon non exécutable**. Aucune source listée ici n'a été
-téléchargée, acquise, copiée dans `RAW` ou promue dans `VALIDATED`.
+Statut : **candidat non approuvé**. Les dix archives du catalogue ont été
+acquises en `RAW` le 2026-09-08 ; aucune n'a été promue dans `VALIDATED`.
+
+## Mesure RAW 2026-09-08
+
+- 10 archives GitHub figées, 169 470 351 octets RAW et SHA-256 par paquet ;
+- 75 228 fichiers texte admissibles et 48 256 fichiers exclus ;
+- 97 396 860 tokens estimés, dont 406 893 français (0,417768 %) ;
+- ce résultat dépasse le pilote de 10 M tokens : aucun entraînement ni
+  promotion ne peut partir avant un sous-échantillonnage approuvé ;
+- reçu durable :
+  `/volume1/sovereign-ai-secure/raw/corpus-v1-acquisition-20260908.receipt.json`.
 
 ## Cible
 
@@ -11,7 +21,7 @@ le corpus anglais technique initial lié au tokenizer `candidate_core` actuel.
 
 ## Contrat proposé pour chaque paquet
 
-Avant toute acquisition, chaque paquet doit disposer dans un manifeste signé
+Avant toute promotion, chaque paquet doit disposer dans un manifeste signé
 par le propriétaire des champs suivants :
 
 - identifiant stable, URL exacte et date de récupération ;
