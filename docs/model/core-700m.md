@@ -61,3 +61,12 @@ ses propres sorties. Les seuils d'activation, l'isolation, les plafonds de
 données synthétiques et le passage obligatoire par le gate corpus sont définis
 dans [la spécification de boucle](self-training-loop-spec.md). CORE-MINI doit
 valider cette chaîne avant toute adaptation de budget à CORE-700M.
+
+## Évaluation avant toute utilité déclarée
+
+La perte, le débit et l'existence d'un checkpoint ne sont pas des preuves de
+qualité conversationnelle. La grille proposée pour commencer par CORE-30M puis
+être réutilisée par CORE-700M sépare intégrité mécanique, lecture bilingue et
+code vérifié de l'extérieur. Elle reste non approuvée tant que le propriétaire
+n'a pas fixé le jeu et les seuils : voir la
+[proposition d'évaluation CORE-30M](core-30m-evaluation-proposal.md).
