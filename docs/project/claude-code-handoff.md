@@ -103,6 +103,8 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
   pour l'état CORE ;
 - `1758172` : réponses BOOTSTRAP progressives via le flux local SSE.
 - `4362468` : état content-free de l'index lexical affiché dans le chat.
+- `64ae6f0` : proposition E0/E1/E2 qui sépare intégrité, qualité bilingue et
+  code vérifié avant toute utilité déclarée pour CORE.
 
 ## Branche de travail
 
