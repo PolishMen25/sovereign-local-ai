@@ -28,6 +28,12 @@ Ils sont conservés uniquement pour la traçabilité de la tranche du 7 septembr
 
 - l'interface privée, l'authentification et BOOTSTRAP fonctionnent ; BOOTSTRAP
   reste le moteur par défaut et le seul chat présenté comme exploitable ;
+- l'interface vérifie la santé locale de BOOTSTRAP avant de l'activer. Elle ne
+  bascule jamais automatiquement vers CORE-700M si BOOTSTRAP est indisponible ;
+  l'utilisateur doit choisir explicitement CORE pour un essai expérimental ;
+- BOOTSTRAP transmet maintenant ses réponses locales progressivement à
+  l'interface. Ce flux ne sort pas de la machine et une interruption conserve
+  le message utilisateur dans l'historique sans inventer de réponse assistant ;
 - CORE-700M est raccordé en expérimental. Ses premiers paliers démontrent
   chargement, génération bornée, checkpoint et reprise, mais pas une qualité
   linguistique : il ne doit jamais être présenté comme assistant utile ;
@@ -43,7 +49,7 @@ Ils sont conservés uniquement pour la traçabilité de la tranche du 7 septembr
 - mémoire SQLite, index lexical RAG, exports/suppressions de conversation et
   sauvegardes durables existent. RAG sémantique, agents actifs et RBAC final
   ne sont pas terminés ;
-- sur cette lignée, la suite complète compte 249 tests verts et un ignoré.
+- sur cette lignée, la suite complète compte 254 tests verts et un ignoré.
 
 ### Invariants à préserver
 
@@ -87,6 +93,12 @@ En attendant un palier, un agent peut améliorer les tests, la documentation,
 les runbooks, les vérifications de sauvegarde et la grille d'évaluation. Il ne
 peut ni entraîner sans contrat validé, ni contourner un préflight, ni écraser
 un checkpoint, ni acquérir/promouvoir implicitement du contenu.
+
+### Commits de cette reprise interface
+
+- `97ce24d` : disponibilité BOOTSTRAP vérifiée par l'interface et délai court
+  pour l'état CORE ;
+- `1758172` : réponses BOOTSTRAP progressives via le flux local SSE.
 
 ## Branche de travail
 
