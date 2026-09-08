@@ -145,6 +145,12 @@ class WebState:
 
     def engines(self) -> list[dict[str, Any]]:
         try:
+            bootstrap = self.runtime.status()
+            bootstrap_available = bool(bootstrap.get("available", False))
+            bootstrap_state = str(bootstrap.get("state", "unavailable"))
+        except (AttributeError, RuntimeError):
+            bootstrap_available, bootstrap_state = False, "unavailable"
+        try:
             core = self.core_runtime.status()
             available = bool(core.get("available", False)) if isinstance(core, dict) else core.generation_available
             state = core.get("state", "unavailable") if isinstance(core, dict) else core.state
@@ -153,9 +159,9 @@ class WebState:
         return [
             {
                 "engine": "BOOTSTRAP",
-                "available": True,
+                "available": bootstrap_available,
                 "selected_by_default": True,
-                "description": "Modèle local provisoire, disponible maintenant.",
+                "description": "Modèle local provisoire, disponible maintenant." if bootstrap_available else "Le moteur BOOTSTRAP est temporairement indisponible (état : " + bootstrap_state + ").",
             },
             {
                 "engine": "CORE-700M",

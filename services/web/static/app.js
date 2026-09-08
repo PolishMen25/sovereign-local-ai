@@ -27,7 +27,8 @@
 
   function engineLabel(value) {
     return value === "BOOTSTRAP" ? "BOOTSTRAP · modèle local provisoire"
-      : value === "CORE-700M" ? "CORE-700M expérimental" : "Moteur indisponible";
+      : value === "CORE-700M" ? "CORE-700M expérimental"
+        : value === "" ? "Aucun moteur vérifié" : "Moteur indisponible";
   }
 
   async function readEventStream(body, onEvent) {
@@ -128,7 +129,8 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    for (const id of ["send", "new", "history", "engine", "profile", "logout"]) q(id).disabled = busy;
+    for (const id of ["new", "history", "engine", "profile", "logout"]) q(id).disabled = busy;
+    q("send").disabled = busy || !q("engine").value;
     for (const button of q("conversations").querySelectorAll("button")) button.disabled = busy;
     q("export").disabled = busy || !state.conversation;
     q("delete").disabled = busy || !state.conversation;
@@ -277,6 +279,15 @@
     state.engines = (data.engines || []).filter((item) => item && typeof item.engine === "string" && typeof item.available === "boolean").slice(0, 8);
     if (!state.engines.length) return;
     q("engine").replaceChildren();
+    const bootstrap = state.engines.find((item) => item.engine === "BOOTSTRAP");
+    if (!bootstrap?.available) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.disabled = true;
+      option.selected = true;
+      option.textContent = "BOOTSTRAP indisponible · choisissez CORE seulement pour un test";
+      q("engine").append(option);
+    }
     for (const engine of state.engines) {
       const option = document.createElement("option");
       option.value = engine.engine;
@@ -284,9 +295,10 @@
       option.disabled = !engine.available;
       q("engine").append(option);
     }
-    const defaultEngine = state.engines.find((item) => item.selected_by_default && item.available) || state.engines.find((item) => item.available);
-    if (defaultEngine) q("engine").value = defaultEngine.engine;
+    if (bootstrap?.available) q("engine").value = "BOOTSTRAP";
     describeEngine();
+    updateEngine(q("engine").value);
+    setBusy(state.busy);
   }
 
   async function enterWorkspace(session) {
@@ -396,7 +408,11 @@
     }
   });
 
-  q("engine").addEventListener("change", describeEngine);
+  q("engine").addEventListener("change", () => {
+    describeEngine();
+    updateEngine(q("engine").value);
+    setBusy(state.busy);
+  });
 
   q("message").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {

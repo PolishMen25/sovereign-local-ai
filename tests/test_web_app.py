@@ -6,6 +6,14 @@ from services.inference.runtime import LocalInferenceRuntime
 from services.web.app import WEB_PROFILES, WebState, authorize, parse_chat, response
 
 
+class BootstrapStatus:
+    def __init__(self, available: bool) -> None:
+        self.available = available
+
+    def status(self) -> dict[str, bool | str]:
+        return {"available": self.available, "state": "ready" if self.available else "unavailable"}
+
+
 class WebAppTests(unittest.TestCase):
     def test_authorization_is_constant_time_and_requires_long_token(self) -> None:
         token = "x" * 32
@@ -55,11 +63,15 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual("lexical", response("req-123456", "coordination", "completed", "ok")["rag_mode"])
 
     def test_core_engine_is_advertised_but_not_available_without_runtime(self) -> None:
-        state = WebState(None, None, None, LocalInferenceRuntime("CORE-700M", Path("missing.pt")), None, "x" * 32)
+        state = WebState(None, None, BootstrapStatus(True), LocalInferenceRuntime("CORE-700M", Path("missing.pt")), None, "x" * 32)
         engines = state.engines()
         self.assertTrue(engines[0]["available"])
         self.assertEqual("CORE-700M", engines[1]["engine"])
         self.assertFalse(engines[1]["available"])
+
+    def test_bootstrap_is_not_advertised_when_its_health_check_fails(self) -> None:
+        state = WebState(None, None, BootstrapStatus(False), LocalInferenceRuntime("CORE-700M", Path("missing.pt")), None, "x" * 32)
+        self.assertFalse(state.engines()[0]["available"])
 
 
 if __name__ == "__main__":

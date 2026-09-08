@@ -36,6 +36,19 @@ class BootstrapClient:
         self.endpoint = validate_endpoint(endpoint)
         self.opener = opener or request.build_opener(request.ProxyHandler({}), _NoRedirect())
 
+    def status(self) -> dict[str, str | bool]:
+        """Check the loopback runtime without prompting it to generate text."""
+        outgoing = request.Request(f"{self.endpoint}/health", headers={"Accept": "application/json"})
+        try:
+            with self.opener.open(outgoing, timeout=5) as response:
+                body = response.read(16_384)
+            value = json.loads(body)
+        except (OSError, error.URLError, error.HTTPError, RuntimeError, UnicodeDecodeError, json.JSONDecodeError):
+            return {"available": False, "state": "unavailable"}
+        if not isinstance(value, dict) or value.get("status") != "ok":
+            return {"available": False, "state": "invalid_health_response"}
+        return {"available": True, "state": "ready"}
+
     def generate(self, messages: list[dict[str, str]], *, max_tokens: int = 512) -> str:
         if not isinstance(messages, list) or not 1 <= len(messages) <= 200:
             raise ValueError("message history is invalid")

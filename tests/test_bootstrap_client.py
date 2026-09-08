@@ -39,6 +39,18 @@ class BootstrapClientTests(unittest.TestCase):
         self.assertEqual("BOOTSTRAP", sent["model"])
         self.assertFalse(sent["stream"])
 
+    def test_status_uses_bounded_loopback_health_check(self) -> None:
+        opener = Opener(b'{"status":"ok"}')
+        self.assertEqual({"available": True, "state": "ready"}, BootstrapClient(opener=opener).status())
+        self.assertEqual("http://127.0.0.1:8080/health", opener.requests[0][0].full_url)
+        self.assertEqual(5, opener.requests[0][1])
+
+    def test_status_refuses_invalid_health_response(self) -> None:
+        self.assertEqual(
+            {"available": False, "state": "invalid_health_response"},
+            BootstrapClient(opener=Opener(b'{"status":"starting"}')).status(),
+        )
+
     def test_invalid_response_and_tool_roles_are_refused(self) -> None:
         with self.assertRaises(ValueError):
             BootstrapClient(opener=Opener(b"{}")).generate([{"role": "tool", "content": "x"}])
