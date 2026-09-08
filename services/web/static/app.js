@@ -26,7 +26,7 @@
 
   function engineLabel(value) {
     return value === "BOOTSTRAP" ? "BOOTSTRAP · modèle local provisoire"
-      : value === "CORE-700M" ? "CORE-700M" : "Moteur indisponible";
+      : value === "CORE-700M" ? "CORE-700M expérimental" : "Moteur indisponible";
   }
 
   async function readEventStream(body, onEvent) {

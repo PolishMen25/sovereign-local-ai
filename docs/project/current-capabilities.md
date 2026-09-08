@@ -9,8 +9,9 @@ Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
 
 Il est maintenant possible de poser une question à un modèle local depuis une
 CLI SSH ou une interface HTTPS privée de tailnet et d'obtenir une réponse
-réellement générée. Ce chat utilise le modèle tiers temporaire **BOOTSTRAP**,
-pas CORE-700M.
+réellement générée. **BOOTSTRAP** reste le choix par défaut ;
+**CORE-700M expérimental** est sélectionnable après validation mécanique de
+son checkpoint et produit une génération CPU locale.
 
 Le checkpoint CORE-MINI actuel prouve que l'entraînement CPU, la sauvegarde et
 la reprise fonctionnent. Il a appris sur des identifiants de tokens synthétiques
@@ -46,7 +47,7 @@ génère pas une réponse d'IA.
 | Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution ; deux paliers CORE-700M exécutés | Aucun service de génération CORE ; preuve d'isolation après redémarrage reste à compléter |
 | CORE-700M | Vingt étapes CPU et reprise réelle vérifiées | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé ; étapes 1 à 20 continues avec checkpoints durables aux étapes 10 et 20. Le palier initial a mesuré 5,79 tokens/s avec 4 cœurs, batch 1 et séquence 64 ; le palier 11→20 est fixé sur NUMA 0 avec ces mêmes quatre cœurs | Vingt étapes ne produisent pas un assistant ; le palier NUMA 0 est une mesure de placement unique, pas un benchmark comparatif ni une estimation de durée. Aucune évaluation linguistique ou génération CORE n'est validée |
 | Corpus / tokenizer | Candidat 32k traçable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et promotion `experimental` → `candidate_core` avec reçu | Qualité, couverture française et passage à l'échelle restent à traiter |
-| Moteur d'inférence CORE | Garde-fou inactif | Validation des entrées et refus sûr quand le runtime CORE n'est pas disponible | Aucune génération CORE validée ; BOOTSTRAP utilise un runtime séparé |
+| Moteur d'inférence CORE | Runtime expérimental CPU actif | Checkpoint d'inférence compact validé, contrat configuration/tokenizer/manifeste/préflight vérifié, API privée authentifiée sur `192.168.0.143:9000`, génération gloutonne bornée et déterministe | Vingt étapes ne constituent pas une qualité linguistique ; aucune promesse d'assistant général. Le runtime ne reçoit ni Internet ni outil arbitraire |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |
 | RAG | Recherche lexicale locale approuvée, avec gate de reconstruction | L'index SQLite/FTS5 fournit à BOOTSTRAP des extraits bornés et citations depuis quatre documents internes approuvés ; toute reconstruction exige un manifeste exact, son empreinte et une référence d'audit | Aucun moteur d'embeddings, index sémantique, conversation, RAW ou VALIDATED n'est indexé |
 | Collector de conversations | Ingress write-only fonctionnel | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
@@ -54,7 +55,7 @@ génère pas une réponse d'IA.
 | Orchestrateur | Préparation fail-closed | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution |
 | 60 profils d'agents | Configurés mais désactivés | Identifiants, permissions minimales et contrats versionnés | Tous sont `draft`; aucun agent n'est actif |
 | Mémoire conversationnelle | SQLite local actif avec sauvegarde durable | Masquage de secrets, empreintes, historique, export, suppression avec reçu sans contenu et sauvegarde SQLite vérifiée vers le NAS | Pas encore raccordée au RAG ; restauration applicative de remplacement reste manuelle |
-| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique réouvrable, export, suppression et `/v1/chat` réel vers llama.cpp ; BOOTSTRAP est explicite et le sélecteur prépare CORE-700M sans l’activer prématurément | Le sélecteur CORE reste bloqué tant qu’un runtime de génération et ses contrôles ne sont pas validés |
+| Interface Web du projet | Passerelle installée et active derrière le HTTPS privé | Première configuration, login, CSRF, historique réouvrable, export, suppression et `/v1/chat` vers llama.cpp ou CORE ; le sélecteur marque en permanence CORE-700M comme expérimental et conserve le moteur utilisé | CORE reste expérimental et BOOTSTRAP demeure la valeur par défaut |
 | Authentification/RBAC | Argon2id et sessions déployés | Secret propriétaire créé dans le navigateur, jetons de session hachés, cookie sécurisé et CSRF | Compte propriétaire pas encore initialisé ; politiques des agents non raccordées |
 
 ## Vérifications confirmées
