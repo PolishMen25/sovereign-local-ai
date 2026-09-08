@@ -49,6 +49,9 @@ Ils sont conservés uniquement pour la traçabilité de la tranche du 7 septembr
 - mémoire SQLite, index lexical RAG, exports/suppressions de conversation et
   sauvegardes durables existent. RAG sémantique, agents actifs et RBAC final
   ne sont pas terminés ;
+- l'interface expose un état RAG sans contenu : au relevé, l'index lexical
+  contenait quatre documents VALIDATED. Cet état ne rend ni RAW ni les
+  conversations consultables par le RAG ;
 - sur cette lignée, la suite complète compte 254 tests verts et un ignoré.
 
 ### Invariants à préserver
@@ -99,6 +102,7 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
 - `97ce24d` : disponibilité BOOTSTRAP vérifiée par l'interface et délai court
   pour l'état CORE ;
 - `1758172` : réponses BOOTSTRAP progressives via le flux local SSE.
+- `4362468` : état content-free de l'index lexical affiché dans le chat.
 
 ## Branche de travail
 
