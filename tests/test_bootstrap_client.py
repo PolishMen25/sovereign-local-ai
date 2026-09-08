@@ -51,6 +51,27 @@ class BootstrapClientTests(unittest.TestCase):
             BootstrapClient(opener=Opener(b'{"status":"starting"}')).status(),
         )
 
+    def test_stream_yields_only_valid_text_deltas_and_requires_done(self) -> None:
+        payload = b"\n".join(
+            [
+                b'data: {"choices":[{"delta":{"role":"assistant"}}]}',
+                b'data: {"choices":[{"delta":{"content":null}}]}',
+                b'data: {"choices":[{"delta":{"content":"Bon"}}]}',
+                b'data: {"choices":[{"delta":{"content":"jour"}}]}',
+                b"data: [DONE]",
+                b"",
+            ]
+        )
+        opener = Opener(payload)
+        self.assertEqual(["Bon", "jour"], list(BootstrapClient(opener=opener).stream([{"role": "user", "content": "Bonjour"}])))
+        sent = json.loads(opener.requests[0][0].data)
+        self.assertTrue(sent["stream"])
+
+    def test_stream_refuses_a_response_without_done_marker(self) -> None:
+        payload = b'data: {"choices":[{"delta":{"content":"incomplet"}}]}\n'
+        with self.assertRaises(RuntimeError):
+            list(BootstrapClient(opener=Opener(payload)).stream([{"role": "user", "content": "Bonjour"}]))
+
     def test_invalid_response_and_tool_roles_are_refused(self) -> None:
         with self.assertRaises(ValueError):
             BootstrapClient(opener=Opener(b"{}")).generate([{"role": "tool", "content": "x"}])

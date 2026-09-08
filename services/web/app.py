@@ -196,17 +196,26 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.send_bytes(status, encoded, "application/json; charset=utf-8", extra_headers=extra_headers)
 
+    def begin_event_stream(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+    def send_event(self, event: str, payload: dict[str, Any]) -> None:
+        encoded = f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n".encode("utf-8")
+        self.wfile.write(encoded)
+        self.wfile.flush()
+
     def send_event_stream(self, events: list[tuple[str, dict[str, Any]]]) -> None:
-        payload = b"".join(
-            f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False, separators=(',', ':'))}\n\n".encode("utf-8")
-            for event, data in events
-        )
-        self.send_bytes(
-            200,
-            payload,
-            "text/event-stream; charset=utf-8",
-            extra_headers={"X-Accel-Buffering": "no"},
-        )
+        self.begin_event_stream()
+        for event, payload in events:
+            self.send_event(event, payload)
 
     def read_json(self) -> dict[str, Any]:
         if self.headers.get_content_type() != "application/json":
@@ -369,6 +378,24 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                     }
                 )
             messages.extend({"role": item["role"], "content": item["content"]} for item in history if item["role"] in {"user", "assistant"})
+            if requested_engine == "BOOTSTRAP" and "text/event-stream" in self.headers.get("Accept", ""):
+                self.begin_event_stream()
+                self.send_event("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "lexical"})
+                try:
+                    chunks: list[str] = []
+                    for chunk in self.state.runtime.stream(messages):
+                        chunks.append(chunk)
+                        self.send_event("delta", {"delta": chunk})
+                    answer = "".join(chunks)
+                    self.state.memory.append_message(conversation_id, role="assistant", content=answer)
+                except RuntimeError:
+                    payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "error", "Le moteur local demandé est indisponible ou son flux a été interrompu.", engine="BOOTSTRAP", conversation_id=conversation_id)
+                    payload["error"] = "runtime_unavailable"
+                    self.send_event("error", payload)
+                    return
+                payload = response(request_value["request_id"], request_value.get("profile_id", "coordination"), "completed", answer, engine="BOOTSTRAP", conversation_id=conversation_id, citations=citations)
+                self.send_event("completed", payload)
+                return
             if requested_engine == "CORE-700M":
                 answer = self.state.core_runtime.generate(request_value["message"])
                 selected_engine = "CORE-700M"

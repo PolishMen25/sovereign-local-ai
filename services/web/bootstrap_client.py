@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from typing import Any
 from urllib import error, request
 from urllib.parse import urlsplit
@@ -49,7 +50,7 @@ class BootstrapClient:
             return {"available": False, "state": "invalid_health_response"}
         return {"available": True, "state": "ready"}
 
-    def generate(self, messages: list[dict[str, str]], *, max_tokens: int = 512) -> str:
+    def _payload(self, messages: list[dict[str, str]], max_tokens: int, *, stream: bool) -> bytes:
         if not isinstance(messages, list) or not 1 <= len(messages) <= 200:
             raise ValueError("message history is invalid")
         for message in messages:
@@ -61,17 +62,20 @@ class BootstrapClient:
                 raise ValueError("message content is invalid")
         if not isinstance(max_tokens, int) or not 1 <= max_tokens <= 2_048:
             raise ValueError("max_tokens is invalid")
-        payload = json.dumps(
+        return json.dumps(
             {
                 "model": "BOOTSTRAP",
                 "messages": messages,
                 "temperature": 0.3,
                 "max_tokens": max_tokens,
-                "stream": False,
+                "stream": stream,
             },
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
+
+    def generate(self, messages: list[dict[str, str]], *, max_tokens: int = 512) -> str:
+        payload = self._payload(messages, max_tokens, stream=False)
         outgoing = request.Request(
             f"{self.endpoint}/v1/chat/completions",
             data=payload,
@@ -93,4 +97,50 @@ class BootstrapClient:
         if not isinstance(answer, str) or not 1 <= len(answer) <= 120_000:
             raise RuntimeError("bootstrap answer is invalid")
         return answer
+
+    def stream(self, messages: list[dict[str, str]], *, max_tokens: int = 512) -> Iterator[str]:
+        """Yield bounded text chunks from the loopback-only OpenAI-compatible SSE API."""
+        payload = self._payload(messages, max_tokens, stream=True)
+        outgoing = request.Request(
+            f"{self.endpoint}/v1/chat/completions",
+            data=payload,
+            method="POST",
+            headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+        )
+        total = 0
+        completed = False
+        try:
+            with self.opener.open(outgoing, timeout=180) as response:
+                for raw_line in response:
+                    try:
+                        line = raw_line.decode("utf-8").strip()
+                    except UnicodeDecodeError as failure:
+                        raise RuntimeError("bootstrap stream is not UTF-8") from failure
+                    if not line or line.startswith(":"):
+                        continue
+                    if not line.startswith("data:"):
+                        raise RuntimeError("bootstrap stream is malformed")
+                    data = line[5:].lstrip()
+                    if data == "[DONE]":
+                        completed = True
+                        break
+                    try:
+                        value = json.loads(data)
+                        delta = value["choices"][0]["delta"].get("content", "")
+                    except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError) as failure:
+                        raise RuntimeError("bootstrap stream is malformed") from failure
+                    if delta is None:
+                        continue
+                    if not isinstance(delta, str):
+                        raise RuntimeError("bootstrap stream contains an invalid delta")
+                    if not delta:
+                        continue
+                    total += len(delta)
+                    if total > 120_000:
+                        raise RuntimeError("bootstrap stream exceeds the size limit")
+                    yield delta
+        except (OSError, error.URLError, error.HTTPError, RuntimeError) as failure:
+            raise RuntimeError("bootstrap runtime is unavailable") from failure
+        if not completed or total < 1:
+            raise RuntimeError("bootstrap stream ended before a valid answer")
 
