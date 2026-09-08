@@ -30,6 +30,69 @@ Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, constr
   `configs/corpus/core-v1-source-policy.approved.json`, fichier que seul le
   propriétaire peut commiter.
 
+## Utiliser le système aujourd'hui
+
+L'interface est privée : elle est accessible depuis le LAN autorisé ou le
+tailnet, jamais comme service public. Après connexion avec le compte local,
+choisir **BOOTSTRAP** pour une conversation utilisable. L'interface conserve
+le moteur associé à chaque conversation, permet de créer une conversation,
+d'afficher l'historique, d'exporter ou de supprimer explicitement une
+conversation.
+
+Les conversations restent des données de mémoire : elles ne servent jamais à
+réentraîner automatiquement BOOTSTRAP ou CORE. Elles ne doivent pas être
+considérées comme un accès implicite aux fichiers du Synology, à un RAG validé,
+à un shell, à Proxmox ou à des outils MCP larges. Toute action sensible doit
+être proposée précisément puis confirmée par un humain.
+
+### Moteurs affichés dans l'interface
+
+| Moteur | État | Usage à retenir |
+| --- | --- | --- |
+| `BOOTSTRAP` | Fonctionnel, moteur par défaut | Questions et assistance quotidienne locale. |
+| `CORE-700M expérimental` | Chaîne technique fonctionnelle ; qualité non validée | Diagnostic de raccordement uniquement ; ne pas l'employer pour des réponses utiles. |
+| `CORE-MINI` | Pipeline de test | Validation des entraînements, checkpoints et reprises. |
+
+Le choix explicite de CORE-700M ne doit pas être compris comme une promotion :
+le moteur conserve son étiquette expérimentale et l'interface prévoit un
+repli vers BOOTSTRAP si une sortie est invalide.
+
+## Corpus : état et frontière de confiance
+
+Les dix archives permissives du catalogue sont conservées **telles que reçues
+dans RAW**, avec l'URL de tag, la licence vérifiée, l'empreinte SHA-256, la
+taille et les mesures de texte. Les archives ne sont ni réécrites, ni déplacées
+vers `VALIDATED`, ni ajoutées aux poids.
+
+```text
+Internet autorisé (acquisition ponctuelle)
+        -> RAW Synology : 10 archives, 169.47 MB
+        -> revue propriétaire + sous-échantillon déterministe
+        -> manifest approuvé avec SHA-256
+        -> VALIDATED
+        -> tokenizer / entraînement CORE
+```
+
+Le premier relevé dépasse volontairement le plafond pilote : 97.4 M tokens
+estimés au lieu d'environ 10 M, dont seulement 0.42 % de français. Ce constat
+est utile : il interdit de présenter ce lot comme le corpus final ou comme un
+corpus français-technique équilibré. TypeScript et Kubernetes devront être
+bornés par une règle de sélection reproductible avant toute approbation.
+
+## Ce qui bloque volontairement la suite
+
+1. Le propriétaire choisit et approuve un sous-échantillon déterministe proche
+   de 10 M tokens, avec une proportion FR/EN cible explicite.
+2. Le propriétaire crée et committe lui-même
+   `core-v1-source-policy.approved.json`, qui lie les dix sources, leurs
+   empreintes, le commit candidat et son identité d'approbation.
+3. Le préflight vérifie ce contrat avant le tokenizer et avant tout entraînement.
+4. Un benchmark CPU/NUMA reproductible et une restauration de checkpoint restent
+   requis avant un palier CORE-700M prolongé.
+
+Il n'existe ni drapeau `--force`, ni variable d'environnement permettant de
+contourner cette chaîne. Un refus de gate est le comportement attendu.
+
 ## Invariants déjà décidés
 
 - aucun GPU, CUDA, ROCm ou TPU dans le chemin V1 ;
