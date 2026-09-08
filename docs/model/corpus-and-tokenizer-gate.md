@@ -55,7 +55,8 @@ La politique versionnée
 traduit les choix actuels du propriétaire : français et anglais, priorité au
 développement logiciel, à l'administration système et au réseau, et licences
 réutilisables (`MIT`, `Apache-2.0`, familles BSD, `ISC`, `CC0-1.0`, `0BSD`,
-`Unlicense` et `CC-BY-4.0`). `CC-BY-SA` reste exclue.
+`Unlicense`, `CC-BY-4.0` et `Etalab-2.0`). `CC-BY-SA`, `CC-BY-NC` et
+`CC-BY-ND` restent exclues.
 
 Elle exclut les conversations privées, données personnelles, identifiants,
 contenus propriétaires et licences inconnues. Elle impose pour chaque futur

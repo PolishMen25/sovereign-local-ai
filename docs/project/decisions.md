@@ -38,6 +38,7 @@ Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confir
 | D-030 | L'interface V1 est mono-utilisateur, accessible en HTTPS sur LAN et tailnet, avec compte local et identité tailnet additionnelle à distance. | Initialisation du secret dans le navigateur, stockage Argon2id, sessions sécurisées et aucune exposition publique directe du moteur. |
 | D-031 | Le corpus cible le code et l'infrastructure, avec licences strictement réutilisables, et les calculs longs peuvent fonctionner en continu après gates. | Priorité à Python, shells, Web, SQL, Docker, Linux et réseau ; monitoring et arrêt sûr obligatoires. |
 | D-032 | Le propriétaire autorise `CC-BY-4.0` avec attribution/provenance et la mise en file automatique des messages de conversation déjà assainis. | `CC-BY-SA` reste refusée. Les messages `user`/`assistant` entrent dans une file locale supprimable avec leur conversation ; un manifeste, ses empreintes et le gate d'entraînement restent requis avant modification des poids. |
+| D-033 | Le propriétaire autorise `Etalab-2.0` après vérification du texte de licence, avec conservation de la provenance et de l'attribution. | Les corpus français sous Licence Ouverte 2.0 peuvent être proposés au manifeste ; `CC-BY-SA`, `CC-BY-NC` et `CC-BY-ND` restent refusées. |
 
 ## Orientations provisoires
 

@@ -113,6 +113,18 @@ class TrainingCorpusManifestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "license"):
             MODULE.validate(manifest)
 
+    def test_etalab_open_license_is_accepted_for_linguistic_training(self) -> None:
+        manifest = valid_manifest()
+        manifest["classification"] = "approved_training"
+        manifest["tokenizer_contract"]["review_state"] = "approved"
+        manifest["approvals"] = {
+            "data_governance": "approved",
+            "training_authorization": "approved",
+        }
+        for package in manifest["source_packages"]:
+            package["license"] = "Etalab-2.0"
+        MODULE.validate(manifest, require_training_authorization=True)
+
 
 if __name__ == "__main__":
     unittest.main()

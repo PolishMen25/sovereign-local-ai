@@ -19,7 +19,7 @@ MAXIMUM_RECORDS = 1_000_000_000_000
 MAXIMUM_SOURCE_PACKAGES = 100_000
 ALLOWED_TRAINING_LICENSES = frozenset({
     "0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0",
-    "CC-BY-4.0", "ISC", "MIT", "Unlicense", "verified-public-domain",
+    "CC-BY-4.0", "Etalab-2.0", "ISC", "MIT", "Unlicense", "verified-public-domain",
 })
 
 TOP_LEVEL = {
