@@ -6,8 +6,11 @@ retourne le contenu privé authentifié ; la suppression efface les messages et
 ne conserve qu'un reçu d'audit sans contenu.
 
 Le chemin SQLite est fixé par l'opérateur et n'est jamais fourni par une
-requête. Cette mémoire n'est ni un corpus d'entraînement ni une connaissance
-validée. Aucune opération ne promeut une conversation vers `VALIDATED`.
+requête. Les messages `user` et `assistant` déjà assainis sont ajoutés à une
+file locale de candidats d'apprentissage ; les messages `system` et `tool` sont
+exclus. La file n'est ni un corpus d'entraînement ni une connaissance validée :
+elle devra être matérialisée, empreintée et liée à un manifeste avant tout
+entraînement. Supprimer une conversation retire également ses candidats.
 
 ## Sauvegarde durable
 

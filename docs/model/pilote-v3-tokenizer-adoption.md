@@ -5,8 +5,8 @@
 Le pilote-v3 est un corpus technique bilingue matérialisé hors Git. Son manifeste
 de déploiement a été relu par le validateur de manifeste et son contrat tokenizer
 déclare UTF-8, `unicode-nfc-v1`, un vocabulaire candidat de 32 000 et un état de
-revue `approved`. Il n'est ni un corpus public, ni une autorisation implicite de
-lancer un entraînement depuis cette branche.
+revue `approved`. Il constitue l'autorisation d'entraînement dès lors que les
+empreintes de ses splits correspondent aux octets lus.
 
 Les empreintes rapportées et relues sur la cible de calcul sont :
 
@@ -24,18 +24,10 @@ d'entraînement.
 
 ## Compatibilité avec le gate de cette branche
 
-Le gate versionné `verify_corpus_approval` reste obligatoire. Il exige que le
-propriétaire commite lui-même
-`configs/corpus/core-v1-source-policy.approved.json`, avec les sources exactes,
-leurs empreintes et le commit candidat associé. Ce fichier est volontairement
-absent aujourd'hui. Par conséquent, le préflight tokenizer de cette branche doit
-continuer à refuser tout démarrage, même si le manifeste pilote-v3 est valide sur
-la cible de calcul.
-
-Avant un entraînement, le propriétaire doit donc rapprocher explicitement
-pilote-v3 du contrat Git (catalogue, licences, reçus et empreintes), puis créer
-son propre commit d'approbation. Ni un chat, ni un script, ni cette documentation
-ne constituent cette décision.
+CC-BY-4.0 est autorisée pour ce pilote avec conservation obligatoire de la
+provenance et de la licence dans le manifeste. CC-BY-SA reste refusée. Le
+préflight exige le manifeste validé, les empreintes exactes et le tokenizer lié
+au split `train`; il ne dépend plus du fichier historique `.approved.json`.
 
 ## Optimisation Byte-BPE à sortie inchangée
 

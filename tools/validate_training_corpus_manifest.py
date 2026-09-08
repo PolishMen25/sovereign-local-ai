@@ -17,6 +17,10 @@ POLICY_ID = re.compile(r"^[a-z][a-z0-9._-]{2,127}$")
 MAXIMUM_MATERIALIZATION_BYTES = 1_099_511_627_776
 MAXIMUM_RECORDS = 1_000_000_000_000
 MAXIMUM_SOURCE_PACKAGES = 100_000
+ALLOWED_TRAINING_LICENSES = frozenset({
+    "0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0",
+    "CC-BY-4.0", "ISC", "MIT", "Unlicense", "verified-public-domain",
+})
 
 TOP_LEVEL = {
     "schema_version", "corpus_id", "lifecycle_state", "classification", "materialization",
@@ -108,6 +112,11 @@ def validate(document: Any, *, require_training_authorization: bool = False) -> 
         require_sha256(package["content_sha256"], "source_package.content_sha256")
         if not isinstance(package["license"], str) or not 1 <= len(package["license"].strip()) <= 200:
             fail("source_package.license is required")
+        if (
+            doc["classification"] == "approved_training"
+            and package["license"] not in ALLOWED_TRAINING_LICENSES
+        ):
+            fail("source_package.license is not allowed for training")
         if package["review_state"] != "approved":
             fail("each source package requires approval")
         languages = package["languages"]

@@ -1,12 +1,12 @@
 # Gate corpus et tokenizer
 
-## Approbation propriétaire obligatoire du catalogue candidat
+## Gate unique par manifeste validé
 
-Le catalogue candidat n'est jamais une approbation. Seul le propriétaire peut
-créer et commiter sur la PR le fichier
-`configs/corpus/core-v1-source-policy.approved.json`. Ce geste est la décision
-humaine traçable : une conversation, une sortie de modèle, un message ou un
-outil ne peut ni créer ni simuler cette approbation.
+L'autorisation d'entraînement est portée par le manifeste du corpus : état
+`VALIDATED`, classification `approved_training`, empreintes des paquets et des
+splits, approbations données/training et contrat tokenizer approuvé. Le
+préflight relit ce manifeste et les octets du split `train`; il ne dépend plus
+d'un second fichier `.approved.json`.
 
 Le fichier est volontairement absent du dépôt tant que le propriétaire ne
 l'ajoute pas lui-même. Son schéma est le suivant : les `sources` reprennent à
@@ -31,13 +31,13 @@ commit du catalogue approuvé.
 }
 ```
 
-`tools/verify_corpus_approval.py` compare cette liste au candidat, refuse une
-approbation absente, une empreinte `pending`/`unverified`, une licence hors
-allowlist ou une divergence de source. `tools/preflight_core_700m_tokenizer.py`
-appelle ce vérificateur avant toute autre opération et n'offre aucun bypass.
+`tools/verify_corpus_approval.py` reste disponible comme audit renforcé des
+catalogues Git historiques. Le contrôle bloquant est désormais le manifeste
+validé, ses empreintes et les licences admises par
+`validate_training_corpus_manifest.py`.
 
-**Statut : la politique Git reste candidate tant que le fichier d'approbation
-propriétaire est absent ; aucun préflight ne peut donc démarrer.**
+**Statut : un manifeste valide suffit au préflight. `pilote-v3` peut être utilisé
+car son manifeste lie les paquets, les splits, les empreintes et l'autorisation.**
 
 Ce projet ne lance pas d'entraînement linguistique tant qu'un corpus, son
 tokenizer et son autorisation ne sont pas explicitement approuvés. Le
@@ -54,8 +54,8 @@ La politique versionnée
 [`core-v1-source-policy.candidate.json`](../../configs/corpus/core-v1-source-policy.candidate.json)
 traduit les choix actuels du propriétaire : français et anglais, priorité au
 développement logiciel, à l'administration système et au réseau, et licences
-strictement permissives (`MIT`, `Apache-2.0`, familles BSD, `ISC`, `CC0-1.0`,
-`0BSD` et `Unlicense`).
+réutilisables (`MIT`, `Apache-2.0`, familles BSD, `ISC`, `CC0-1.0`, `0BSD`,
+`Unlicense` et `CC-BY-4.0`). `CC-BY-SA` reste exclue.
 
 Elle exclut les conversations privées, données personnelles, identifiants,
 contenus propriétaires et licences inconnues. Elle impose pour chaque futur

@@ -50,9 +50,9 @@ class TokenizerCandidatePromotionTests(unittest.TestCase):
             "lifecycle_state": "VALIDATED", "classification": "approved_training",
             "materialization": {"format": "jsonl-utf8", "content_sha256": digest(train + validation + test), "byte_size": len(train + validation + test), "record_count": 3},
             "source_packages": [
-                {"package_id": "package-train", "provenance_id": "provenance-train", "content_sha256": digest(train), "license": "LicenseRef-Test", "languages": ["en"], "review_state": "approved"},
-                {"package_id": "package-validation", "provenance_id": "provenance-validation", "content_sha256": digest(validation), "license": "LicenseRef-Test", "languages": ["en"], "review_state": "approved"},
-                {"package_id": "package-test", "provenance_id": "provenance-test", "content_sha256": digest(test), "license": "LicenseRef-Test", "languages": ["en"], "review_state": "approved"},
+                {"package_id": "package-train", "provenance_id": "provenance-train", "content_sha256": digest(train), "license": "MIT", "languages": ["en"], "review_state": "approved"},
+                {"package_id": "package-validation", "provenance_id": "provenance-validation", "content_sha256": digest(validation), "license": "MIT", "languages": ["en"], "review_state": "approved"},
+                {"package_id": "package-test", "provenance_id": "provenance-test", "content_sha256": digest(test), "license": "MIT", "languages": ["en"], "review_state": "approved"},
             ],
             "splits": {
                 "train": {"package_ids": ["package-train"], "content_sha256": digest(train), "byte_size": len(train), "record_count": 1},

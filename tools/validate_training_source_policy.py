@@ -16,7 +16,7 @@ TOP_LEVEL = {
     "catalog_status", "purpose", "acquisition_guard", "sources",
     "estimated_total_tokens", "rejected_sources",
 }
-ALLOWED_LICENSES = {"0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "ISC", "MIT", "Unlicense"}
+ALLOWED_LICENSES = {"0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "CC-BY-4.0", "ISC", "MIT", "Unlicense"}
 DOMAINS = {"software-development", "systems-administration", "networking"}
 EXCLUSIONS = {"credentials", "personal-data", "private-conversations", "proprietary-content", "unknown-license"}
 REVIEW_REQUIREMENTS = {"license-verified", "provenance-verified", "content-sha256", "human-approval"}

@@ -34,10 +34,12 @@ class CorpusApprovalTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "unapproved sha256"):
                 verify_corpus_approval(candidate_path=candidate, approved_path=approved)
 
-    def test_non_permissive_license_is_refused(self) -> None:
+    def test_cc_by_is_allowed_but_sharealike_is_refused(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory); candidate = root / "candidate.json"; approved = root / "approved.json"
             item = source(license_name="CC-BY-4.0"); self.write_json(candidate, {"sources": [item]}); self.write_json(approved, self.approved(item))
+            self.assertEqual(verify_corpus_approval(candidate_path=candidate, approved_path=approved)["source_count"], 1)
+            item = source(license_name="CC-BY-SA-4.0"); self.write_json(candidate, {"sources": [item]}); self.write_json(approved, self.approved(item))
             with self.assertRaisesRegex(ValueError, "non-permissive"):
                 verify_corpus_approval(candidate_path=candidate, approved_path=approved)
 

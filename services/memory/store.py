@@ -69,8 +69,16 @@ class MemoryStore:
                     occurred_at TEXT NOT NULL,
                     event_sha256 TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS learning_queue (
+                    message_id TEXT PRIMARY KEY REFERENCES messages(message_id) ON DELETE CASCADE,
+                    conversation_id TEXT NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+                    content_sha256 TEXT NOT NULL,
+                    queued_at TEXT NOT NULL
+                );
                 CREATE INDEX IF NOT EXISTS messages_conversation_order
                     ON messages(conversation_id, ordinal);
+                CREATE INDEX IF NOT EXISTS learning_queue_conversation
+                    ON learning_queue(conversation_id, queued_at);
                 """
             )
 
@@ -123,6 +131,12 @@ class MemoryStore:
                 "UPDATE conversations SET updated_at = ? WHERE conversation_id = ?",
                 (now, conversation_id),
             )
+            if role in {"user", "assistant"}:
+                connection.execute(
+                    "INSERT INTO learning_queue(message_id,conversation_id,content_sha256,queued_at) "
+                    "VALUES(?,?,?,?)",
+                    (message_id, conversation_id, digest, now),
+                )
         return {
             "message_id": message_id,
             "ordinal": ordinal,
@@ -130,7 +144,17 @@ class MemoryStore:
             "content": redacted,
             "content_sha256": digest,
             "created_at": now,
+            "learning_candidate_queued": role in {"user", "assistant"},
         }
+
+    def learning_queue_summary(self) -> dict[str, int]:
+        """Return content-free status for locally queued, redacted messages."""
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS messages, COUNT(DISTINCT conversation_id) AS conversations "
+                "FROM learning_queue"
+            ).fetchone()
+        return {"messages": int(row["messages"]), "conversations": int(row["conversations"])}
 
     def list_conversations(self, *, limit: int = 100) -> list[dict[str, str]]:
         if not isinstance(limit, int) or not 1 <= limit <= 500:

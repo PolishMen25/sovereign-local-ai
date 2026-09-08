@@ -26,6 +26,8 @@ class MemoryStoreTests(unittest.TestCase):
         exported = self.store.export_conversation(conversation_id)
         self.assertNotIn("VerySecretValue123", exported["messages"][0]["content"])
         self.assertEqual(message["content_sha256"], exported["messages"][0]["content_sha256"])
+        self.assertTrue(message["learning_candidate_queued"])
+        self.assertEqual(self.store.learning_queue_summary(), {"messages": 1, "conversations": 1})
 
     def test_delete_removes_content_and_returns_content_free_receipt(self) -> None:
         conversation_id = self.store.create_conversation(conversation_id="conversation_002")
@@ -35,6 +37,13 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertNotIn("content", receipt)
         with self.assertRaises(KeyError):
             self.store.export_conversation(conversation_id)
+        self.assertEqual(self.store.learning_queue_summary(), {"messages": 0, "conversations": 0})
+
+    def test_system_and_tool_messages_are_not_learning_candidates(self) -> None:
+        conversation_id = self.store.create_conversation(conversation_id="conversation_004")
+        self.assertFalse(self.store.append_message(conversation_id, role="system", content="internal prompt")["learning_candidate_queued"])
+        self.assertFalse(self.store.append_message(conversation_id, role="tool", content="tool result")["learning_candidate_queued"])
+        self.assertEqual(self.store.learning_queue_summary(), {"messages": 0, "conversations": 0})
 
     def test_unknown_conversation_and_invalid_inputs_fail_closed(self) -> None:
         with self.assertRaises(KeyError):

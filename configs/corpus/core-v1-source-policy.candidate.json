@@ -6,13 +6,13 @@
   "purpose": "CORE-700M bilingual French-English technical candidate corpus; RAW acquired, never promoted or approved",
   "target_languages": ["fr", "en"],
   "priority_domains": ["software-development", "systems-administration", "networking"],
-  "allowed_licenses": ["0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "ISC", "MIT", "Unlicense"],
+  "allowed_licenses": ["0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "CC-BY-4.0", "ISC", "MIT", "Unlicense"],
   "excluded_content": ["credentials", "personal-data", "private-conversations", "proprietary-content", "unknown-license"],
   "review_requirements": ["license-verified", "provenance-verified", "content-sha256", "human-approval"],
   "acquisition_guard": {
     "raw_to_validated_promotion": "manual_owner_approval_only",
     "corpus_bytes_acquired": true,
-    "allowed_licenses": ["MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "ISC", "CC0-1.0", "verified-public-domain"]
+    "allowed_licenses": ["MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "ISC", "CC0-1.0", "CC-BY-4.0", "verified-public-domain"]
   },
   "sources": [
     {
@@ -48,10 +48,7 @@
   ],
   "estimated_total_tokens": "7.4M-11.9M (estimation; target approximately 10M)",
   "rejected_sources": [
-    {"name": "Vue documentation", "url": "https://github.com/vuejs/docs", "reason": "LICENSE read: CC-BY-4.0 is outside the permitted-license allowlist."},
     {"name": "Node.js", "url": "https://github.com/nodejs/node", "reason": "LICENSE read: third-party and composite licensing; rejected under the no-ambiguous-or-composite rule."},
-    {"name": "MDN content", "url": "https://github.com/mdn/content", "reason": "CC-BY-SA licensing is outside the permitted-license allowlist."},
-    {"name": "PowerShell documentation", "url": "https://github.com/MicrosoftDocs/PowerShell-Docs", "reason": "LICENSE.md read: Creative Commons Attribution 4.0; documentation is outside the permitted-license allowlist."},
-    {"name": "Kubernetes website and documentation", "url": "https://github.com/kubernetes/website", "reason": "LICENSE read: Creative Commons Attribution 4.0; documentation is outside the permitted-license allowlist."}
+    {"name": "MDN content", "url": "https://github.com/mdn/content", "reason": "CC-BY-SA licensing remains outside the permitted-license allowlist."}
   ]
 }

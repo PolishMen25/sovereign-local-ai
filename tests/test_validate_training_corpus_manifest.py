@@ -24,9 +24,9 @@ def valid_manifest() -> dict:
         "classification": "synthetic",
         "materialization": {"format": "jsonl-utf8", "content_sha256": digest("a"), "byte_size": 100, "record_count": 3},
         "source_packages": [
-            {"package_id": "package-train", "provenance_id": "provenance-train", "content_sha256": digest("b"), "license": "LicenseRef-Synthetic", "languages": ["fr"], "review_state": "approved"},
-            {"package_id": "package-validation", "provenance_id": "provenance-validation", "content_sha256": digest("c"), "license": "LicenseRef-Synthetic", "languages": ["fr"], "review_state": "approved"},
-            {"package_id": "package-test", "provenance_id": "provenance-test", "content_sha256": digest("d"), "license": "LicenseRef-Synthetic", "languages": ["fr"], "review_state": "approved"},
+            {"package_id": "package-train", "provenance_id": "provenance-train", "content_sha256": digest("b"), "license": "CC-BY-4.0", "languages": ["fr"], "review_state": "approved"},
+            {"package_id": "package-validation", "provenance_id": "provenance-validation", "content_sha256": digest("c"), "license": "CC-BY-4.0", "languages": ["fr"], "review_state": "approved"},
+            {"package_id": "package-test", "provenance_id": "provenance-test", "content_sha256": digest("d"), "license": "CC-BY-4.0", "languages": ["fr"], "review_state": "approved"},
         ],
         "splits": {
             "train": {"package_ids": ["package-train"], "content_sha256": digest("e"), "byte_size": 30, "record_count": 1},
@@ -105,6 +105,13 @@ class TrainingCorpusManifestTests(unittest.TestCase):
         manifest["tokenizer_contract"]["review_state"] = "approved"
         manifest["approvals"] = {"data_governance": "approved", "training_authorization": "approved"}
         MODULE.validate(manifest, require_training_authorization=True)
+
+    def test_sharealike_license_is_refused_for_linguistic_training(self) -> None:
+        manifest = valid_manifest()
+        manifest["classification"] = "approved_training"
+        manifest["source_packages"][0]["license"] = "CC-BY-SA-4.0"
+        with self.assertRaisesRegex(ValueError, "license"):
+            MODULE.validate(manifest)
 
 
 if __name__ == "__main__":

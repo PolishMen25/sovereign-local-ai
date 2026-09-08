@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from pathlib import Path
 import shutil
 import sqlite3
@@ -38,7 +39,7 @@ class DurableMemoryBackupTests(unittest.TestCase):
         restored = self.backups / "restored.sqlite3"
         result = restore_backup(artifact, manifest_path, restored)
         self.assertEqual(result["restored_sha256"], manifest["sha256"])
-        with sqlite3.connect(restored) as connection:
+        with closing(sqlite3.connect(restored)) as connection:
             self.assertEqual(connection.execute("SELECT content FROM messages").fetchone()[0], "message de test")
 
     def test_verify_refuses_tampered_manifest(self) -> None:
