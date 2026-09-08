@@ -24,6 +24,9 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = PROJECT_ROOT / "configs" / "corpus" / "core-v1-source-policy.candidate.json"
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+TOKEN = re.compile(r"\w+|[^\s\w]", re.UNICODE)
+TEXT_SUFFIXES = {".bash", ".c", ".cc", ".cpp", ".cs", ".css", ".go", ".h", ".html", ".java", ".js", ".json", ".md", ".mdx", ".ps1", ".psm1", ".py", ".rst", ".sh", ".sql", ".toml", ".ts", ".tsx", ".txt", ".yaml", ".yml", ".zsh"}
+EXCLUDED_PARTS = {".git", "coverage", "dist", "node_modules", "vendor"}
 
 
 def load_policy(path: Path) -> dict[str, Any]:
@@ -60,10 +63,45 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _archive_stats(path: Path) -> tuple[int, int]:
+def _archive_stats(path: Path, source: dict[str, Any]) -> dict[str, int]:
+    fr_directory = source.get("fr_content")
+    language = source.get("language")
+    if not isinstance(fr_directory, str) or not isinstance(language, str):
+        raise ValueError("source language metadata is invalid")
+    normalized_fr_directory = fr_directory.strip("/")
+    stats = {"archive_file_count": 0, "archive_unpacked_bytes": 0, "text_file_count": 0,
+             "excluded_file_count": 0, "estimated_tokens": 0, "fr_tokens": 0, "en_tokens": 0}
     with tarfile.open(path, "r:gz") as archive:
-        files = [member for member in archive.getmembers() if member.isfile()]
-    return len(files), sum(member.size for member in files)
+        for member in archive.getmembers():
+            if not member.isfile():
+                continue
+            stats["archive_file_count"] += 1
+            stats["archive_unpacked_bytes"] += member.size
+            parts = Path(member.name).parts
+            relative_parts = parts[1:] if len(parts) > 1 else parts
+            if any(part in EXCLUDED_PARTS for part in relative_parts) or Path(member.name).suffix.lower() not in TEXT_SUFFIXES or member.size > 2_000_000:
+                stats["excluded_file_count"] += 1
+                continue
+            handle = archive.extractfile(member)
+            if handle is None:
+                stats["excluded_file_count"] += 1
+                continue
+            data = handle.read()
+            if b"\0" in data:
+                stats["excluded_file_count"] += 1
+                continue
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                stats["excluded_file_count"] += 1
+                continue
+            token_count = len(TOKEN.findall(text))
+            stats["text_file_count"] += 1
+            stats["estimated_tokens"] += token_count
+            relative_name = "/".join(relative_parts)
+            is_french = language == "fr" or (language == "mixte" and normalized_fr_directory != "none" and relative_name.startswith(normalized_fr_directory + "/"))
+            stats["fr_tokens" if is_french else "en_tokens"] += token_count
+    return stats
 
 
 def acquire(policy_path: Path, raw_root: Path, *, opener=urllib.request.urlopen) -> list[dict[str, Any]]:
@@ -98,15 +136,14 @@ def acquire(policy_path: Path, raw_root: Path, *, opener=urllib.request.urlopen)
         except Exception:
             # Evidence is intentionally retained in RAW as an incomplete artifact.
             raise
-        file_count, unpacked_bytes = _archive_stats(destination)
+        stats = _archive_stats(destination, source)
         results.append({
             "name": name,
             "url": url,
             "archive": destination.name,
             "sha256": _sha256(destination),
             "archive_bytes": destination.stat().st_size,
-            "archive_file_count": file_count,
-            "archive_unpacked_bytes": unpacked_bytes,
+            **stats,
         })
     return results
 
