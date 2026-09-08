@@ -301,6 +301,14 @@
     setBusy(state.busy);
   }
 
+  async function loadKnowledgeStatus() {
+    const data = await api("/v1/knowledge-status");
+    const documents = Number.isInteger(data.documents) && data.documents >= 0 ? data.documents : 0;
+    q("knowledge-status").textContent = data.ready === true
+      ? "Documentation locale : " + documents + " document" + (documents > 1 ? "s" : "") + " validé" + (documents > 1 ? "s" : "") + ", citations disponibles."
+      : "Documentation locale : aucune source validée disponible.";
+  }
+
   async function enterWorkspace(session) {
     state.csrf = session.csrf_token;
     q("setup").hidden = true;
@@ -310,7 +318,7 @@
     q("username").textContent = session.username || "";
     updateEngine(session.engine, session.rag_mode || "");
     newConversation();
-    const results = await Promise.allSettled([refreshHistory(), loadProfiles(), loadEngines()]);
+    const results = await Promise.allSettled([refreshHistory(), loadProfiles(), loadEngines(), loadKnowledgeStatus()]);
     for (const result of results) if (result.status === "rejected") notice(errorMessage(result.reason));
   }
 

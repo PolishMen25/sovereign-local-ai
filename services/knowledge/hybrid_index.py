@@ -109,6 +109,20 @@ class HybridKnowledgeIndex:
                 (key, value),
             )
 
+    def status(self) -> dict[str, Any]:
+        """Return a small, content-free view suitable for an authenticated UI."""
+        try:
+            with closing(self._connect(read_only=True)) as connection:
+                count = int(connection.execute("SELECT COUNT(*) FROM validated_chunks").fetchone()[0])
+        except (OSError, sqlite3.Error):
+            return {"ready": False, "state": "unavailable", "mode": "lexical", "documents": 0}
+        return {
+            "ready": count > 0,
+            "state": "ready" if count > 0 else "empty",
+            "mode": "lexical",
+            "documents": count,
+        }
+
     def upsert_validated(
         self,
         *,

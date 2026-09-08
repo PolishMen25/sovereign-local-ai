@@ -35,6 +35,20 @@ class HybridKnowledgeIndexTests(unittest.TestCase):
         self.assertEqual("storage-001", result["hits"][0]["document_id"])
         self.assertEqual("approved-storage-v1", result["hits"][0]["provenance_id"])
 
+    def test_status_is_content_free_and_reports_ready_index(self) -> None:
+        self.assertEqual(
+            {"ready": True, "state": "ready", "mode": "lexical", "documents": 2},
+            self.index.status(),
+        )
+
+    def test_status_reports_an_initialized_empty_index(self) -> None:
+        empty = HybridKnowledgeIndex(self.index.database.with_name("empty.sqlite3"))
+        empty.initialize()
+        self.assertEqual(
+            {"ready": False, "state": "empty", "mode": "lexical", "documents": 0},
+            empty.status(),
+        )
+
     def test_lexical_fallback_is_explicit(self) -> None:
         result = self.index.search("route Internet", query_embedding=None)
         self.assertEqual("lexical", result["mode"])

@@ -274,6 +274,9 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         if self.path == "/v1/engines":
             self.send_json(200, {"engines": self.state.engines()})
             return
+        if self.path == "/v1/knowledge-status":
+            self.send_json(200, self.state.knowledge.status())
+            return
         if self.path == "/v1/conversations":
             self.send_json(200, {"conversations": self.state.memory.list_conversations()})
             return
