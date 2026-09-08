@@ -1,14 +1,34 @@
 # Sovereign Local AI
 
-Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du projet. La V1 vise un modèle de langage créé localement dans la classe 50–100 millions de paramètres, un RAG traçable, des agents logiques et une séparation stricte entre ingestion externe et connaissances internes, sans donner d'accès Internet à l'IA interne. Deux services MCP distincts constituent l'option candidate actuelle, encore soumise à audit.
+Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du propriétaire. La V1 vise un modèle de langage créé localement, `CORE-700M`, un RAG traçable, des agents logiques et une séparation stricte entre ingestion externe et connaissances internes, sans donner d'accès Internet à IA-CORE. Deux services MCP distincts constituent l'option candidate actuelle, encore soumise à audit.
 
-> État : **phase 0 — découverte et validation de l'architecture**. Ce dépôt pose les contraintes, les contrats et les gates de décision. Il ne prétend pas encore fournir une plateforme de production.
+> État au 2026-09-08 : **socle expérimental contrôlé**. L'interface privée et le moteur BOOTSTRAP sont utilisables ; CORE-700M, le corpus et les composants de connaissance restent soumis à des gates explicites. Ce dépôt ne prétend pas encore fournir une plateforme de production.
 
-> **Utilisation actuelle : un chat tiers BOOTSTRAP fonctionne localement en
-> CLI CPU.** Il fournit des réponses réelles pendant la construction de CORE,
-> mais n'est ni CORE-MINI ni CORE-700M. CORE-MINI valide toujours le chemin
-> d'entraînement et CORE-700M n'a pas encore de poids linguistiques. Voir la
-> matrice [Capacités réellement disponibles](docs/project/current-capabilities.md).
+> **Utilisation actuelle : l'interface privée sert le moteur BOOTSTRAP par
+> défaut.** Il fournit les réponses exploitables. CORE-700M est également
+> raccordé à l'interface en mode expérimental, mais ses 20 étapes de test ne
+> produisent que du bruit : il ne doit pas être utilisé comme assistant. Chaque
+> conversation indique le moteur employé. Voir la matrice
+> [Capacités réellement disponibles](docs/project/current-capabilities.md).
+
+## État vérifié
+
+- l'interface privée, l'authentification locale et le chat **BOOTSTRAP** sont
+  disponibles sur le réseau privé/Tailscale ; BOOTSTRAP reste le défaut ;
+- la chaîne mécanique **CORE-700M** est déployée en expérimental : chargement
+  de checkpoint, API interne, sélection dans l'interface et repli BOOTSTRAP ;
+  ses sorties ne sont pas encore linguistiquement exploitables ;
+- le checkpoint expérimental de l'étape 20 est conservé sur le Synology avec
+  une empreinte SHA-256 vérifiée après copie ;
+- le catalogue bilingue de 10 sources permissives est acquis en **RAW** sur le
+  Synology : 169 470 351 octets et 97 396 860 tokens estimés. Il n'est ni
+  promu dans `VALIDATED`, ni approuvé, ni consommable par un entraînement ;
+- l'acquisition a révélé que TypeScript et Kubernetes dépassent à eux seuls le
+  format pilote. Un sous-échantillonnage déterministe d'environ 10 M tokens et
+  une approbation propriétaire restent obligatoires ;
+- le préflight tokenizer et tout entraînement CORE refusent de démarrer sans
+  `configs/corpus/core-v1-source-policy.approved.json`, fichier que seul le
+  propriétaire peut commiter.
 
 ## Invariants déjà décidés
 
@@ -69,7 +89,12 @@ L'option Research Gateway est la direction recommandée pour l'étude, car elle 
 
 Le candidat principal est un Transformer decoder-only de **691 160 320 paramètres entraînables** : vocabulaire 32 000, dimension 1 280, 32 blocs, 20 têtes, MLP SwiGLU 3 584, RoPE, RMSNorm, matrice d'embedding de tokens et tête de sortie liées, sans biais. CORE-80M reste une référence historique, sans entraînement long prévu.
 
-Ce nombre est exact pour cette définition, mais aucun poids linguistique n'existe encore. Le contexte candidat est 2 048 tokens ; le corpus exact, le tokenizer, la précision et les seuils d'évaluation restent soumis aux gates. Voir [docs/model/core-700m.md](docs/model/core-700m.md) et vérifier le calcul avec :
+Ce nombre est exact pour cette définition. Un checkpoint expérimental à 20
+étapes existe, mais ne constitue pas un modèle linguistique utile : aucune
+qualité ne doit lui être attribuée. Le contexte candidat est 2 048 tokens ; le
+corpus approuvé, le tokenizer, la précision et les seuils d'évaluation restent
+soumis aux gates. Voir [docs/model/core-700m.md](docs/model/core-700m.md) et
+vérifier le calcul avec :
 
 Sous Windows :
 
@@ -90,6 +115,7 @@ python3 -B tools/count_core_parameters.py
 ├── AGENTS.md                         règles de travail pour Codex
 ├── SECURITY.md                       signalement et principes de sécurité
 ├── configs/models/                   configurations candidates, non validées
+├── configs/corpus/                   catalogue et gate d'approbation du corpus
 ├── docs/
 │   ├── architecture/                 architecture logique et déploiement
 │   ├── security/                     menaces, frontières et gates
@@ -111,10 +137,11 @@ python3 -B tools/count_core_parameters.py
 1. Lire [AGENTS.md](AGENTS.md) et le [registre des décisions](docs/project/decisions.md).
    Pour reprendre avec un autre agent, consulter aussi le
    [handoff Claude Code](docs/project/claude-code-handoff.md).
-2. Compléter uniquement les informations encore ouvertes dans le [questionnaire de découverte](docs/project/discovery-questionnaire.md).
-3. Valider la topologie réseau, les flux, le stockage, l'identité, les sauvegardes et les politiques de données.
-4. Mesurer le ML350 : CPU, RAM, NUMA, disque, threads et tokens/seconde sur un mini-modèle.
-5. Produire les ADR et figer une pile minimale avant toute implémentation de production.
+2. Consulter la [matrice des capacités](docs/project/current-capabilities.md) : sélectionner BOOTSTRAP pour un usage réel et traiter CORE-700M comme expérimental.
+3. Revoir le catalogue RAW et approuver explicitement un sous-échantillon avant de créer le fichier d'approbation propriétaire.
+4. Valider la topologie réseau, les flux, le stockage, l'identité, les sauvegardes et les politiques de données.
+5. Mesurer le ML350 : CPU, RAM, NUMA, disque, threads et tokens/seconde sur un mini-modèle.
+6. Produire les ADR et figer une pile minimale avant toute implémentation de production.
 
 Le projet n'adopte pas encore de base vectorielle, de framework Web définitif,
 de système de queue ou de moteur d'embeddings pour le RAG. SMB est utilisé pour
