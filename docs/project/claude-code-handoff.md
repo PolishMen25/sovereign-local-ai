@@ -105,6 +105,8 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
 - `4362468` : état content-free de l'index lexical affiché dans le chat.
 - `64ae6f0` : proposition E0/E1/E2 qui sépare intégrité, qualité bilingue et
   code vérifié avant toute utilité déclarée pour CORE.
+- `0a5e98b` : suite E1 candidate de 50 prompts français/anglais, équilibrée et
+  validée structurellement ; elle attend encore la revue propriétaire.
 
 ## Branche de travail
 
