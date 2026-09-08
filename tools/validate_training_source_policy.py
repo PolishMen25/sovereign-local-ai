@@ -13,6 +13,8 @@ POLICY_ID = re.compile(r"^[a-z][a-z0-9-]{2,62}$")
 TOP_LEVEL = {
     "schema_version", "policy_id", "status", "target_languages", "priority_domains",
     "allowed_licenses", "excluded_content", "review_requirements",
+    "catalog_status", "purpose", "acquisition_guard", "sources",
+    "estimated_total_tokens", "rejected_sources",
 }
 ALLOWED_LICENSES = {"0BSD", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC0-1.0", "ISC", "MIT", "Unlicense"}
 DOMAINS = {"software-development", "systems-administration", "networking"}
@@ -36,6 +38,10 @@ def validate(document: Any) -> None:
         raise ValueError("policy id is invalid")
     if document["status"] != "candidate":
         raise ValueError("a source policy must remain candidate until owner approval")
+    if document["catalog_status"] != "candidate_requires_owner_approval":
+        raise ValueError("catalog status must require owner approval")
+    if not isinstance(document["purpose"], str) or not document["purpose"].strip():
+        raise ValueError("purpose is invalid")
     _require_exact_list(document["target_languages"], {"fr", "en"}, "target languages")
     _require_exact_list(document["priority_domains"], DOMAINS, "priority domains")
     _require_exact_list(document["allowed_licenses"], ALLOWED_LICENSES, "allowed licenses")
@@ -46,6 +52,20 @@ def validate(document: Any) -> None:
         raise ValueError("all protected content classes must be excluded")
     if not REVIEW_REQUIREMENTS.issubset(document["review_requirements"]):
         raise ValueError("all source review requirements are mandatory")
+    guard = document["acquisition_guard"]
+    if not isinstance(guard, dict) or set(guard) != {
+        "raw_to_validated_promotion", "corpus_bytes_acquired", "allowed_licenses"
+    }:
+        raise ValueError("acquisition guard keys are invalid")
+    if guard["raw_to_validated_promotion"] != "manual_owner_approval_only":
+        raise ValueError("raw promotion must require owner approval")
+    if not isinstance(guard["corpus_bytes_acquired"], bool):
+        raise ValueError("acquisition state is invalid")
+    _require_exact_list(guard["allowed_licenses"], ALLOWED_LICENSES | {"verified-public-domain"}, "acquisition licenses")
+    if not isinstance(document["sources"], list) or len(document["sources"]) != 10:
+        raise ValueError("candidate catalog must contain exactly ten sources")
+    if not isinstance(document["rejected_sources"], list):
+        raise ValueError("rejected sources are invalid")
 
 
 def main() -> int:

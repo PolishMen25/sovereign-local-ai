@@ -29,6 +29,12 @@ class TrainingSourcePolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(unsafe)
 
+    def test_policy_refuses_automatic_raw_promotion(self) -> None:
+        unsafe = copy.deepcopy(self.policy)
+        unsafe["acquisition_guard"]["raw_to_validated_promotion"] = "automatic"
+        with self.assertRaisesRegex(ValueError, "raw promotion"):
+            validate(unsafe)
+
 
 if __name__ == "__main__":
     unittest.main()

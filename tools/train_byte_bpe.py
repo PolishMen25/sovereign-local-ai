@@ -27,7 +27,7 @@ from services.inference.tokenizer import (
 from tools.validate_training_corpus_manifest import validate
 
 
-MAXIMUM_CORPUS_BYTES = 64 * 1024 * 1024
+MAXIMUM_CORPUS_BYTES = 512 * 1024 * 1024
 MAXIMUM_RECORD_BYTES = 1024 * 1024
 MAXIMUM_RECORDS = 1_000_000
 

@@ -32,6 +32,9 @@ def manifest(*, candidate_vocabulary_size: int = 270) -> dict:
 
 
 class ByteBpeTrainingTests(unittest.TestCase):
+    def test_corpus_limit_supports_the_verified_pilot_split_size(self) -> None:
+        self.assertEqual(MODULE.MAXIMUM_CORPUS_BYTES, 512 * 1024 * 1024)
+
     def test_training_is_deterministic_and_keeps_exact_byte_coverage(self) -> None:
         first = MODULE.train(["bonjour bonjour", "bonjour monde"], 270)
         second = MODULE.train(["bonjour bonjour", "bonjour monde"], 270)

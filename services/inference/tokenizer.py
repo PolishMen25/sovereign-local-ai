@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 import unicodedata
+from array import array
+from heapq import heapify, heappop, heappush
 
 
 SCHEMA_VERSION = "0.2.0"
@@ -130,42 +132,150 @@ def train_byte_bpe(
     if not normalized or any(not text for text in normalized):
         fail("texts must be a non-empty iterable of non-empty strings")
 
-    sequences = [
-        [f"{byte:02x}" for byte in text.encode(INPUT_ENCODING)]
-        for text in normalized
-    ]
-    tokens = list(canonical_byte_tokens())
+    # Incremental implementation with output identical to the reference BPE.
+    # The representation and pair accounting change, not eligibility, tie
+    # breaking, or left-to-right non-overlapping merge semantics.
+    symbol_strings = list(canonical_byte_tokens())
+    symbol_lengths = [1] * 256
+    tokens = list(symbol_strings)
     vocabulary = set(tokens)
     merges: list[tuple[str, str]] = []
 
-    while len(SPECIAL_TOKENS) + len(tokens) < vocabulary_size:
-        frequencies: dict[tuple[str, str], int] = {}
-        for sequence in sequences:
-            for pair in zip(sequence, sequence[1:]):
-                frequencies[pair] = frequencies.get(pair, 0) + 1
+    symbols = array("i")
+    previous_index = array("i")
+    next_index = array("i")
+    base = 0
+    for text in normalized:
+        payload = text.encode(INPUT_ENCODING)
+        length = len(payload)
+        symbols.extend(payload)
+        previous_index.extend(range(base - 1, base + length - 1))
+        next_index.extend(range(base + 1, base + length + 1))
+        previous_index[base] = -1
+        next_index[base + length - 1] = -1
+        base += length
+    del normalized
+    total = len(symbols)
 
-        eligible: list[tuple[int, str, str]] = []
-        for (left, right), count in frequencies.items():
-            merged = left + right
-            if (
-                count >= minimum_frequency
-                and merged not in vocabulary
-                and len(merged) // 2 <= MAXIMUM_TOKEN_BYTES
-            ):
-                eligible.append((count, left, right))
-        if not eligible:
+    counts: dict[tuple[int, int], int] = {}
+    positions: dict[tuple[int, int], array] = {}
+    for position in range(total):
+        following = next_index[position]
+        if following == -1:
+            continue
+        key = (symbols[position], symbols[following])
+        count = counts.get(key)
+        if count is None:
+            counts[key] = 1
+            slot = array("i")
+            slot.append(position)
+            positions[key] = slot
+        else:
+            counts[key] = count + 1
+            positions[key].append(position)
+
+    heap = [
+        (-count, symbol_strings[key[0]], symbol_strings[key[1]], key[0], key[1])
+        for key, count in counts.items()
+    ]
+    heapify(heap)
+    rebuild_at = max(4 * len(heap), 1_000_000)
+
+    while len(SPECIAL_TOKENS) + len(tokens) < vocabulary_size:
+        chosen = None
+        while heap:
+            recorded, left_string, right_string, left, right = heappop(heap)
+            key = (left, right)
+            current = counts.get(key, 0)
+            if current != -recorded:
+                if current > 0:
+                    heappush(heap, (-current, left_string, right_string, left, right))
+                continue
+            if current < minimum_frequency:
+                continue
+            if symbol_lengths[left] + symbol_lengths[right] > MAXIMUM_TOKEN_BYTES:
+                continue
+            if left_string + right_string in vocabulary:
+                continue
+            chosen = key
+            break
+        if chosen is None:
             break
 
-        count, left, right = min(
-            eligible, key=lambda candidate: (-candidate[0], candidate[1], candidate[2])
-        )
-        del count
-        pair = (left, right)
-        merged = left + right
-        merges.append(pair)
-        tokens.append(merged)
+        left, right = chosen
+        merged = symbol_strings[left] + symbol_strings[right]
+        merged_id = len(symbol_strings)
+        symbol_strings.append(merged)
+        symbol_lengths.append(symbol_lengths[left] + symbol_lengths[right])
         vocabulary.add(merged)
-        sequences = [merge_sequence(sequence, pair, merged) for sequence in sequences]
+        tokens.append(merged)
+        merges.append((symbol_strings[left], symbol_strings[right]))
+
+        occurrences = positions.pop(chosen, array("i"))
+        counts.pop(chosen, None)
+
+        for position in sorted(occurrences):
+            if symbols[position] != left:
+                continue
+            following = next_index[position]
+            if following == -1 or symbols[following] != right:
+                continue
+            preceding = previous_index[position]
+            trailing = next_index[following]
+
+            if preceding != -1:
+                key = (symbols[preceding], left)
+                count = counts.get(key)
+                if count is not None:
+                    if count <= 1:
+                        del counts[key]
+                        positions.pop(key, None)
+                    else:
+                        counts[key] = count - 1
+            if trailing != -1:
+                key = (right, symbols[trailing])
+                count = counts.get(key)
+                if count is not None:
+                    if count <= 1:
+                        del counts[key]
+                        positions.pop(key, None)
+                    else:
+                        counts[key] = count - 1
+
+            symbols[position] = merged_id
+            symbols[following] = -1
+            next_index[position] = trailing
+            if trailing != -1:
+                previous_index[trailing] = position
+
+            if preceding != -1:
+                key = (symbols[preceding], merged_id)
+                count = counts.get(key, 0) + 1
+                counts[key] = count
+                slot = positions.get(key)
+                if slot is None:
+                    slot = array("i")
+                    positions[key] = slot
+                slot.append(preceding)
+                heappush(heap, (-count, symbol_strings[key[0]], merged, key[0], merged_id))
+            if trailing != -1:
+                key = (merged_id, symbols[trailing])
+                count = counts.get(key, 0) + 1
+                counts[key] = count
+                slot = positions.get(key)
+                if slot is None:
+                    slot = array("i")
+                    positions[key] = slot
+                slot.append(position)
+                heappush(heap, (-count, merged, symbol_strings[key[1]], merged_id, key[1]))
+
+        if len(heap) > rebuild_at:
+            heap = [
+                (-count, symbol_strings[key[0]], symbol_strings[key[1]], key[0], key[1])
+                for key, count in counts.items()
+            ]
+            heapify(heap)
+            rebuild_at = max(4 * len(heap), 1_000_000)
 
     return BpeTrainingResult(tokens_hex=tuple(tokens), merges=tuple(merges))
 

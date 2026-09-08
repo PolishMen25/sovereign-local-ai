@@ -36,7 +36,8 @@ approbation absente, une empreinte `pending`/`unverified`, une licence hors
 allowlist ou une divergence de source. `tools/preflight_core_700m_tokenizer.py`
 appelle ce vérificateur avant toute autre opération et n'offre aucun bypass.
 
-**Statut : corpus initial approuvé ; tokenizer 32k en promotion contrôlée.**
+**Statut : la politique Git reste candidate tant que le fichier d'approbation
+propriétaire est absent ; aucun préflight ne peut donc démarrer.**
 
 Ce projet ne lance pas d'entraînement linguistique tant qu'un corpus, son
 tokenizer et son autorisation ne sont pas explicitement approuvés. Le
@@ -152,7 +153,9 @@ Une promotion distincte peut le rendre `candidate_core` après vérification du
 manifeste approuvé, du split `train`, du vocabulaire et des empreintes ; elle
 produit un reçu séparé liant les deux versions. `approved_core_v1` reste
 réservé à une décision ultérieure. Le prototype est borné à 32 768 unités et
-son algorithme d'apprentissage naïf n'est pas encore adapté à un grand corpus.
+conserve les règles de sortie de référence tout en mettant à jour localement les
+occurrences de paires ; le détail de l'adoption contrôlée pour pilote-v3 est
+décrit dans [la note d'adoption](pilote-v3-tokenizer-adoption.md).
 Pour un corpus réduit, le seuil minimal de fréquence `1` est admis, consigné dans
 l'artefact et doit rester explicite dans le reçu de promotion.
 La configuration candidate est
