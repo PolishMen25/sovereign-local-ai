@@ -52,3 +52,12 @@ Le corpus vise prioritairement Python, PowerShell, Bash,
 JavaScript/TypeScript, HTML/CSS, SQL, Docker, Linux et réseau, avec du français
 et de l'anglais technique. Une source ambiguë, non traçable ou incompatible
 avec la politique de réutilisation est refusée.
+
+## Boucle d'amélioration par signal externe
+
+La boucle d'auto-entraînement reste **INACTIVE**. Sa seule source de sélection
+est un résultat de tests exécutés dans un bac à sable isolé ; CORE ne juge jamais
+ses propres sorties. Les seuils d'activation, l'isolation, les plafonds de
+données synthétiques et le passage obligatoire par le gate corpus sont définis
+dans [la spécification de boucle](self-training-loop-spec.md). CORE-MINI doit
+valider cette chaîne avant toute adaptation de budget à CORE-700M.
