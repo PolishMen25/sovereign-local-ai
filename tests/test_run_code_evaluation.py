@@ -21,15 +21,15 @@ class CodeEvaluationSuiteTests(unittest.TestCase):
     def setUp(self) -> None:
         self.suite = json.loads(SUITE_PATH.read_text(encoding="utf-8"))
 
-    def test_candidate_suite_has_ten_distinct_python_tasks(self) -> None:
+    def test_candidate_suite_has_fifty_distinct_python_tasks(self) -> None:
         tasks = MODULE.validate_suite(self.suite)
-        self.assertEqual(10, len(tasks))
-        self.assertEqual(10, len({task["id"] for task in tasks}))
+        self.assertEqual(50, len(tasks))
+        self.assertEqual(50, len({task["id"] for task in tasks}))
 
     def test_suite_refuses_an_extra_task_or_wrong_status(self) -> None:
         changed = json.loads(json.dumps(self.suite))
         changed["tasks"].append(changed["tasks"][0])
-        with self.assertRaisesRegex(MODULE.EvaluationRefused, "ten tasks"):
+        with self.assertRaisesRegex(MODULE.EvaluationRefused, "fifty tasks"):
             MODULE.validate_suite(changed)
         changed = json.loads(json.dumps(self.suite))
         changed["status"] = "approved"
@@ -77,7 +77,7 @@ class CodeEvaluationSuiteTests(unittest.TestCase):
             with patch.object(MODULE, "require_sandbox", return_value="/usr/bin/bwrap"), patch.object(MODULE, "run_task", side_effect=[dict(result, task_id=task["id"]) for task in self.suite["tasks"]]):
                 report = MODULE.evaluate(suite_path=suite_path, candidates_path=candidates_path, output_dir=output_dir)
             report_text = (output_dir / "code-evaluation-report.json").read_text(encoding="utf-8")
-            self.assertEqual(10, report["accepted"])
+            self.assertEqual(50, report["accepted"])
             self.assertNotIn("private candidate text", report_text)
             self.assertNotIn(self.suite["tasks"][0]["prompt"], report_text)
 

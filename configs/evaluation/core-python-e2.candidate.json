@@ -63,6 +63,246 @@
       "function_name": "group_initial",
       "prompt": "Write group_initial(words) that groups strings by their first character, preserving input order in each group.",
       "test_source": "assert module['group_initial']([]) == {}\nassert module['group_initial'](['ant', 'bee', 'apple']) == {'a': ['ant', 'apple'], 'b': ['bee']}\n"
+    },
+    {
+      "id": "python-11-flatten-once",
+      "function_name": "flatten_once",
+      "prompt": "Write flatten_once(groups) that concatenates one level of lists while preserving order.",
+      "test_source": "assert module['flatten_once']([]) == []\nassert module['flatten_once']([[1, 2], [], [3]]) == [1, 2, 3]\n"
+    },
+    {
+      "id": "python-12-rotate-left",
+      "function_name": "rotate_left",
+      "prompt": "Write rotate_left(values, count) that rotates a list left by count positions and handles counts larger than its length.",
+      "test_source": "assert module['rotate_left']([], 4) == []\nassert module['rotate_left']([1, 2, 3, 4], 1) == [2, 3, 4, 1]\nassert module['rotate_left']([1, 2, 3], 4) == [2, 3, 1]\n"
+    },
+    {
+      "id": "python-13-merge-intervals",
+      "function_name": "merge_intervals",
+      "prompt": "Write merge_intervals(intervals) that merges overlapping or touching (start, end) integer intervals and returns them ordered.",
+      "test_source": "assert module['merge_intervals']([]) == []\nassert module['merge_intervals']([(5, 7), (1, 3), (3, 4), (8, 9)]) == [(1, 4), (5, 7), (8, 9)]\nassert module['merge_intervals']([(1, 2), (2, 5)]) == [(1, 5)]\n"
+    },
+    {
+      "id": "python-14-balanced-brackets",
+      "function_name": "balanced_brackets",
+      "prompt": "Write balanced_brackets(text) that returns whether (), [] and {} are properly balanced; ignore other characters.",
+      "test_source": "assert module['balanced_brackets']('a(b[c]{d})') is True\nassert module['balanced_brackets']('([)]') is False\nassert module['balanced_brackets'](')') is False\n"
+    },
+    {
+      "id": "python-15-run-length-encode",
+      "function_name": "run_length_encode",
+      "prompt": "Write run_length_encode(text) returning (character, count) pairs for consecutive runs in a string.",
+      "test_source": "assert module['run_length_encode']('') == []\nassert module['run_length_encode']('aaabbc') == [('a', 3), ('b', 2), ('c', 1)]\n"
+    },
+    {
+      "id": "python-16-most-common",
+      "function_name": "most_common",
+      "prompt": "Write most_common(values) that returns the most frequent value, breaking ties by the first value encountered, or None for empty input.",
+      "test_source": "assert module['most_common']([]) is None\nassert module['most_common'](['b', 'a', 'a', 'b']) == 'b'\nassert module['most_common']([3, 1, 3, 1, 1]) == 1\n"
+    },
+    {
+      "id": "python-17-slugify",
+      "function_name": "slugify",
+      "prompt": "Write slugify(text) that lowercases text, converts runs of non-alphanumeric characters to one hyphen, and strips edge hyphens.",
+      "test_source": "assert module['slugify']('Hello, World!') == 'hello-world'\nassert module['slugify']('  A__B  ') == 'a-b'\nassert module['slugify']('') == ''\n"
+    },
+    {
+      "id": "python-18-parse-query",
+      "function_name": "parse_query",
+      "prompt": "Write parse_query(query) that parses ampersand-separated key=value pairs into a dictionary; later duplicate keys replace earlier values.",
+      "test_source": "assert module['parse_query']('') == {}\nassert module['parse_query']('a=1&b=two&a=3') == {'a': '3', 'b': 'two'}\n"
+    },
+    {
+      "id": "python-19-chunked",
+      "function_name": "chunked",
+      "prompt": "Write chunked(values, size) that returns consecutive list chunks of at most size elements; return [] for a non-positive size.",
+      "test_source": "assert module['chunked']([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]\nassert module['chunked']([1], 0) == []\n"
+    },
+    {
+      "id": "python-20-deep-get",
+      "function_name": "deep_get",
+      "prompt": "Write deep_get(mapping, path, default=None) that follows dot-separated dictionary keys and returns default when a key is missing.",
+      "test_source": "data = {'a': {'b': {'c': 4}}}\nassert module['deep_get'](data, 'a.b.c') == 4\nassert module['deep_get'](data, 'a.x', 'none') == 'none'\n"
+    },
+    {
+      "id": "python-21-topological-ready",
+      "function_name": "topological_ready",
+      "prompt": "Write topological_ready(tasks, completed) that returns task names whose dependencies are all completed, preserving tasks order.",
+      "test_source": "tasks = {'build': [], 'test': ['build'], 'ship': ['test'], 'docs': []}\nassert module['topological_ready'](tasks, {'build'}) == ['test', 'docs']\nassert module['topological_ready'](tasks, set()) == ['build', 'docs']\n"
+    },
+    {
+      "id": "python-22-csv-row",
+      "function_name": "parse_csv_row",
+      "prompt": "Write parse_csv_row(row) that splits a single CSV row on commas, except commas inside double quotes; quoted values exclude their quotes.",
+      "test_source": "assert module['parse_csv_row']('a,b,c') == ['a', 'b', 'c']\nassert module['parse_csv_row']('a,\"b,c\",d') == ['a', 'b,c', 'd']\n"
+    },
+    {
+      "id": "python-23-roman-to-int",
+      "function_name": "roman_to_int",
+      "prompt": "Write roman_to_int(value) for valid uppercase Roman numerals using I, V, X, L, C, D and M.",
+      "test_source": "assert module['roman_to_int']('III') == 3\nassert module['roman_to_int']('IV') == 4\nassert module['roman_to_int']('MCMXCIV') == 1994\n"
+    },
+    {
+      "id": "python-24-gcd",
+      "function_name": "greatest_common_divisor",
+      "prompt": "Write greatest_common_divisor(a, b) that returns the non-negative greatest common divisor of two integers.",
+      "test_source": "assert module['greatest_common_divisor'](54, 24) == 6\nassert module['greatest_common_divisor'](-8, 12) == 4\nassert module['greatest_common_divisor'](0, 5) == 5\n"
+    },
+    {
+      "id": "python-25-prime-factors",
+      "function_name": "prime_factors",
+      "prompt": "Write prime_factors(value) that returns the prime factors of an integer greater than one in ascending order with repeats.",
+      "test_source": "assert module['prime_factors'](2) == [2]\nassert module['prime_factors'](60) == [2, 2, 3, 5]\nassert module['prime_factors'](97) == [97]\n"
+    },
+    {
+      "id": "python-26-validate-ipv4",
+      "function_name": "is_ipv4",
+      "prompt": "Write is_ipv4(value) that returns True only for four dot-separated decimal octets from 0 through 255 without empty octets.",
+      "test_source": "assert module['is_ipv4']('192.168.0.1') is True\nassert module['is_ipv4']('256.1.1.1') is False\nassert module['is_ipv4']('1.2.3') is False\n"
+    },
+    {
+      "id": "python-27-duration-seconds",
+      "function_name": "duration_seconds",
+      "prompt": "Write duration_seconds(value) that parses a non-negative HH:MM:SS string into seconds.",
+      "test_source": "assert module['duration_seconds']('00:00:00') == 0\nassert module['duration_seconds']('01:02:03') == 3723\nassert module['duration_seconds']('10:00:01') == 36001\n"
+    },
+    {
+      "id": "python-28-ini-sections",
+      "function_name": "ini_sections",
+      "prompt": "Write ini_sections(text) that returns a dictionary of section names to dictionaries of key=value entries, ignoring blank lines and # comments.",
+      "test_source": "text = '[app]\\nport=80\\n# note\\n[db]\\nhost=localhost\\n'\nassert module['ini_sections'](text) == {'app': {'port': '80'}, 'db': {'host': 'localhost'}}\n"
+    },
+    {
+      "id": "python-29-lru-touch",
+      "function_name": "lru_touch",
+      "prompt": "Write lru_touch(keys, key, capacity) that returns an updated least-recently-used list after touching key; keep at most capacity items.",
+      "test_source": "assert module['lru_touch'](['a', 'b', 'c'], 'b', 3) == ['a', 'c', 'b']\nassert module['lru_touch'](['a', 'b'], 'c', 2) == ['b', 'c']\n"
+    },
+    {
+      "id": "python-30-binary-search",
+      "function_name": "binary_search",
+      "prompt": "Write binary_search(values, target) that returns the index of target in an ascending list or -1 when absent.",
+      "test_source": "assert module['binary_search']([], 1) == -1\nassert module['binary_search']([1, 3, 5, 8], 5) == 2\nassert module['binary_search']([1, 3, 5, 8], 4) == -1\n"
+    },
+    {
+      "id": "python-31-longest-prefix",
+      "function_name": "longest_common_prefix",
+      "prompt": "Write longest_common_prefix(values) returning the longest string prefix shared by every string, or an empty string for empty input.",
+      "test_source": "assert module['longest_common_prefix'](['flower', 'flow', 'flight']) == 'fl'\nassert module['longest_common_prefix'](['dog', 'racecar']) == ''\nassert module['longest_common_prefix']([]) == ''\n"
+    },
+    {
+      "id": "python-32-levenshtein",
+      "function_name": "levenshtein_distance",
+      "prompt": "Write levenshtein_distance(left, right) that returns the minimum number of single-character insertions, deletions and replacements.",
+      "test_source": "assert module['levenshtein_distance']('', 'abc') == 3\nassert module['levenshtein_distance']('kitten', 'sitting') == 3\nassert module['levenshtein_distance']('same', 'same') == 0\n"
+    },
+    {
+      "id": "python-33-url-parts",
+      "function_name": "url_parts",
+      "prompt": "Write url_parts(url) that returns (scheme, host, path) for simple absolute HTTP or HTTPS URLs, with path defaulting to '/'.",
+      "test_source": "assert module['url_parts']('https://example.com/a/b') == ('https', 'example.com', '/a/b')\nassert module['url_parts']('http://localhost') == ('http', 'localhost', '/')\n"
+    },
+    {
+      "id": "python-34-headers-normalize",
+      "function_name": "normalize_headers",
+      "prompt": "Write normalize_headers(headers) that returns a dictionary with lower-case header names and trimmed string values; later values replace earlier ones.",
+      "test_source": "assert module['normalize_headers']([('Content-Type', ' text/plain '), ('X-ID', '7'), ('content-type', 'application/json')]) == {'content-type': 'application/json', 'x-id': '7'}\n"
+    },
+    {
+      "id": "python-35-diff-keys",
+      "function_name": "diff_keys",
+      "prompt": "Write diff_keys(left, right) that returns sorted keys whose values differ, including keys present in only one dictionary.",
+      "test_source": "assert module['diff_keys']({'a': 1, 'b': 2}, {'a': 1, 'c': 3}) == ['b', 'c']\nassert module['diff_keys']({}, {}) == []\n"
+    },
+    {
+      "id": "python-36-retry-delays",
+      "function_name": "retry_delays",
+      "prompt": "Write retry_delays(initial, attempts, maximum) that returns exponential retry delays capped at maximum.",
+      "test_source": "assert module['retry_delays'](1, 5, 10) == [1, 2, 4, 8, 10]\nassert module['retry_delays'](2, 0, 10) == []\n"
+    },
+    {
+      "id": "python-37-port-range",
+      "function_name": "expand_port_range",
+      "prompt": "Write expand_port_range(specification) that parses a comma-separated list of ports or inclusive start-end ranges into sorted unique integers.",
+      "test_source": "assert module['expand_port_range']('80,443,8000-8002,80') == [80, 443, 8000, 8001, 8002]\nassert module['expand_port_range']('22') == [22]\n"
+    },
+    {
+      "id": "python-38-log-level-counts",
+      "function_name": "log_level_counts",
+      "prompt": "Write log_level_counts(lines) that counts log levels appearing as the first whitespace-separated token in each nonblank line.",
+      "test_source": "assert module['log_level_counts'](['INFO start', 'ERROR fail', '', 'INFO done']) == {'INFO': 2, 'ERROR': 1}\n"
+    },
+    {
+      "id": "python-39-tail-lines",
+      "function_name": "tail_lines",
+      "prompt": "Write tail_lines(lines, count) that returns the final count items of a list without mutating it; return [] for non-positive count.",
+      "test_source": "values = [1, 2, 3, 4]\nassert module['tail_lines'](values, 2) == [3, 4]\nassert values == [1, 2, 3, 4]\nassert module['tail_lines'](values, 0) == []\n"
+    },
+    {
+      "id": "python-40-deduplicate-records",
+      "function_name": "deduplicate_records",
+      "prompt": "Write deduplicate_records(records, key) that keeps the first dictionary for each distinct key value, preserving order.",
+      "test_source": "rows = [{'id': 1, 'v': 'a'}, {'id': 2, 'v': 'b'}, {'id': 1, 'v': 'later'}]\nassert module['deduplicate_records'](rows, 'id') == rows[:2]\n"
+    },
+    {
+      "id": "python-41-sorted-insert",
+      "function_name": "sorted_insert",
+      "prompt": "Write sorted_insert(values, value) that returns a new ascending list with value inserted after existing equal values.",
+      "test_source": "assert module['sorted_insert']([1, 3, 3, 5], 3) == [1, 3, 3, 3, 5]\nassert module['sorted_insert']([], 2) == [2]\n"
+    },
+    {
+      "id": "python-42-parse-size",
+      "function_name": "parse_size_bytes",
+      "prompt": "Write parse_size_bytes(value) that parses an integer followed by optional B, KB, MB or GB (base 1024) into bytes.",
+      "test_source": "assert module['parse_size_bytes']('42') == 42\nassert module['parse_size_bytes']('2KB') == 2048\nassert module['parse_size_bytes']('3 MB') == 3 * 1024 * 1024\n"
+    },
+    {
+      "id": "python-43-ranges-compress",
+      "function_name": "compress_ranges",
+      "prompt": "Write compress_ranges(values) that converts sorted unique integers into inclusive (start, end) ranges for consecutive values.",
+      "test_source": "assert module['compress_ranges']([]) == []\nassert module['compress_ranges']([1, 2, 3, 7, 9, 10]) == [(1, 3), (7, 7), (9, 10)]\n"
+    },
+    {
+      "id": "python-44-parse-boolean",
+      "function_name": "parse_boolean",
+      "prompt": "Write parse_boolean(value) that returns True for true, yes, 1; False for false, no, 0; and None for anything else, case-insensitively.",
+      "test_source": "assert module['parse_boolean']('YES') is True\nassert module['parse_boolean']('0') is False\nassert module['parse_boolean']('maybe') is None\n"
+    },
+    {
+      "id": "python-45-bfs-distances",
+      "function_name": "bfs_distances",
+      "prompt": "Write bfs_distances(graph, start) that returns shortest edge distances from start in an adjacency-list graph.",
+      "test_source": "graph = {'a': ['b', 'c'], 'b': ['d'], 'c': ['d'], 'd': []}\nassert module['bfs_distances'](graph, 'a') == {'a': 0, 'b': 1, 'c': 1, 'd': 2}\n"
+    },
+    {
+      "id": "python-46-toml-values",
+      "function_name": "simple_toml_values",
+      "prompt": "Write simple_toml_values(text) that parses root-level key = value lines, with quoted strings unquoted and decimal integers converted to int.",
+      "test_source": "assert module['simple_toml_values']('name = \"core\"\\nport = 9000\\n') == {'name': 'core', 'port': 9000}\n"
+    },
+    {
+      "id": "python-47-ring-buffer",
+      "function_name": "ring_buffer_append",
+      "prompt": "Write ring_buffer_append(values, value, capacity) that returns a new list containing the newest capacity values after appending value.",
+      "test_source": "assert module['ring_buffer_append']([1, 2, 3], 4, 3) == [2, 3, 4]\nassert module['ring_buffer_append']([], 'x', 2) == ['x']\n"
+    },
+    {
+      "id": "python-48-median",
+      "function_name": "median",
+      "prompt": "Write median(values) that returns the numeric median of a non-empty list without mutating the input.",
+      "test_source": "values = [9, 1, 5]\nassert module['median'](values) == 5\nassert values == [9, 1, 5]\nassert module['median']([1, 8, 2, 4]) == 3.0\n"
+    },
+    {
+      "id": "python-49-template-render",
+      "function_name": "render_template",
+      "prompt": "Write render_template(template, values) that replaces {name} placeholders using a dictionary and leaves unknown placeholders unchanged.",
+      "test_source": "assert module['render_template']('Hi {name}, {missing}!', {'name': 'Ada'}) == 'Hi Ada, {missing}!'\n"
+    },
+    {
+      "id": "python-50-permissions",
+      "function_name": "has_permission",
+      "prompt": "Write has_permission(user_roles, required_roles) that returns True when the two role collections share at least one role.",
+      "test_source": "assert module['has_permission']({'admin', 'reader'}, {'writer', 'admin'}) is True\nassert module['has_permission'](['reader'], ['writer']) is False\n"
     }
   ]
 }

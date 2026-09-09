@@ -26,9 +26,9 @@ SUITE_SCHEMA = "core-code-evaluation-suite.v1"
 CANDIDATES_SCHEMA = "core-code-evaluation-candidates.v1"
 REPORT_SCHEMA = "core-code-evaluation-report.v1"
 SUITE_STATUS = "candidate_owner_review_required"
-TASK_ID = re.compile(r"^python-(?:0[1-9]|10)-[a-z-]+$")
+TASK_ID = re.compile(r"^python-(?:0[1-9]|[1-4][0-9]|50)-[a-z0-9-]+$")
 HEX_SHA256 = re.compile(r"^[0-9a-f]{64}$")
-TASK_COUNT = 10
+TASK_COUNT = 50
 CPU_SECONDS = 10
 MEMORY_BYTES = 512 * 1024 * 1024
 OUTPUT_BYTES = 64 * 1024 * 1024
@@ -75,7 +75,7 @@ def validate_suite(document: Any) -> list[dict[str, str]]:
         raise EvaluationRefused("evaluation suite contract is invalid")
     tasks = document["tasks"]
     if not isinstance(tasks, list) or len(tasks) != TASK_COUNT:
-        raise EvaluationRefused("evaluation suite must contain exactly ten tasks")
+        raise EvaluationRefused("evaluation suite must contain exactly fifty tasks")
     identifiers: set[str] = set()
     validated: list[dict[str, str]] = []
     for task in tasks:
