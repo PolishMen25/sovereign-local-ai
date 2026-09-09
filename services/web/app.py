@@ -416,7 +416,8 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                 answer = self.state.core_runtime.generate(request_value["message"])
                 selected_engine = "CORE-700M"
             elif requested_engine == "QWEN-CODER":
-                answer = self.state.qwen_runtime.generate(request_value["message"])
+                messages[0] = {"role": "system", "content": "Tu es Qwen Coder, assistant local de programmation distinct de CORE. Réponds dans la langue de l'utilisateur. Tu n'as ni outil ni accès Internet. Ne prétends jamais avoir exécuté le code proposé."}
+                answer = self.state.qwen_runtime.generate(messages)
                 selected_engine = "QWEN-CODER"
             else:
                 answer = self.state.runtime.generate(messages)
