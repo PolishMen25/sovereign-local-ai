@@ -22,6 +22,19 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   puis rechargé depuis sa copie durable. Les paliers ultérieurs doivent conserver
   cette règle : checkpoint atomique, destination absente, comparaison SHA-256,
   source conservée ;
+- la lignée pré-tokenisée a ensuite franchi les étapes 3 110, 4 110 et 5 110.
+  Les checkpoints 4 110 et 5 110 ont chacun une copie durable relue dont
+  l'empreinte est identique à la source. Le calcul actif reste local au nœud de
+  calcul et le stockage durable complet reste sur le NAS ;
+- la mémoire privée peut désormais exporter les paires complètes
+  `user`/`assistant` déjà assainies en paquet candidat déterministe. Le paquet
+  contient un manifeste, une empreinte relue après écriture et le compte des
+  exclusions ; il reste `pending_owner_approval` et ne déclenche aucune
+  promotion ni aucun entraînement ;
+- une reprise opérateur des conversations antérieures est disponible. Elle
+  refuse toute entrée non assainie ou dont l'empreinte ne correspond plus, et
+  ne reprend jamais les rôles `system` ou `tool`. La base privée observée lors
+  du déploiement ne contenait encore aucune paire complète à exporter ;
 - le checkpoint CORE-30M de l'étape 1 110 a une copie durable dont l'empreinte
   est identique à la source. Son contrôle E0 est positif : contrat complet,
   chargement CPU et génération bornée déterministe ; cela ne constitue pas une
@@ -82,6 +95,8 @@ Ils sont conservés uniquement pour la traçabilité de la tranche du 7 septembr
   contenait quatre documents VALIDATED. Cet état ne rend ni RAW ni les
   conversations consultables par le RAG ;
 - sur cette lignée, la suite complète compte 254 tests verts et un ignoré.
+  Après l'ajout de l'export conversationnel et de sa reprise contrôlée, la
+  suite compte 271 tests verts et un ignoré.
 
 ### Invariants à préserver
 
@@ -136,6 +151,13 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
   code vérifié avant toute utilité déclarée pour CORE.
 - `0a5e98b` : suite E1 candidate de 50 prompts français/anglais, équilibrée et
   validée structurellement ; elle attend encore la revue propriétaire.
+- `090dd6e` : lecture vérifiée du corpus pré-tokenisé, équivalente au chemin
+  autorisé non mis en cache.
+- `46541e3` : borne explicite du pilote CORE-30M jusqu'à 20 000 étapes.
+- `9663a52` : export déterministe des conversations assainies en paquet
+  candidat non approuvé.
+- `fd743c6` : reprise explicite des anciens messages assainis avec refus sur
+  contenu ou empreinte incohérents.
 
 ## Branche de travail
 
