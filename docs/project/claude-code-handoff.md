@@ -35,6 +35,10 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   prépare 50 réponses bornées pour une revue propriétaire séparée. Le checkpoint
   final a échoué ce garde sur une sortie répétitive : aucun paquet E1 n'a été
   créé et CORE-30M ne doit pas être présenté comme chat ou assistant de code ;
+- le runner E2 contient dix tâches Python et retient uniquement des verdicts
+  produits par leurs tests dans un bac à sable offline. Il est prêt à être
+  exécuté lorsqu'un environnement Linux avec Bubblewrap est disponible ; il ne
+  remplace pas E1 et ne transforme aucune réponse en donnée d'entraînement ;
 - la mémoire privée peut désormais exporter les paires complètes
   `user`/`assistant` déjà assainies en paquet candidat déterministe. Le paquet
   contient un manifeste, une empreinte relue après écriture et le compte des
@@ -169,6 +173,8 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
   contenu ou empreinte incohérents.
 - `0607f1a` : runner E1 CORE-30M atomique, reproductible et destiné à la revue
   propriétaire ; `ff16ad9` consigne le refus E0 du checkpoint final.
+- `de71ef9` : suite E2 Python hors ligne, limites de ressources et verdicts de
+  tests externes sans auto-évaluation du modèle.
 
 ## Branche de travail
 
