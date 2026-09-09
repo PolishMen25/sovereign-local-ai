@@ -51,6 +51,16 @@ Les seuils de passage et la taille finale du jeu restent à approuver par le
 propriétaire. Tant qu'ils ne le sont pas, E1 produit une observation, jamais un
 verdict de qualité.
 
+### Résultat enregistré — 2026-09-09
+
+Le checkpoint final du pilote pré-entraîné a été soumis à E1 avec le contrat de
+corpus, tokenizer et préflight correspondant. Le runtime a refusé une sortie
+répétitive pendant le garde E0 ; aucun paquet de réponses ni modèle de revue E1
+n'a donc été créé. Ce résultat interdit de présenter cette lignée comme un chat
+ou assistant de programmation utilisable. Il ne justifie ni un contournement du+garde ni une nouvelle estimation de qualité : les prochaines données doivent
+être des paires instruction-réponse assainies et des tâches de code validées par
+des tests externes.
+
 ### E2 — code vérifiable de l'extérieur
 
 Les tâches de code décrivent une fonction, ses entrées et des tests attendus.
