@@ -27,6 +27,20 @@ class InferenceUnavailable(RuntimeError):
     """Raised when local inference cannot prove its complete contract."""
 
 
+def allowed_checkpoint_schemas(model_name: str) -> frozenset[str]:
+    """Return the exact checkpoint envelopes accepted for one CORE candidate.
+
+    Checkpoint provenance is model-specific: accepting a generic ``core-*``
+    schema would make it possible to load weights produced for a different
+    candidate.  The historical inference envelope is a CORE-700M-only format.
+    """
+
+    schemas = {f"{model_name.lower()}-checkpoint.v1"}
+    if model_name == "CORE-700M":
+        schemas.add("core-700m-inference-checkpoint.v1")
+    return frozenset(schemas)
+
+
 def _sha256(path: Path) -> str:
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -90,7 +104,7 @@ class LocalInferenceRuntime:
         if not isinstance(checkpoint, dict) or set(checkpoint) not in ({"schema_version", "model_name", "step", "contract", "model"}, {"schema_version", "model_name", "step", "contract", "model", "optimizer"}):
             raise InferenceUnavailable("CORE checkpoint envelope is incompatible")
         contract = checkpoint.get("contract")
-        if checkpoint.get("schema_version") not in {"core-700m-checkpoint.v1", "core-700m-inference-checkpoint.v1"} or checkpoint.get("model_name") != self.model_name or not isinstance(contract, dict) or any(contract.get(key) != value for key, value in expected.items()) or not isinstance(checkpoint.get("model"), dict):
+        if checkpoint.get("schema_version") not in allowed_checkpoint_schemas(self.model_name) or checkpoint.get("model_name") != self.model_name or not isinstance(contract, dict) or any(contract.get(key) != value for key, value in expected.items()) or not isinstance(checkpoint.get("model"), dict):
             raise InferenceUnavailable("CORE checkpoint provenance is incompatible")
         model = build_model(torch, config)
         try:
