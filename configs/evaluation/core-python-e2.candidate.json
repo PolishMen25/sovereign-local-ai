@@ -1,0 +1,68 @@
+{
+  "schema_version": "core-code-evaluation-suite.v1",
+  "status": "candidate_owner_review_required",
+  "language": "python",
+  "execution": "isolated_external_tests",
+  "tasks": [
+    {
+      "id": "python-01-reverse-text",
+      "function_name": "reverse_text",
+      "prompt": "Write reverse_text(value) that returns the characters in a string in reverse order.",
+      "test_source": "assert module['reverse_text']('abc') == 'cba'\nassert module['reverse_text']('') == ''\nassert module['reverse_text']('a b') == 'b a'\n"
+    },
+    {
+      "id": "python-02-clamp",
+      "function_name": "clamp",
+      "prompt": "Write clamp(value, minimum, maximum) that keeps value within the inclusive bounds.",
+      "test_source": "assert module['clamp'](5, 0, 10) == 5\nassert module['clamp'](-1, 0, 10) == 0\nassert module['clamp'](12, 0, 10) == 10\n"
+    },
+    {
+      "id": "python-03-palindrome",
+      "function_name": "is_palindrome",
+      "prompt": "Write is_palindrome(value) that returns whether a string reads the same backwards.",
+      "test_source": "assert module['is_palindrome']('kayak') is True\nassert module['is_palindrome']('python') is False\nassert module['is_palindrome']('') is True\n"
+    },
+    {
+      "id": "python-04-fibonacci",
+      "function_name": "fibonacci",
+      "prompt": "Write fibonacci(count) that returns a list containing the first count Fibonacci numbers, starting with 0, 1.",
+      "test_source": "assert module['fibonacci'](0) == []\nassert module['fibonacci'](1) == [0]\nassert module['fibonacci'](6) == [0, 1, 1, 2, 3, 5]\n"
+    },
+    {
+      "id": "python-05-parse-kv",
+      "function_name": "parse_kv_lines",
+      "prompt": "Write parse_kv_lines(text) that returns a dictionary from newline-separated key=value lines and ignores blank lines.",
+      "test_source": "assert module['parse_kv_lines']('a=1\\nb=two\\n') == {'a': '1', 'b': 'two'}\nassert module['parse_kv_lines']('\\nname=Victor\\n') == {'name': 'Victor'}\n"
+    },
+    {
+      "id": "python-06-count-words",
+      "function_name": "count_words",
+      "prompt": "Write count_words(words) that returns a dictionary mapping each string to its number of occurrences.",
+      "test_source": "assert module['count_words']([]) == {}\nassert module['count_words'](['a', 'b', 'a']) == {'a': 2, 'b': 1}\n"
+    },
+    {
+      "id": "python-07-even-numbers",
+      "function_name": "even_numbers",
+      "prompt": "Write even_numbers(values) that returns the even integers in their original order.",
+      "test_source": "assert module['even_numbers']([]) == []\nassert module['even_numbers']([1, 2, 3, 4, 5]) == [2, 4]\nassert module['even_numbers']([-2, -1, 0]) == [-2, 0]\n"
+    },
+    {
+      "id": "python-08-unique-sorted",
+      "function_name": "unique_sorted",
+      "prompt": "Write unique_sorted(values) that returns the unique integers sorted in ascending order.",
+      "test_source": "assert module['unique_sorted']([]) == []\nassert module['unique_sorted']([3, 1, 3, 2]) == [1, 2, 3]\n"
+    },
+    {
+      "id": "python-09-window-sums",
+      "function_name": "window_sums",
+      "prompt": "Write window_sums(values, width) that returns sums of each contiguous window of width elements.",
+      "test_source": "assert module['window_sums']([1, 2, 3, 4], 2) == [3, 5, 7]\nassert module['window_sums']([1, 2], 3) == []\n"
+    },
+    {
+      "id": "python-10-group-initial",
+      "function_name": "group_initial",
+      "prompt": "Write group_initial(words) that groups strings by their first character, preserving input order in each group.",
+      "test_source": "assert module['group_initial']([]) == {}\nassert module['group_initial'](['ant', 'bee', 'apple']) == {'a': ['ant', 'apple'], 'b': ['bee']}\n"
+    }
+  ]
+}

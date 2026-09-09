@@ -73,6 +73,17 @@ Le rapport conserve le SHA-256 du prompt, du test, de la sortie et du résultat,
 mais pas de secret ou de contenu privé. Une sortie rejetée ne rejoint ni corpus
 d'entraînement ni file d'apprentissage.
 
+Le socle candidat est versionné dans
+[`core-python-e2.candidate.json`](../../configs/evaluation/core-python-e2.candidate.json).
+Il contient dix tâches Python statiques. Le lanceur
+[`run_code_evaluation.py`](../../tools/run_code_evaluation.py) exige `bubblewrap`
+sur Linux, crée une instance jetable sans réseau ni montage hôte accessible en
+écriture, applique les limites CPU, mémoire, sortie et durée, puis n'écrit qu'un
+rapport content-free de verdicts et d'empreintes dans le répertoire de sortie.
+Il ne lance aucune génération : les candidats sont une entrée explicite liée à
+un SHA-256 de checkpoint. L'absence du sandbox est un refus, jamais un repli
+vers une exécution directe.
+
 ## Règles de décision
 
 1. BOOTSTRAP reste le défaut tant qu'E0, E1 et E2 ne sont pas approuvés et
