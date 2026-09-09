@@ -12,8 +12,16 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 - le split d'entraînement pilote-v3 a été pré-tokenisé intégralement en artefact
   persistant et lié par empreintes au manifeste, au split, au tokenizer et aux
-  fichiers de tokens ; le runner ne l'utilise pas encore, car une équivalence
-  stricte des deux chemins reste à intégrer et tester avant le prochain palier ;
+  fichiers de tokens. Le runner vérifie ce contrat avant chaque démarrage et
+  utilise le cache seulement s'il est identique au chemin autorisé ;
+- l'équivalence a été testée structurellement sur 630 cas et vérifiée sur le
+  corpus réel par 120 comparaisons de fenêtres. Le palier CORE-30M 1 110→2 110
+  a mesuré environ 0,47 s par étape avec ce cache, contre environ 2,3 s avant ;
+  ce gain de débit ne constitue pas une mesure de qualité ;
+- le checkpoint CORE-30M de l'étape 2 110 a été archivé avec empreinte identique
+  puis rechargé depuis sa copie durable. Les paliers ultérieurs doivent conserver
+  cette règle : checkpoint atomique, destination absente, comparaison SHA-256,
+  source conservée ;
 - le checkpoint CORE-30M de l'étape 1 110 a une copie durable dont l'empreinte
   est identique à la source. Son contrôle E0 est positif : contrat complet,
   chargement CPU et génération bornée déterministe ; cela ne constitue pas une
