@@ -28,6 +28,7 @@
   function engineLabel(value) {
     return value === "BOOTSTRAP" ? "BOOTSTRAP · modèle local provisoire"
       : value === "CORE-700M" ? "CORE-700M expérimental"
+        : value === "QWEN-CODER" ? "Qwen Coder · programmation locale"
         : value === "" ? "Aucun moteur vérifié" : "Moteur indisponible";
   }
 
