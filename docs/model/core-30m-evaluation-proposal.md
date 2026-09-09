@@ -74,9 +74,16 @@ d'entraînement ni file d'apprentissage.
 4. Les seuils, le jeu de prompts et toute transition vers un moteur utilisable
    sont une décision explicite du propriétaire, versionnée séparément.
 
-## Prochain geste requis
+## Exécution E1 reproductible
 
-Après la fin et la restauration vérifiée du palier CORE-30M, préparer un jeu
-candidat E1 sans le lancer, puis soumettre sa taille, ses catégories et ses
-seuils au propriétaire. E2 ne démarre qu'après une spécification du bac à sable
-et des tests de code approuvés.
+`tools/run_core_language_evaluation.py` charge uniquement un checkpoint dont le
+contrat est accepté par le runtime CPU local. Il produit un nouveau répertoire
+atomique contenant les 50 réponses bornées, un reçu qui lie les empreintes du
+checkpoint, de la configuration, du tokenizer, du manifeste et du préflight,
+ainsi qu'un modèle de revue propriétaire séparé. Une destination existante est
+refusée : une évaluation précédente reste donc inchangée. L'outil ne lance aucun
+entraînement et ne déduit aucun verdict de qualité.
+
+Le propriétaire remplit ensuite explicitement `accept`, `reject` ou `abstain`
+dans une copie du modèle de revue. E2 ne démarre qu'après une spécification du
+bac à sable et des tests de code approuvés.
