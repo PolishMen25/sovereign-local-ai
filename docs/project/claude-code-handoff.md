@@ -10,6 +10,10 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 ## Mise à jour vérifiée — 2026-09-09
 
+- le palier CORE-30M batch 8 de l'étape 500 à l'étape 1 000 est terminé.
+  Le checkpoint final a été relu côté calcul et stockage durable avec la même
+  empreinte SHA-256 ; ce palier valide la lignée batch 8 et ne mesure pas une
+  capacité conversationnelle ou de programmation ;
 - le corpus étendu a été redécoupé dans un dérivé RAW candidat par un outil du
   dépôt. Les 1 531 documents présents dans les holdouts pilote-v3 ont été
   retirés ; les nouveaux splits contiennent 166 421 en entraînement, 1 690 en
@@ -45,7 +49,7 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   prépare 50 réponses bornées pour une revue propriétaire séparée. Le checkpoint
   final a échoué ce garde sur une sortie répétitive : aucun paquet E1 n'a été
   créé et CORE-30M ne doit pas être présenté comme chat ou assistant de code ;
-- le runner E2 contient dix tâches Python et retient uniquement des verdicts
+- le runner E2 contient cinquante tâches Python et retient uniquement des verdicts
   produits par leurs tests dans un bac à sable offline. Il est prêt à être
   exécuté lorsqu'un environnement Linux avec Bubblewrap est disponible ; il ne
   remplace pas E1 et ne transforme aucune réponse en donnée d'entraînement ;
@@ -187,7 +191,8 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
 - `0607f1a` : runner E1 CORE-30M atomique, reproductible et destiné à la revue
   propriétaire ; `ff16ad9` consigne le refus E0 du checkpoint final.
 - `de71ef9` : suite E2 Python hors ligne, limites de ressources et verdicts de
-  tests externes sans auto-évaluation du modèle.
+  tests externes sans auto-évaluation du modèle ; `1f87ecb` porte la suite à
+  cinquante tâches distinctes avant la mesure de l'agent Qwen.
 
 ## Branche de travail
 
