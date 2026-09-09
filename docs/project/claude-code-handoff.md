@@ -30,6 +30,11 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   Son checkpoint final possède une copie durable relue avec une empreinte
   identique à la source. Ce résultat valide la reprise et l'archivage du pilote,
   sans démontrer une qualité conversationnelle ;
+- le runner E1 reproductible charge le checkpoint seulement si ses empreintes
+  de configuration, tokenizer, manifeste et préflight correspondent, puis
+  prépare 50 réponses bornées pour une revue propriétaire séparée. Le checkpoint
+  final a échoué ce garde sur une sortie répétitive : aucun paquet E1 n'a été
+  créé et CORE-30M ne doit pas être présenté comme chat ou assistant de code ;
 - la mémoire privée peut désormais exporter les paires complètes
   `user`/`assistant` déjà assainies en paquet candidat déterministe. Le paquet
   contient un manifeste, une empreinte relue après écriture et le compte des
@@ -162,6 +167,8 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
   candidat non approuvé.
 - `fd743c6` : reprise explicite des anciens messages assainis avec refus sur
   contenu ou empreinte incohérents.
+- `0607f1a` : runner E1 CORE-30M atomique, reproductible et destiné à la revue
+  propriétaire ; `ff16ad9` consigne le refus E0 du checkpoint final.
 
 ## Branche de travail
 
