@@ -17,6 +17,7 @@ from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
 from services.web.core_client import CoreClient
+from services.web.qwen_client import QwenClient
 from services.inference.runtime import LocalInferenceRuntime
 
 
@@ -44,7 +45,7 @@ INDEX_HTML = """<!doctype html><html lang='fr'><meta charset='utf-8'>
 <main><h1>Sovereign Local AI</h1><p id='status'>Connexion locale…</p>
 <section id='setup' hidden><h2>Première configuration</h2><input id='setup-token' type='password' placeholder="Jeton d'installation"><input id='setup-user' value='owner' autocomplete='username'><input id='setup-password' type='password' autocomplete='new-password' placeholder='Mot de passe local'><button id='setup-button'>Créer le compte</button></section>
 <section id='login' hidden><h2>Connexion</h2><input id='login-user' value='owner' autocomplete='username'><input id='login-password' type='password' autocomplete='current-password' placeholder='Mot de passe'><button id='login-button'>Connexion</button></section>
-<section id='chat' hidden><div id='messages' aria-live='polite'></div><textarea id='message' maxlength='12000' placeholder='Pose ta question…'></textarea><button id='send'>Envoyer</button><button id='new'>Nouvelle conversation</button><button id='history'>Historique</button><div id='conversations'></div></section>
+<section id='chat' hidden><label>Moteur <select id='engine'><option value='BOOTSTRAP'>BOOTSTRAP</option><option value='QWEN-CODER'>Qwen Coder</option><option value='CORE-700M'>CORE-700M expérimental</option></select></label><div id='messages' aria-live='polite'></div><textarea id='message' maxlength='12000' placeholder='Pose ta question…'></textarea><button id='send'>Envoyer</button><button id='new'>Nouvelle conversation</button><button id='history'>Historique</button><div id='conversations'></div></section>
 </main><script src='/app.js' defer></script></html>"""
 
 APP_CSS = """body{font:16px system-ui;background:#0c111b;color:#eef3ff;margin:0}main{max-width:900px;margin:auto;padding:2rem}section{display:grid;gap:.75rem;margin:1rem 0;padding:1rem;background:#151e2e;border-radius:12px}input,textarea,button{font:inherit;padding:.75rem;border-radius:8px;border:1px solid #40506a}textarea{min-height:120px}button{cursor:pointer;background:#4f7cff;color:white}.message{white-space:pre-wrap;padding:.8rem;margin:.5rem 0;background:#1d2940;border-radius:8px}.engine{font-size:.8rem;color:#a9bad7}"""
@@ -101,7 +102,7 @@ def parse_chat(body: bytes) -> dict[str, Any]:
     profile_id = request_value.get("profile_id", "coordination")
     if not isinstance(profile_id, str) or PROFILE_ID.fullmatch(profile_id) is None:
         raise ValueError("profile_id is invalid")
-    if request_value.get("engine", "BOOTSTRAP") not in {"BOOTSTRAP", "CORE-700M"}:
+    if request_value.get("engine", "BOOTSTRAP") not in {"BOOTSTRAP", "CORE-700M", "QWEN-CODER"}:
         raise ValueError("engine is invalid")
     context_refs = request_value.get("context_refs", [])
     if not isinstance(context_refs, list) or len(context_refs) > 20 or any(not isinstance(item, str) for item in context_refs):
@@ -142,6 +143,7 @@ class WebState:
     core_runtime: Any
     knowledge: HybridKnowledgeIndex
     setup_token: str
+    qwen_runtime: Any = None
 
     def engines(self) -> list[dict[str, Any]]:
         try:
@@ -156,6 +158,11 @@ class WebState:
             state = core.get("state", "unavailable") if isinstance(core, dict) else core.state
         except RuntimeError:
             available, state = False, "unavailable"
+        try:
+            qwen = self.qwen_runtime.status() if self.qwen_runtime is not None else {}
+            qwen_available, qwen_state = bool(qwen.get("available")), qwen.get("state", "unavailable")
+        except RuntimeError:
+            qwen_available, qwen_state = False, "unavailable"
         return [
             {
                 "engine": "BOOTSTRAP",
@@ -168,6 +175,12 @@ class WebState:
                 "available": available,
                 "selected_by_default": False,
                 "description": "CORE-700M expérimental : disponible seulement si son checkpoint et sa provenance sont validés (état : " + str(state) + ").",
+            },
+            {
+                "engine": "QWEN-CODER",
+                "available": qwen_available,
+                "selected_by_default": False,
+                "description": "Agent de programmation Qwen isolé sur CPU (état : " + str(qwen_state) + ").",
             },
         ]
 
@@ -402,6 +415,9 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             if requested_engine == "CORE-700M":
                 answer = self.state.core_runtime.generate(request_value["message"])
                 selected_engine = "CORE-700M"
+            elif requested_engine == "QWEN-CODER":
+                answer = self.state.qwen_runtime.generate(request_value["message"])
+                selected_engine = "QWEN-CODER"
             else:
                 answer = self.state.runtime.generate(messages)
                 selected_engine = self.state.runtime.engine
@@ -465,8 +481,12 @@ def main() -> int:
     core_runtime: Any = LocalInferenceRuntime("CORE-700M", Path("/nonexistent-core-checkpoint"))
     if len(core_token) >= 32:
         core_runtime = CoreClient(os.environ.get("SOVEREIGN_CORE_ENDPOINT", "http://192.168.0.143:9000"), core_token)
+    qwen_runtime: Any = LocalInferenceRuntime("QWEN-CODER", Path("/nonexistent-qwen-checkpoint"))
+    qwen_token = os.environ.get("SOVEREIGN_QWEN_TOKEN", "")
+    if len(qwen_token) >= 32:
+        qwen_runtime = QwenClient(os.environ.get("SOVEREIGN_QWEN_ENDPOINT", "http://192.168.0.144:8790"), qwen_token)
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
-    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token)  # type: ignore[attr-defined]
+    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime)  # type: ignore[attr-defined]
     server.serve_forever()
     return 0
 
