@@ -26,6 +26,10 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   Les checkpoints 4 110 et 5 110 ont chacun une copie durable relue dont
   l'empreinte est identique à la source. Le calcul actif reste local au nœud de
   calcul et le stockage durable complet reste sur le NAS ;
+- la lignée CORE-30M pré-tokenisée a atteint son palier final de 19 532 étapes.
+  Son checkpoint final possède une copie durable relue avec une empreinte
+  identique à la source. Ce résultat valide la reprise et l'archivage du pilote,
+  sans démontrer une qualité conversationnelle ;
 - la mémoire privée peut désormais exporter les paires complètes
   `user`/`assistant` déjà assainies en paquet candidat déterministe. Le paquet
   contient un manifeste, une empreinte relue après écriture et le compte des
