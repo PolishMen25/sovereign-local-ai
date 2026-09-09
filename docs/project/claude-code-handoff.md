@@ -24,6 +24,16 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
   600 M tokens, sans cible de chat ; Qwen2.5-Coder-7B-Instruct Q4_K_M devient
   l'agent de programmation après acquisition RAW, contrôle de licence et
   empreintes, sur un nœud physique séparé ;
+- l'artefact Qwen2.5-Coder-7B-Instruct Q4_K_M a été acquis dans RAW à la
+  révision `13fb94bfda8c8cf22497dc57b78f391a9acb426a`, avec sa licence Apache-2.0
+  de la même révision. La copie RAW relue fait 4 683 073 536 octets et son
+  SHA-256 est `509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c`.
+  Elle reste RAW : aucune promotion ni chargement du modèle n'a été effectué ;
+- un conteneur non privilégié distinct a été créé pour l'agent de programmation.
+  Son runtime llama.cpp b10537 et sa dépendance CPU ont été transférés et
+  vérifiés hors ligne ; `llama-server --version` démarre avec succès. Le
+  conteneur ne possède aucune interface réseau ni outil d'administration du
+  cluster ;
 - le split d'entraînement pilote-v3 a été pré-tokenisé intégralement en artefact
   persistant et lié par empreintes au manifeste, au split, au tokenizer et aux
   fichiers de tokens. Le runner vérifie ce contrat avant chaque démarrage et
