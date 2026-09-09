@@ -19,6 +19,11 @@ if str(PROJECT_ROOT) not in sys.path:
 from services.inference.configuration import load_core_candidate_configuration
 from services.inference.model import build_model, require_cpu_torch
 from tools.authorized_text_bundle import load_authorized_text_bundle
+from tools.pretokenized_authorized_text import (
+    PretokenizedAuthorizedText,
+    load_pretokenized_authorized_text,
+    pretokenized_text_token_rows,
+)
 from tools.train_core_mini import authorized_text_token_rows
 
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "models" / "core-700m.candidate.json"
@@ -103,6 +108,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         config_sha256=config_sha256,
         bundle=bundle,
     )
+    pretokenized: PretokenizedAuthorizedText | None = None
+    if args.pretokenized_dir is not None:
+        pretokenized = load_pretokenized_authorized_text(
+            args.pretokenized_dir, bundle=bundle
+        )
     torch = require_cpu_torch()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
@@ -127,7 +137,23 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     stage_cpu_started = time.process_time()
     with metrics_path.open("a", encoding="utf-8") as metrics:
         for step in range(start_step, start_step + args.steps):
-            rows = authorized_text_token_rows(bundle, step=step, batch_size=args.batch_size, sequence_length=args.sequence_length, seed=args.seed)
+            rows = (
+                pretokenized_text_token_rows(
+                    pretokenized,
+                    step=step,
+                    batch_size=args.batch_size,
+                    sequence_length=args.sequence_length,
+                    seed=args.seed,
+                )
+                if pretokenized is not None
+                else authorized_text_token_rows(
+                    bundle,
+                    step=step,
+                    batch_size=args.batch_size,
+                    sequence_length=args.sequence_length,
+                    seed=args.seed,
+                )
+            )
             tokens = torch.tensor(rows, dtype=torch.long)
             logits = model(tokens[:, :-1])
             loss = torch.nn.functional.cross_entropy(logits.reshape(-1, config.vocabulary_size), tokens[:, 1:].reshape(-1))
@@ -158,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--train-jsonl", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
+    parser.add_argument("--pretokenized-dir", type=Path)
     parser.add_argument("--preflight-json", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--steps", type=int, required=True)
