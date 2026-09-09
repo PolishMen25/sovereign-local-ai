@@ -73,12 +73,15 @@ def build_candidate_records(messages: list[dict[str, Any]]) -> tuple[list[dict[s
     return records, excluded
 
 
-def export_learning_candidates(*, database: Path, output_dir: Path) -> dict[str, Any]:
+def export_learning_candidates(
+    *, database: Path, output_dir: Path, backfill_existing: bool = False
+) -> dict[str, Any]:
     if not database.is_file() or database.is_symlink():
         raise ValueError("memory database must be an existing regular file")
     if output_dir.exists():
         raise FileExistsError("candidate destination already exists")
     store = MemoryStore(database)
+    backfill = store.backfill_learning_queue() if backfill_existing else {"queued": 0}
     messages = store.learning_candidates()
     records, excluded = build_candidate_records(messages)
     if not records:
@@ -95,6 +98,7 @@ def export_learning_candidates(*, database: Path, output_dir: Path) -> dict[str,
     manifest = {
         "approval_status": "pending_owner_approval",
         "automatic_promotion": False,
+        "backfilled_message_count": backfill["queued"],
         "conversation_count": len({record["conversation_sha256"] for record in records}),
         "data_file": DATA_FILE,
         "data_sha256": data_sha256,
@@ -117,9 +121,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--backfill-existing",
+        action="store_true",
+        help="queue older user/assistant messages only after digest and sanitization checks",
+    )
     args = parser.parse_args()
     try:
-        manifest = export_learning_candidates(database=args.database, output_dir=args.output_dir)
+        manifest = export_learning_candidates(
+            database=args.database,
+            output_dir=args.output_dir,
+            backfill_existing=args.backfill_existing,
+        )
     except (OSError, ValueError, RuntimeError) as error:
         parser.exit(1, f"conversation learning export refused: {error}\n")
     print(json.dumps(manifest, separators=(",", ":"), sort_keys=True))

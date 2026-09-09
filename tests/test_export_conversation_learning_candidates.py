@@ -55,6 +55,21 @@ class ConversationLearningCandidateExportTests(unittest.TestCase):
             (self.root / "second" / "learning-candidates.jsonl").read_bytes(),
         )
 
+    def test_explicit_backfill_exports_older_sanitized_messages(self) -> None:
+        conversation = self.store.create_conversation(conversation_id="conversation_005")
+        self.store.append_message(conversation, role="user", content="question")
+        self.store.append_message(conversation, role="assistant", content="answer")
+        with closing(sqlite3.connect(self.database)) as connection, connection:
+            connection.execute("DELETE FROM learning_queue")
+
+        manifest = export_learning_candidates(
+            database=self.database,
+            output_dir=self.root / "backfilled",
+            backfill_existing=True,
+        )
+        self.assertEqual(manifest["backfilled_message_count"], 2)
+        self.assertEqual(manifest["record_count"], 1)
+
     def test_refuses_existing_destination_and_empty_queue(self) -> None:
         (self.root / "existing").mkdir()
         with self.assertRaises(FileExistsError):
@@ -82,6 +97,26 @@ class ConversationLearningCandidateExportTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "digest mismatch"):
             export_learning_candidates(database=self.database, output_dir=self.root / "queue-tampered")
+
+    def test_backfill_refuses_historical_unsanitized_content(self) -> None:
+        conversation = self.store.create_conversation(conversation_id="conversation_006")
+        message = self.store.append_message(conversation, role="user", content="safe question")
+        self.store.append_message(conversation, role="assistant", content="answer")
+        raw_secret = "password=UnsafeHistoricalValue123!"
+        raw_digest = hashlib.sha256(raw_secret.encode("utf-8")).hexdigest()
+        with closing(sqlite3.connect(self.database)) as connection, connection:
+            connection.execute("DELETE FROM learning_queue")
+            connection.execute(
+                "UPDATE messages SET content=?,content_sha256=? WHERE message_id=?",
+                (raw_secret, raw_digest, message["message_id"]),
+            )
+        with self.assertRaisesRegex(ValueError, "not fully sanitized"):
+            export_learning_candidates(
+                database=self.database,
+                output_dir=self.root / "unsafe-backfill",
+                backfill_existing=True,
+            )
+        self.assertEqual(self.store.learning_queue_summary(), {"messages": 0, "conversations": 0})
 
 
 if __name__ == "__main__":

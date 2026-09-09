@@ -185,6 +185,33 @@ class MemoryStore:
             candidates.append(candidate)
         return candidates
 
+    def backfill_learning_queue(self) -> dict[str, int]:
+        """Queue older redacted user/assistant messages after integrity checks."""
+        with closing(self._connect()) as connection, connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                "SELECT m.message_id,m.conversation_id,m.role,m.content,m.content_sha256,m.created_at "
+                "FROM messages AS m LEFT JOIN learning_queue AS q ON q.message_id=m.message_id "
+                "WHERE m.role IN ('user','assistant') AND q.message_id IS NULL "
+                "ORDER BY m.conversation_id ASC,m.ordinal ASC,m.message_id ASC"
+            ).fetchall()
+            for row in rows:
+                content = str(row["content"])
+                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                if digest != row["content_sha256"]:
+                    raise ValueError("historical message content digest mismatch")
+                if sanitize_text(content) != content:
+                    raise ValueError("historical message is not fully sanitized")
+            connection.executemany(
+                "INSERT INTO learning_queue(message_id,conversation_id,content_sha256,queued_at) "
+                "VALUES(?,?,?,?)",
+                [
+                    (row["message_id"], row["conversation_id"], row["content_sha256"], row["created_at"])
+                    for row in rows
+                ],
+            )
+        return {"queued": len(rows)}
+
     def list_conversations(self, *, limit: int = 100) -> list[dict[str, str]]:
         if not isinstance(limit, int) or not 1 <= limit <= 500:
             raise ValueError("conversation limit is invalid")

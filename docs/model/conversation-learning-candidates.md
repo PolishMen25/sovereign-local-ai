@@ -24,6 +24,12 @@ ne déclenche aucun entraînement. Pour devenir une entrée d’entraînement, u
 paquet devra suivre la même chaîne que le corpus externe : revue, manifeste
 figé, empreintes vérifiées, approbation du propriétaire puis gate bloquant.
 
+L’option opérateur `--backfill-existing` reprend les anciens messages
+`user`/`assistant` qui précèdent l’activation de la file. Elle refuse la totalité
+de l’opération si un contenu n’est pas déjà assaini ou si son empreinte ne
+correspond plus. Elle ne reprend jamais les rôles `system` et `tool`, et inscrit
+dans le manifeste le nombre exact de messages repris.
+
 La suppression d’une conversation retire ses messages de la file SQLite. Tout
 paquet candidat antérieur à cette suppression doit être régénéré et réapprouvé
 avant usage ; son empreinte précédente ne peut pas être réutilisée.

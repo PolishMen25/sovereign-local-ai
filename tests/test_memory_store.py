@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 import unittest
 
@@ -44,6 +45,17 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertFalse(self.store.append_message(conversation_id, role="system", content="internal prompt")["learning_candidate_queued"])
         self.assertFalse(self.store.append_message(conversation_id, role="tool", content="tool result")["learning_candidate_queued"])
         self.assertEqual(self.store.learning_queue_summary(), {"messages": 0, "conversations": 0})
+
+    def test_backfill_queues_only_integrity_checked_sanitized_roles(self) -> None:
+        conversation_id = self.store.create_conversation(conversation_id="conversation_005")
+        user = self.store.append_message(conversation_id, role="user", content="safe question")
+        self.store.append_message(conversation_id, role="assistant", content="safe answer")
+        self.store.append_message(conversation_id, role="system", content="system")
+        with closing(self.store._connect()) as connection, connection:
+            connection.execute("DELETE FROM learning_queue")
+        self.assertEqual(self.store.backfill_learning_queue(), {"queued": 2})
+        self.assertEqual(self.store.learning_queue_summary(), {"messages": 2, "conversations": 1})
+        self.assertIn(user["content_sha256"], {row["content_sha256"] for row in self.store.learning_candidates()})
 
     def test_unknown_conversation_and_invalid_inputs_fail_closed(self) -> None:
         with self.assertRaises(KeyError):
