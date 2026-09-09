@@ -1,12 +1,33 @@
 # Reprise Claude Code
 
-Dernière mise à jour : 2026-09-07.
+Dernière mise à jour : 2026-09-09.
 
 Ce document est le point de reprise public et expurgé. Il ne contient ni
 adresse privée, compte, secret, chemin d'administration ou inventaire détaillé.
 Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 `docs/project/current-capabilities.md`, `docs/architecture/overview.md` et
 `docs/security/threat-model.md`.
+
+## Mise à jour vérifiée — 2026-09-09
+
+- le split d'entraînement pilote-v3 a été pré-tokenisé intégralement en artefact
+  persistant et lié par empreintes au manifeste, au split, au tokenizer et aux
+  fichiers de tokens ; le runner ne l'utilise pas encore, car une équivalence
+  stricte des deux chemins reste à intégrer et tester avant le prochain palier ;
+- le checkpoint CORE-30M de l'étape 1 110 a une copie durable dont l'empreinte
+  est identique à la source. Son contrôle E0 est positif : contrat complet,
+  chargement CPU et génération bornée déterministe ; cela ne constitue pas une
+  évaluation de qualité et la réponse obtenue à ce palier est vide ;
+- le runtime accepte une enveloppe de checkpoint seulement lorsqu'elle est
+  liée au candidat demandé. Le format historique d'inférence demeure limité à
+  CORE-700M ; cette correction est couverte par les tests ;
+- l'audit du corpus étendu encore en RAW a relevé des recouvrements avec les
+  splits pilote-v3 de test et validation. Toute promotion et tout entraînement
+  sur ce corpus restent bloqués jusqu'à reconstruction des splits au niveau des
+  paquets, sans fuite ;
+- le reçu hors entraînement est une observation, non un seuil de qualité : la
+  comparaison avec la perte d'entraînement et une évaluation propriétaire E1
+  restent nécessaires. BOOTSTRAP demeure le seul moteur quotidien.
 
 ## Mise à jour consolidée — 2026-09-08
 
