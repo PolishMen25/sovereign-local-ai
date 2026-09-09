@@ -10,6 +10,16 @@ Lire d'abord `AGENTS.md`, `docs/project/decisions.md`,
 
 ## Mise à jour vérifiée — 2026-09-09
 
+- le corpus étendu a été redécoupé dans un dérivé RAW candidat par un outil du
+  dépôt. Les 1 531 documents présents dans les holdouts pilote-v3 ont été
+  retirés ; les nouveaux splits contiennent 166 421 en entraînement, 1 690 en
+  validation et 1 771 en test, avec intersection holdout vérifiée à zéro. Ce
+  dérivé reste en attente de revue et de promotion explicite ; aucun
+  entraînement ne l'utilise encore ;
+- la stratégie est désormais séparée : CORE-30M valide le pipeline CPU jusqu'à
+  600 M tokens, sans cible de chat ; Qwen2.5-Coder-7B-Instruct Q4_K_M devient
+  l'agent de programmation après acquisition RAW, contrôle de licence et
+  empreintes, sur un nœud physique séparé ;
 - le split d'entraînement pilote-v3 a été pré-tokenisé intégralement en artefact
   persistant et lié par empreintes au manifeste, au split, au tokenizer et aux
   fichiers de tokens. Le runner vérifie ce contrat avant chaque démarrage et
@@ -171,6 +181,9 @@ un checkpoint, ni acquérir/promouvoir implicitement du contenu.
   candidat non approuvé.
 - `fd743c6` : reprise explicite des anciens messages assainis avec refus sur
   contenu ou empreinte incohérents.
+- `50192f5` : ADR et lock candidat de l'agent Qwen-Coder, avec séparation de
+  CORE-30M et de l'agent de programmation ; `0f11e9d` : splitter du corpus
+  étendu qui bloque toute fuite depuis les holdouts pilote.
 - `0607f1a` : runner E1 CORE-30M atomique, reproductible et destiné à la revue
   propriétaire ; `ff16ad9` consigne le refus E0 du checkpoint final.
 - `de71ef9` : suite E2 Python hors ligne, limites de ressources et verdicts de
