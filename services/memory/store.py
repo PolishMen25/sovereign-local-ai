@@ -156,6 +156,35 @@ class MemoryStore:
             ).fetchone()
         return {"messages": int(row["messages"]), "conversations": int(row["conversations"])}
 
+    def learning_candidates(self, *, limit: int = 100_000) -> list[dict[str, Any]]:
+        """Return an integrity-checked snapshot of the redacted learning queue.
+
+        This is an operator-only building block.  It does not approve, promote,
+        or remove queued messages.
+        """
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100_000:
+            raise ValueError("learning candidate limit is invalid")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT m.message_id,m.conversation_id,m.ordinal,m.role,m.content,"
+                "m.content_sha256,q.content_sha256 AS queued_content_sha256,q.queued_at "
+                "FROM learning_queue AS q JOIN messages AS m ON m.message_id=q.message_id "
+                "ORDER BY m.conversation_id ASC,m.ordinal ASC,m.message_id ASC LIMIT ?",
+                (limit + 1,),
+            ).fetchall()
+        if len(rows) > limit:
+            raise ValueError("learning candidate limit exceeded")
+        candidates: list[dict[str, Any]] = []
+        for row in rows:
+            candidate = dict(row)
+            if candidate["role"] not in {"user", "assistant"}:
+                raise ValueError("learning queue contains a forbidden role")
+            digest = hashlib.sha256(candidate["content"].encode("utf-8")).hexdigest()
+            if digest != candidate["content_sha256"] or digest != candidate["queued_content_sha256"]:
+                raise ValueError("learning queue content digest mismatch")
+            candidates.append(candidate)
+        return candidates
+
     def list_conversations(self, *, limit: int = 100) -> list[dict[str, str]]:
         if not isinstance(limit, int) or not 1 <= limit <= 500:
             raise ValueError("conversation limit is invalid")
