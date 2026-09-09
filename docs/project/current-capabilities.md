@@ -1,23 +1,21 @@
 # Capacités réellement disponibles
 
-Dernière vérification : 2026-09-07.
+Dernière vérification : 2026-09-09.
 
 Ce document est la source de vérité publique sur l'état exécutable du projet.
 Il distingue ce qui fonctionne aujourd'hui de l'architecture visée.
 
 ## Réponse courte
 
-Il est maintenant possible de poser une question à un modèle local depuis une
-CLI SSH ou une interface HTTPS privée de tailnet et d'obtenir une réponse
-réellement générée. **BOOTSTRAP** reste le choix par défaut ;
-**CORE-700M expérimental** est sélectionnable après validation mécanique de
-son checkpoint et produit une génération CPU locale.
+Il est possible de poser une question à BOOTSTRAP depuis une CLI SSH ou une
+interface HTTPS privée de tailnet et d'obtenir une réponse réellement générée.
+L'agent de programmation Qwen2.5-Coder-7B est décidé mais pas encore acquis ni
+déployé. CORE-30M valide l'entraînement CPU ; il n'est pas un chat.
 
 Le checkpoint CORE-MINI actuel prouve que l'entraînement CPU, la sauvegarde et
-la reprise fonctionnent. Il a appris sur des identifiants de tokens synthétiques
-et ne possède aucun savoir linguistique. CORE-700M possède vingt étapes
-techniques CPU liées à un tokenizer 32k `candidate_core` ; ce n'est pas un
-modèle linguistique utilisable ni un moteur de chat.
+la reprise fonctionnent. CORE-30M poursuit séparément sa validation de pipeline
+avec un budget cible de 600 M tokens. Ni CORE-MINI, ni CORE-30M, ni CORE-700M
+ne sont présentés comme moteur conversationnel ou de programmation utilisable.
 
 Un runner CPU/NUMA synthétique et fail-closed a produit deux preuves répétées
 de trois runs sur le même commit et workload. Le placement A a une médiane
@@ -45,7 +43,8 @@ génère pas une réponse d'IA.
 | CORE-MINI-1M | Entraînement `authorized-text` borné et reprise vérifiés | Modèle de 1 328 256 paramètres ; 50 étapes sur le corpus approuvé, checkpoint durable, puis reprise contrôlée de 10 étapes jusqu'à 60 avec journal continu et empreintes ; modes explicitement séparés | 60 étapes ne produisent pas un assistant : aucune évaluation linguistique ni question CORE possible ; aucun checkpoint CORE-700M |
 | Runner CORE-MINI NUMA | Deux preuves A/B et comparateur strict exécutés | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Mesures mémoire/NUMA élargies et décision G4 encore absentes |
 | Zone de calcul CORE | Invité non privilégié actif | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution ; deux paliers CORE-700M exécutés | Aucun service de génération CORE ; preuve d'isolation après redémarrage reste à compléter |
-| CORE-700M | Vingt étapes CPU et reprise réelle vérifiées | Configuration de 691 160 320 paramètres ; tokenizer 32k `candidate_core`, corpus anglais technique initial approuvé ; étapes 1 à 20 continues avec checkpoints durables aux étapes 10 et 20. Le palier initial a mesuré 5,79 tokens/s avec 4 cœurs, batch 1 et séquence 64 ; le palier 11→20 est fixé sur NUMA 0 avec ces mêmes quatre cœurs | Vingt étapes ne produisent pas un assistant ; le palier NUMA 0 est une mesure de placement unique, pas un benchmark comparatif ni une estimation de durée. Aucune évaluation linguistique ou génération CORE n'est validée |
+| CORE-700M | Preuves mécaniques archivées | Configuration, tokenizer et checkpoints techniques sont conservés pour traçabilité | Aucun entraînement long ni objectif de chat ou code ; cette voie est remplacée par D-034 |
+| Agent Qwen2.5-Coder-7B | Acquisition décidée, non déployée | Lock candidat, licence Apache-2.0 et politique d'historique additif sont documentés | Le GGUF doit encore être acquis en RAW, haché, promu explicitement et déployé sur le nœud séparé |
 | Corpus / tokenizer | Candidat 32k traçable | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et promotion `experimental` → `candidate_core` avec reçu | Qualité, couverture française et passage à l'échelle restent à traiter |
 | Moteur d'inférence CORE | Runtime expérimental CPU actif | Checkpoint d'inférence compact validé, contrat configuration/tokenizer/manifeste/préflight vérifié, API privée authentifiée sur `192.168.0.143:9000`, génération gloutonne bornée et déterministe | Vingt étapes ne constituent pas une qualité linguistique ; aucune promesse d'assistant général. Le runtime ne reçoit ni Internet ni outil arbitraire |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; l'index hybride testé n'est pas encore alimenté ni raccordé au chat |

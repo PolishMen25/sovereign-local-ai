@@ -1,0 +1,38 @@
+{
+  "schema_version": "programming-agent-model-lock.v1",
+  "status": "approved_acquisition_pending_raw_verification",
+  "purpose": "local_programming_agent_separate_from_core_training",
+  "model": {
+    "name": "Qwen2.5-Coder-7B-Instruct-GGUF",
+    "publisher": "Qwen",
+    "repository": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+    "revision": "pending_exact_revision_at_acquisition",
+    "filename": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+    "quantization": "Q4_K_M",
+    "byte_size": "pending_raw_readback",
+    "sha256": "pending_raw_readback",
+    "license": "Apache-2.0",
+    "license_evidence_url": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/blob/main/LICENSE",
+    "source_url": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF"
+  },
+  "runtime": {
+    "name": "llama.cpp",
+    "release": "b10537",
+    "device": "cpu",
+    "network_download_at_runtime": false,
+    "generation_threads": 20,
+    "prefill_threads": 40
+  },
+  "history_policy": {
+    "mode": "strict_append_only",
+    "rewrite_existing_turns": false,
+    "reorder_tool_results": false,
+    "automatic_compaction": false
+  },
+  "activation_gate": {
+    "raw_readback_sha256_required": true,
+    "promotion_record_required": true,
+    "runtime_readback_sha256_required": true,
+    "cluster_administration_tools_forbidden": true
+  }
+}
