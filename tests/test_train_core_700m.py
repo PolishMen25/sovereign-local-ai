@@ -14,7 +14,12 @@ from tools.pretokenized_authorized_text import (
     pretokenized_text_token_rows,
 )
 from tools.train_core_mini import authorized_text_token_rows
-from tools.train_core_700m import load_preflight, metric_record
+from tools.train_core_700m import (
+    MAXIMUM_TOTAL_STEPS,
+    calculate_final_step,
+    load_preflight,
+    metric_record,
+)
 
 
 def bundle() -> SimpleNamespace:
@@ -28,6 +33,12 @@ def bundle() -> SimpleNamespace:
 
 
 class Core700RunnerTests(unittest.TestCase):
+    def test_total_step_limit_supports_the_bounded_ten_million_token_pilot(self) -> None:
+        self.assertEqual(MAXIMUM_TOTAL_STEPS, 20_000)
+        self.assertEqual(calculate_final_step(start_step=19_110, steps=422), 19_532)
+        with self.assertRaisesRegex(ValueError, "total step"):
+            calculate_final_step(start_step=19_532, steps=469)
+
     def _authorized_bundle(self) -> AuthorizedTextBundle:
         texts = ("A", "Texte autorisé plus long.", "Encore un document technique.")
         result = train_byte_bpe(["bonjour bonjour bonjour", *texts], 264)

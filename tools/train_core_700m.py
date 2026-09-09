@@ -27,6 +27,20 @@ from tools.pretokenized_authorized_text import (
 from tools.train_core_mini import authorized_text_token_rows
 
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "models" / "core-700m.candidate.json"
+MAXIMUM_TOTAL_STEPS = 20_000
+
+
+def calculate_final_step(*, start_step: int, steps: int) -> int:
+    """Return the bounded final step for a resumable candidate CORE run."""
+
+    if type(start_step) is not int or start_step < 0:
+        raise ValueError("CORE start step is invalid")
+    if type(steps) is not int or not 1 <= steps <= MAXIMUM_TOTAL_STEPS:
+        raise ValueError("CORE run limits are invalid")
+    final_step = start_step + steps
+    if final_step > MAXIMUM_TOTAL_STEPS:
+        raise ValueError("CORE total step limit is exceeded")
+    return final_step
 
 
 def load_preflight(
@@ -85,7 +99,7 @@ def load_resume(
         or checkpoint["model_name"] != model_name
         or checkpoint["contract"] != contract
         or type(checkpoint["step"]) is not int
-        or not 1 <= checkpoint["step"] < 10_000
+        or not 1 <= checkpoint["step"] <= MAXIMUM_TOTAL_STEPS
     ):
         raise RuntimeError("CORE checkpoint contract is incompatible")
     if not isinstance(checkpoint["model"], dict) or not isinstance(checkpoint["optimizer"], dict):
@@ -94,7 +108,7 @@ def load_resume(
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
-    if not 1 <= args.steps <= 10_000 or not 1 <= args.batch_size <= 8 or not 2 <= args.sequence_length <= 512:
+    if not 1 <= args.batch_size <= 8 or not 2 <= args.sequence_length <= 512:
         raise ValueError("CORE run limits are invalid")
     document, config, config_sha256 = load_core_candidate_configuration(args.config)
     if document["name"] != args.model_name:
@@ -127,8 +141,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
         model.load_state_dict(checkpoint["model"], strict=True)
         optimizer.load_state_dict(checkpoint["optimizer"])
-    if start_step + args.steps > 10_000:
-        raise ValueError("CORE total step limit is exceeded")
+    final_step = calculate_final_step(start_step=start_step, steps=args.steps)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = args.output_dir / "metrics.jsonl"
     if args.resume is None and metrics_path.exists():
@@ -171,7 +184,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 cpu_seconds=time.process_time() - stage_cpu_started,
             ), sort_keys=True) + "\n")
             metrics.flush()
-    final_step = start_step + args.steps
     checkpoint = args.output_dir / f"{args.model_name.lower()}-step-{final_step:06d}.pt"
     atomic_save(torch, checkpoint, {"schema_version": f"{args.model_name.lower()}-checkpoint.v1", "model_name": document["name"], "step": final_step, "contract": contract, "model": model.state_dict(), "optimizer": optimizer.state_dict()})
     return {"checkpoint": str(checkpoint), "metrics": str(metrics_path), "steps": final_step}
