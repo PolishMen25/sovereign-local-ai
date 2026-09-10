@@ -33,6 +33,9 @@ CPU_SECONDS = 10
 MEMORY_BYTES = 512 * 1024 * 1024
 OUTPUT_BYTES = 64 * 1024 * 1024
 WALL_SECONDS = 12
+SANDBOX_TASK_BUDGET = 64
+SELFTEST_SOURCE = "def sandbox_selftest_ok():\n    return 1\n"
+SELFTEST_TESTS = "assert module['sandbox_selftest_ok']() == 1\n"
 
 
 class EvaluationRefused(ValueError):
@@ -137,13 +140,50 @@ def require_sandbox() -> str:
     return binary
 
 
-def limit_resources() -> None:
+def uid_task_count(uid: int) -> int:
+    """Count the tasks the real user already owns.
+
+    Linux enforces RLIMIT_NPROC on tasks, so every thread counts. A process
+    census undercounts a host running threaded workloads and yields a budget
+    that is still below the kernel ceiling.
+    """
+    total = 0
+    try:
+        entries = list(os.scandir("/proc"))
+    except OSError:
+        return 0
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            if entry.stat().st_uid != uid:
+                continue
+            total += len(os.listdir(f"/proc/{entry.name}/task"))
+        except OSError:
+            continue
+    return total
+
+
+def process_limit() -> int:
+    """Budget the sandbox on top of what the user already runs.
+
+    RLIMIT_NPROC is enforced per real user id across the whole system and counts
+    tasks, threads included. A fixed ceiling therefore makes the very first fork
+    of bwrap fail on any host where the user already runs more tasks than it,
+    and every task is rejected without a single line of candidate code ever
+    being executed.
+    """
+    return uid_task_count(os.getuid()) + SANDBOX_TASK_BUDGET
+
+
+def limit_resources(process_budget: int | None = None) -> None:
     if resource is None:
         raise EvaluationRefused("offline sandbox is unavailable")
     resource.setrlimit(resource.RLIMIT_CPU, (CPU_SECONDS, CPU_SECONDS + 1))
     resource.setrlimit(resource.RLIMIT_AS, (MEMORY_BYTES, MEMORY_BYTES))
     resource.setrlimit(resource.RLIMIT_FSIZE, (OUTPUT_BYTES, OUTPUT_BYTES))
-    resource.setrlimit(resource.RLIMIT_NPROC, (16, 16))
+    budget = process_limit() if process_budget is None else process_budget
+    resource.setrlimit(resource.RLIMIT_NPROC, (budget, budget))
 
 
 def sandbox_command(binary: str, workdir: Path) -> list[str]:
@@ -159,7 +199,8 @@ def sandbox_command(binary: str, workdir: Path) -> list[str]:
     ]
 
 
-def run_task(binary: str, *, task: dict[str, str], source: str, output_dir: Path) -> dict[str, Any]:
+def run_task(binary: str, *, task: dict[str, str], source: str, output_dir: Path,
+             process_budget: int | None = None) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="e2-", dir=output_dir) as temporary:
         workdir = Path(temporary)
         (workdir / "candidate.py").write_text(source, encoding="utf-8")
@@ -175,7 +216,7 @@ def run_task(binary: str, *, task: dict[str, str], source: str, output_dir: Path
         with output_path.open("wb") as output:
             process = subprocess.Popen(
                 sandbox_command(binary, workdir), stdout=output, stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL, preexec_fn=limit_resources,
+                stdin=subprocess.DEVNULL, preexec_fn=lambda: limit_resources(process_budget),
             )
             try:
                 returncode = process.wait(timeout=WALL_SECONDS)
@@ -199,6 +240,30 @@ def run_task(binary: str, *, task: dict[str, str], source: str, output_dir: Path
     }
 
 
+def sandbox_selftest(binary: str, *, output_dir: Path, process_budget: int) -> None:
+    """Refuse loudly when the sandbox cannot run known-good code."""
+    task = {"id": "python-01-sandbox-selftest", "function_name": "sandbox_selftest_ok",
+            "prompt": "internal sandbox self test", "test_source": SELFTEST_TESTS}
+    result = run_task(binary, task=task, source=SELFTEST_SOURCE, output_dir=output_dir,
+                      process_budget=process_budget)
+    if result["verdict"] != "accept":
+        raise EvaluationRefused(
+            "sandbox self test failed (returncode "
+            f"{result['returncode']}, output sha256 {result['output_sha256']}); "
+            "every task would have been rejected without executing any candidate")
+
+
+def refuse_identical_failures(results: list[dict[str, Any]]) -> None:
+    """A whole run rejected with one identical output is a broken sandbox."""
+    if not results or any(result["verdict"] != "reject" for result in results):
+        return
+    digests = {result["output_sha256"] for result in results}
+    if len(digests) == 1:
+        raise EvaluationRefused(
+            f"every task was rejected with the identical output digest {digests.pop()}: "
+            "the sandbox is broken, not the candidates")
+
+
 def evaluate(*, suite_path: Path, candidates_path: Path, output_dir: Path) -> dict[str, Any]:
     suite = read_json(suite_path)
     tasks = validate_suite(suite)
@@ -210,7 +275,11 @@ def evaluate(*, suite_path: Path, candidates_path: Path, output_dir: Path) -> di
     report_path = output_dir / "code-evaluation-report.json"
     if report_path.exists():
         raise EvaluationRefused("evaluation report destination already exists")
-    results = [run_task(binary, task=task, source=candidates[task["id"]], output_dir=output_dir) for task in tasks]
+    process_budget = process_limit()
+    sandbox_selftest(binary, output_dir=output_dir, process_budget=process_budget)
+    results = [run_task(binary, task=task, source=candidates[task["id"]], output_dir=output_dir,
+                        process_budget=process_budget) for task in tasks]
+    refuse_identical_failures(results)
     report = {
         "schema_version": REPORT_SCHEMA,
         "suite_sha256": sha256_file(suite_path),

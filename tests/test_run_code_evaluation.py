@@ -74,12 +74,44 @@ class CodeEvaluationSuiteTests(unittest.TestCase):
             suite_path.write_text(json.dumps(self.suite), encoding="utf-8")
             candidates_path.write_text(json.dumps(candidates), encoding="utf-8")
             result = {"task_id": self.suite["tasks"][0]["id"], "prompt_sha256": "1" * 64, "test_sha256": "2" * 64, "candidate_sha256": "3" * 64, "output_sha256": "4" * 64, "output_bytes": 0, "returncode": 0, "timed_out": False, "verdict": "accept"}
-            with patch.object(MODULE, "require_sandbox", return_value="/usr/bin/bwrap"), patch.object(MODULE, "run_task", side_effect=[dict(result, task_id=task["id"]) for task in self.suite["tasks"]]):
+            with (
+                patch.object(MODULE, "require_sandbox", return_value="/usr/bin/bwrap"),
+                patch.object(MODULE, "sandbox_selftest", return_value=None),
+                patch.object(MODULE, "run_task", side_effect=[dict(result, task_id=task["id"]) for task in self.suite["tasks"]]),
+            ):
                 report = MODULE.evaluate(suite_path=suite_path, candidates_path=candidates_path, output_dir=output_dir)
             report_text = (output_dir / "code-evaluation-report.json").read_text(encoding="utf-8")
             self.assertEqual(50, report["accepted"])
             self.assertNotIn("private candidate text", report_text)
             self.assertNotIn(self.suite["tasks"][0]["prompt"], report_text)
+
+
+class SandboxHealthTests(unittest.TestCase):
+    """A fail-closed harness must fail loudly, not silently reject everything."""
+
+    def test_process_limit_accounts_for_tasks_already_running(self) -> None:
+        with patch.object(MODULE, "uid_task_count", return_value=15):
+            self.assertEqual(15 + MODULE.SANDBOX_TASK_BUDGET, MODULE.process_limit())
+        with patch.object(MODULE, "uid_task_count", return_value=900):
+            self.assertGreater(MODULE.process_limit(), 900)
+
+    def test_identical_rejection_of_every_task_is_refused(self) -> None:
+        broken = [{"verdict": "reject", "output_sha256": "d" * 64} for _ in range(50)]
+        with self.assertRaisesRegex(MODULE.EvaluationRefused, "sandbox is broken"):
+            MODULE.refuse_identical_failures(broken)
+
+    def test_genuine_mixed_results_are_accepted(self) -> None:
+        mixed = [{"verdict": "accept", "output_sha256": "a" * 64},
+                 {"verdict": "reject", "output_sha256": "b" * 64}]
+        MODULE.refuse_identical_failures(mixed)
+        distinct = [{"verdict": "reject", "output_sha256": c * 64} for c in "abc"]
+        MODULE.refuse_identical_failures(distinct)
+
+    def test_self_test_failure_stops_the_run(self) -> None:
+        failing = {"verdict": "reject", "returncode": 1, "output_sha256": "e" * 64}
+        with patch.object(MODULE, "run_task", return_value=failing):
+            with self.assertRaisesRegex(MODULE.EvaluationRefused, "self test failed"):
+                MODULE.sandbox_selftest("/usr/bin/bwrap", output_dir=Path("/tmp"), process_budget=99)
 
 
 if __name__ == "__main__":
