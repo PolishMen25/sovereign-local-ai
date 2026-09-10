@@ -1,6 +1,6 @@
 {
   "schema_version": "programming-agent-model-lock.v1",
-  "status": "raw_verified_pending_explicit_promotion",
+  "status": "promoted_owner_approved",
   "purpose": "local_programming_agent_separate_from_core_training",
   "model": {
     "name": "Qwen2.5-Coder-7B-Instruct-GGUF",
@@ -20,8 +20,10 @@
     "release": "b10537",
     "device": "cpu",
     "network_download_at_runtime": false,
-    "generation_threads": 20,
-    "prefill_threads": 40
+    "generation_threads": 16,
+    "prefill_threads": 16,
+    "context_size": 16384,
+    "mmap": false
   },
   "history_policy": {
     "mode": "strict_append_only",
@@ -34,5 +36,6 @@
     "promotion_record_required": true,
     "runtime_readback_sha256_required": true,
     "cluster_administration_tools_forbidden": true
-  }
+  },
+  "promotion_record": "configs/runtime/qwen2.5-coder-7b-q4km.promotion.json"
 }

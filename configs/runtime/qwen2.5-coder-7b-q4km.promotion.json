@@ -1,0 +1,50 @@
+{
+  "schema_version": "programming-agent-promotion-record.v1",
+  "decided_by": "owner",
+  "decided_utc": "2026-09-10T09:25:28Z",
+  "model": {
+    "name": "Qwen2.5-Coder-7B-Instruct-GGUF",
+    "revision": "13fb94bfda8c8cf22497dc57b78f391a9acb426a",
+    "filename": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+    "byte_size": 4683073536,
+    "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c",
+    "license": "Apache-2.0"
+  },
+  "readbacks": {
+    "raw": {"path": "/mnt/sovereign-ai/raw/models/qwen2.5-coder-7b-instruct-gguf/13fb94bfda8c8cf22497dc57b78f391a9acb426a/qwen2.5-coder-7b-instruct-q4_k_m.gguf", "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c", "verified_utc": "2026-09-10T09:25:28Z"},
+    "validated": {"path": "/mnt/sovereign-ai/validated/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf", "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c", "verified_utc": "2026-09-10T09:25:28Z"},
+    "runtime": {"node": "pve", "container": 103, "path": "/opt/sovereign/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf", "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c", "verified_utc": "2026-09-10T09:25:28Z"}
+  },
+  "runtime": {
+    "engine": "llama.cpp b10537",
+    "endpoint": "http://192.168.0.144:8790",
+    "context_size": 16384,
+    "generation_threads": 16,
+    "batch_threads": 16,
+    "parallel": 1,
+    "mmap": false,
+    "api_key_file": "/etc/sovereign/qwen-api-keys",
+    "network_download_at_runtime": false
+  },
+  "placement": {
+    "node": "pve — HPE DL380p Gen8, 2 x Xeon E5-2667 v2, AVX sans AVX2",
+    "rationale": "separation physique d avec le cluster d entrainement",
+    "measured_cost": "5,74 jetons/s contre 10,4 sur le ML350, soit 55 % de la vitesse"
+  },
+  "measured": {
+    "suite": "core-python-e2.candidate.json, 50 taches",
+    "qwen2.5-1.5b-instruct_single_shot": "23/50",
+    "qwen2.5-coder-7b_single_shot": "38/50",
+    "qwen2.5-coder-7b_with_error_feedback": "45/50",
+    "caveat": "la trace d erreur affiche l assertion echouee ; mesure valable pour un agent qui lit ses erreurs, pas pour la connaissance brute du modele"
+  },
+  "activation_gate": {
+    "raw_readback_sha256_required": "satisfied",
+    "promotion_record_required": "this document",
+    "runtime_readback_sha256_required": "satisfied",
+    "cluster_administration_tools_forbidden": "satisfied — aucun outil pct/qm/pvesh dans CT 103"
+  },
+  "open_risks": [
+    "isolation reseau non appliquee : CT 103 joint 192.168.0.99 et 192.168.0.142 en tcp/22 et dispose d une sortie DNS. A corriger par une regle de pare-feu dediee."
+  ]
+}
