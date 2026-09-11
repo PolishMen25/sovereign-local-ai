@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hmac
@@ -19,6 +21,7 @@ from urllib.parse import parse_qs, urlsplit
 from services.arena.store import ArenaStore
 from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
+from services.knowledge.document_ingest import ingest as ingest_document, IngestError
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
 from services.web.core_client import CoreClient
@@ -27,6 +30,7 @@ from services.inference.runtime import LocalInferenceRuntime
 
 
 MAX_BODY_BYTES = 1_048_576
+MAX_UPLOAD_BODY_BYTES = 40 * 1024 * 1024  # base64-encoded document upload
 CONVERSATION_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 PROFILE_ID = re.compile(r"^[a-z][a-z0-9_-]{2,63}$")
@@ -184,6 +188,7 @@ class WebState:
     corpus_raw_root: Path | None = None
     corpus_validated_root: Path | None = None
     corpus_inbox: Path | None = None
+    documents_dir: Path | None = None
 
     def corpus_increments(self) -> dict[str, Any]:
         """List RAW arena corpus increments with their promotion status.
@@ -500,6 +505,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/chat": self._post_chat,
             "/v1/arena/approve": self._post_arena_approval,
             "/v1/corpus/promote": self._post_corpus_promotion,
+            "/v1/documents": self._post_document,
         }.get(self.path)
         if handler is None:
             self.send_json(404, {"error": "not_found"})
@@ -623,6 +629,44 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.send_json(503, {"error": "corpus_unavailable"})
             return
         self.send_json(202, {"status": "approval_recorded", "kind": "increment", "target_id": target_id})
+
+    def _post_document(self) -> None:
+        """Ingest an uploaded document into the local RAG (offline extraction + OCR)."""
+
+        try:
+            self.require_session(csrf=True)
+        except PermissionError:
+            self.send_json(401, {"error": "unauthorized"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            self.send_json(411, {"error": "length_required"})
+            return
+        if not 1 <= length <= MAX_UPLOAD_BODY_BYTES:
+            self.send_json(413, {"error": "payload_too_large"})
+            return
+        if self.state.documents_dir is None:
+            self.send_json(503, {"error": "documents_unavailable"})
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+            if not isinstance(body, dict) or set(body) != {"filename", "content_base64"}:
+                raise ValueError("invalid document envelope")
+            filename = body["filename"]
+            data = base64.b64decode(body["content_base64"], validate=True)
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, binascii.Error):
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        try:
+            result = ingest_document(self.state.knowledge, self.state.documents_dir, filename=filename, data=data)
+        except IngestError as error:
+            self.send_json(422, {"error": "ingest_refused", "detail": str(error)})
+            return
+        except (OSError, ValueError):
+            self.send_json(503, {"error": "documents_unavailable"})
+            return
+        self.send_json(201, {"status": "indexed", **result})
 
     # --- chat ------------------------------------------------------------
 
@@ -793,8 +837,10 @@ def main() -> int:
     corpus_validated_root = Path(os.environ.get("SOVEREIGN_CORPUS_VALIDATED_ROOT", "/mnt/sovereign-ai/validated/corpus/arena-increments"))
     corpus_inbox = Path(os.environ.get("SOVEREIGN_CORPUS_INBOX", str(state_root / "corpus-inbox")))
     corpus_inbox.mkdir(parents=True, exist_ok=True)
+    documents_dir = Path(os.environ.get("SOVEREIGN_DOCUMENTS_DIR", str(state_root / "documents")))
+    documents_dir.mkdir(parents=True, exist_ok=True)
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox,  # type: ignore[attr-defined]
-                            corpus_raw_root, corpus_validated_root, corpus_inbox)
+                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir)
     server.serve_forever()
     return 0
 

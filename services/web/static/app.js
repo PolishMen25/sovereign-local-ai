@@ -429,6 +429,37 @@
       if (!state.busy) q("chat-form").requestSubmit();
     }
   });
+  // --- document sharing: read locally, send base64, the server extracts (OCR if needed) and indexes it ---
+  const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
+  function readAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Lecture du fichier impossible."));
+      reader.onload = () => resolve(String(reader.result).split(",", 2)[1] || "");
+      reader.readAsDataURL(file);
+    });
+  }
+  q("share-document").addEventListener("click", () => { if (!state.busy) q("document-file").click(); });
+  q("document-file").addEventListener("change", async () => {
+    const file = q("document-file").files[0];
+    q("document-file").value = "";
+    if (!file) return;
+    if (file.size > MAX_DOCUMENT_BYTES) { notice("Document trop volumineux (max 25 Mo)."); return; }
+    notice();
+    q("status").textContent = "Lecture et indexation de « " + file.name + " »… (OCR si nécessaire, cela peut prendre un moment)";
+    q("share-document").disabled = true;
+    try {
+      const content_base64 = await readAsBase64(file);
+      const result = await api("/v1/documents", {method: "POST", body: JSON.stringify({filename: file.name, content_base64})});
+      const how = result.method && result.method.startsWith("ocr") ? " · texte reconnu par OCR" : "";
+      q("status").textContent = "Document indexé : « " + result.title + " » — " + result.chunks + " passage(s), " + result.characters + " caractères" + how + ". Posez votre question.";
+    } catch (error) {
+      q("status").textContent = "Connecté · " + engineLabel(state.engine);
+      notice(error.detail || errorMessage(error));
+    } finally {
+      q("share-document").disabled = false;
+    }
+  });
   q("new").addEventListener("click", () => { if (!state.busy) { notice(); newConversation(); } });
   q("history").addEventListener("click", () => refreshHistory().catch((error) => notice(errorMessage(error))));
   q("profile").addEventListener("change", describeProfile);
