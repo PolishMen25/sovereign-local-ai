@@ -194,13 +194,20 @@ class WebState:
         applier's job.
         """
 
-        if self.corpus_raw_root is None or not self.corpus_raw_root.is_dir():
+        try:
+            if self.corpus_raw_root is None or not self.corpus_raw_root.is_dir():
+                return {"available": False, "increments": []}
+            promoted: set[str] = set()
+            if self.corpus_validated_root is not None and self.corpus_validated_root.is_dir():
+                try:
+                    promoted = {p.name for p in self.corpus_validated_root.iterdir() if p.is_dir()}
+                except OSError:
+                    promoted = set()
+            manifest_paths = sorted(self.corpus_raw_root.glob("*/manifest.json"))
+        except OSError:
             return {"available": False, "increments": []}
-        promoted: set[str] = set()
-        if self.corpus_validated_root is not None and self.corpus_validated_root.is_dir():
-            promoted = {p.name for p in self.corpus_validated_root.iterdir() if p.is_dir()}
         increments: list[dict[str, Any]] = []
-        for manifest_path in sorted(self.corpus_raw_root.glob("*/manifest.json")):
+        for manifest_path in manifest_paths:
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):

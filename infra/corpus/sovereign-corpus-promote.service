@@ -8,7 +8,8 @@ WorkingDirectory=/opt/sovereign/app
 # Applies only owner-approved increment promotions dropped in the inbox by the
 # gateway. It verifies each approval's digest before promoting and never trains.
 ExecStart=/usr/bin/python3 -B -m tools.apply_corpus_promotions
-UMask=0027
+# 0022 so the gateway (a different user) can read the promoted increments it lists.
+UMask=0022
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict

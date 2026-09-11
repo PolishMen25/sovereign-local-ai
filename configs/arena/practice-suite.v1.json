@@ -1,7 +1,7 @@
 {
   "schema_version": "arena-practice-suite.v1",
   "language": "python",
-  "task_count": 52,
+  "task_count": 100,
   "tasks": [
     {
       "id": "arena-001-reverse-words",
@@ -314,6 +314,294 @@
       "function_name": "cron_field_matches",
       "prompt": "Write cron_field_matches(field, value) that returns True if a single cron field ('*', a number, or a comma list of numbers) matches the integer value.",
       "test_source": "assert module['cron_field_matches']('*', 5) is True\nassert module['cron_field_matches']('1,2,3', 2) is True\nassert module['cron_field_matches']('1,2', 5) is False\n"
+    },
+    {
+      "id": "arena-053-count-words",
+      "function_name": "count_words",
+      "prompt": "Write count_words(s) that returns the number of whitespace-separated words in s.",
+      "test_source": "assert module['count_words']('a b c') == 3\nassert module['count_words']('') == 0\nassert module['count_words']('  x  ') == 1\n"
+    },
+    {
+      "id": "arena-054-capitalize-first",
+      "function_name": "capitalize_first",
+      "prompt": "Write capitalize_first(s) that uppercases only the first character of s, leaving the rest unchanged.",
+      "test_source": "assert module['capitalize_first']('hello') == 'Hello'\nassert module['capitalize_first']('') == ''\nassert module['capitalize_first']('aBC') == 'ABC'\n"
+    },
+    {
+      "id": "arena-055-remove-vowels",
+      "function_name": "remove_vowels",
+      "prompt": "Write remove_vowels(s) that returns s without any vowels (aeiou, case-insensitive).",
+      "test_source": "assert module['remove_vowels']('Hello') == 'Hll'\nassert module['remove_vowels']('xyz') == 'xyz'\nassert module['remove_vowels']('AEIOU') == ''\n"
+    },
+    {
+      "id": "arena-056-repeat-string",
+      "function_name": "repeat_string",
+      "prompt": "Write repeat_string(s, n) that returns s repeated n times (n >= 0).",
+      "test_source": "assert module['repeat_string']('ab', 3) == 'ababab'\nassert module['repeat_string']('x', 0) == ''\nassert module['repeat_string']('', 5) == ''\n"
+    },
+    {
+      "id": "arena-057-longest-word",
+      "function_name": "longest_word",
+      "prompt": "Write longest_word(s) that returns the longest whitespace-separated word in s; on a tie the first. Empty string returns ''.",
+      "test_source": "assert module['longest_word']('a bb ccc') == 'ccc'\nassert module['longest_word']('aa bb') == 'aa'\nassert module['longest_word']('') == ''\n"
+    },
+    {
+      "id": "arena-058-count-substring",
+      "function_name": "count_substring",
+      "prompt": "Write count_substring(s, sub) that returns the number of non-overlapping occurrences of the non-empty sub in s.",
+      "test_source": "assert module['count_substring']('aaaa', 'aa') == 2\nassert module['count_substring']('abc', 'x') == 0\nassert module['count_substring']('ababab', 'ab') == 3\n"
+    },
+    {
+      "id": "arena-059-swap-case",
+      "function_name": "swap_case",
+      "prompt": "Write swap_case(s) that returns s with the case of each letter swapped.",
+      "test_source": "assert module['swap_case']('Hello') == 'hELLO'\nassert module['swap_case']('123') == '123'\nassert module['swap_case']('') == ''\n"
+    },
+    {
+      "id": "arena-060-initials",
+      "function_name": "initials",
+      "prompt": "Write initials(name) that returns the uppercase initials of each whitespace-separated word, concatenated.",
+      "test_source": "assert module['initials']('john doe') == 'JD'\nassert module['initials']('a b c') == 'ABC'\nassert module['initials']('') == ''\n"
+    },
+    {
+      "id": "arena-061-first-non-repeating",
+      "function_name": "first_non_repeating",
+      "prompt": "Write first_non_repeating(s) that returns the first character in s that appears exactly once, or '' if none.",
+      "test_source": "assert module['first_non_repeating']('aabbc') == 'c'\nassert module['first_non_repeating']('aabb') == ''\nassert module['first_non_repeating']('x') == 'x'\n"
+    },
+    {
+      "id": "arena-062-normalize-spaces",
+      "function_name": "normalize_spaces",
+      "prompt": "Write normalize_spaces(s) that collapses any run of whitespace into a single space and strips the ends.",
+      "test_source": "assert module['normalize_spaces']('  a   b ') == 'a b'\nassert module['normalize_spaces']('') == ''\nassert module['normalize_spaces']('x') == 'x'\n"
+    },
+    {
+      "id": "arena-063-factorial",
+      "function_name": "factorial",
+      "prompt": "Write factorial(n) that returns n! for a non-negative integer n, with factorial(0) == 1.",
+      "test_source": "assert module['factorial'](5) == 120\nassert module['factorial'](0) == 1\nassert module['factorial'](1) == 1\n"
+    },
+    {
+      "id": "arena-064-fibonacci",
+      "function_name": "fibonacci",
+      "prompt": "Write fibonacci(n) that returns the n-th Fibonacci number with fibonacci(0) == 0 and fibonacci(1) == 1.",
+      "test_source": "assert module['fibonacci'](0) == 0\nassert module['fibonacci'](1) == 1\nassert module['fibonacci'](10) == 55\n"
+    },
+    {
+      "id": "arena-065-is-power-of-two",
+      "function_name": "is_power_of_two",
+      "prompt": "Write is_power_of_two(n) that returns True if the positive integer n is a power of two.",
+      "test_source": "assert module['is_power_of_two'](8) is True\nassert module['is_power_of_two'](6) is False\nassert module['is_power_of_two'](1) is True\n"
+    },
+    {
+      "id": "arena-066-sum-range",
+      "function_name": "sum_range",
+      "prompt": "Write sum_range(a, b) that returns the sum of integers from a to b inclusive (a <= b).",
+      "test_source": "assert module['sum_range'](1, 5) == 15\nassert module['sum_range'](3, 3) == 3\nassert module['sum_range'](-2, 2) == 0\n"
+    },
+    {
+      "id": "arena-067-count-divisors",
+      "function_name": "count_divisors",
+      "prompt": "Write count_divisors(n) that returns the number of positive divisors of a positive integer n.",
+      "test_source": "assert module['count_divisors'](6) == 4\nassert module['count_divisors'](1) == 1\nassert module['count_divisors'](9) == 3\n"
+    },
+    {
+      "id": "arena-068-lcm",
+      "function_name": "lcm",
+      "prompt": "Write lcm(a, b) that returns the least common multiple of two positive integers.",
+      "test_source": "assert module['lcm'](4, 6) == 12\nassert module['lcm'](3, 5) == 15\nassert module['lcm'](2, 2) == 2\n"
+    },
+    {
+      "id": "arena-069-celsius-to-fahrenheit",
+      "function_name": "celsius_to_fahrenheit",
+      "prompt": "Write celsius_to_fahrenheit(c) that converts Celsius to Fahrenheit as a float.",
+      "test_source": "assert module['celsius_to_fahrenheit'](0) == 32.0\nassert module['celsius_to_fahrenheit'](100) == 212.0\nassert abs(module['celsius_to_fahrenheit'](37) - 98.6) < 1e-9\n"
+    },
+    {
+      "id": "arena-070-round-half-up",
+      "function_name": "round_half_up",
+      "prompt": "Write round_half_up(x) that rounds a non-negative float to the nearest integer, rounding .5 up.",
+      "test_source": "assert module['round_half_up'](2.5) == 3\nassert module['round_half_up'](2.4) == 2\nassert module['round_half_up'](0) == 0\n"
+    },
+    {
+      "id": "arena-071-percent-of",
+      "function_name": "percent_of",
+      "prompt": "Write percent_of(part, whole) that returns part / whole * 100 as a float; whole is non-zero.",
+      "test_source": "assert module['percent_of'](1, 4) == 25.0\nassert module['percent_of'](3, 3) == 100.0\nassert abs(module['percent_of'](1, 3) - 33.333333333) < 1e-6\n"
+    },
+    {
+      "id": "arena-072-nth-triangular",
+      "function_name": "nth_triangular",
+      "prompt": "Write nth_triangular(n) that returns the n-th triangular number (0+1+...+n) for n >= 0.",
+      "test_source": "assert module['nth_triangular'](3) == 6\nassert module['nth_triangular'](0) == 0\nassert module['nth_triangular'](10) == 55\n"
+    },
+    {
+      "id": "arena-073-sum-list",
+      "function_name": "sum_list",
+      "prompt": "Write sum_list(nums) that returns the sum of a list of numbers (empty -> 0).",
+      "test_source": "assert module['sum_list']([1, 2, 3]) == 6\nassert module['sum_list']([]) == 0\nassert module['sum_list']([-1, 1]) == 0\n"
+    },
+    {
+      "id": "arena-074-max-list",
+      "function_name": "max_list",
+      "prompt": "Write max_list(nums) that returns the maximum of a non-empty list of numbers.",
+      "test_source": "assert module['max_list']([1, 3, 2]) == 3\nassert module['max_list']([-5]) == -5\nassert module['max_list']([4, 4]) == 4\n"
+    },
+    {
+      "id": "arena-075-min-list",
+      "function_name": "min_list",
+      "prompt": "Write min_list(nums) that returns the minimum of a non-empty list of numbers.",
+      "test_source": "assert module['min_list']([3, 1, 2]) == 1\nassert module['min_list']([9]) == 9\nassert module['min_list']([-1, -2]) == -2\n"
+    },
+    {
+      "id": "arena-076-count-occurrences",
+      "function_name": "count_occurrences",
+      "prompt": "Write count_occurrences(items, target) that returns how many times target appears in the list items.",
+      "test_source": "assert module['count_occurrences']([1, 2, 1, 1], 1) == 3\nassert module['count_occurrences']([], 5) == 0\nassert module['count_occurrences'](['a'], 'b') == 0\n"
+    },
+    {
+      "id": "arena-077-rotate-left",
+      "function_name": "rotate_left",
+      "prompt": "Write rotate_left(items, k) that returns the list rotated left by k positions (k >= 0; the list may be empty).",
+      "test_source": "assert module['rotate_left']([1, 2, 3, 4], 1) == [2, 3, 4, 1]\nassert module['rotate_left']([1, 2, 3], 3) == [1, 2, 3]\nassert module['rotate_left']([], 2) == []\n"
+    },
+    {
+      "id": "arena-078-pairwise-sums",
+      "function_name": "pairwise_sums",
+      "prompt": "Write pairwise_sums(nums) that returns the list of sums of each adjacent pair; a list shorter than 2 returns [].",
+      "test_source": "assert module['pairwise_sums']([1, 2, 3]) == [3, 5]\nassert module['pairwise_sums']([5]) == []\nassert module['pairwise_sums']([]) == []\n"
+    },
+    {
+      "id": "arena-079-intersection",
+      "function_name": "intersection",
+      "prompt": "Write intersection(a, b) that returns the sorted list of values present in both lists, without duplicates.",
+      "test_source": "assert module['intersection']([1, 2, 3], [2, 3, 4]) == [2, 3]\nassert module['intersection']([1], [2]) == []\nassert module['intersection']([1, 1, 2], [2, 2]) == [2]\n"
+    },
+    {
+      "id": "arena-080-list-difference",
+      "function_name": "list_difference",
+      "prompt": "Write list_difference(a, b) that returns the values from a not present in b, keeping a's order and duplicates.",
+      "test_source": "assert module['list_difference']([1, 2, 3], [2]) == [1, 3]\nassert module['list_difference']([1, 1, 2], [1]) == [2]\nassert module['list_difference']([], [1]) == []\n"
+    },
+    {
+      "id": "arena-081-zip-dict",
+      "function_name": "zip_dict",
+      "prompt": "Write zip_dict(keys, values) that builds a dict from parallel lists of keys and values (equal length).",
+      "test_source": "assert module['zip_dict'](['a', 'b'], [1, 2]) == {'a': 1, 'b': 2}\nassert module['zip_dict']([], []) == {}\nassert module['zip_dict'](['x'], [9]) == {'x': 9}\n"
+    },
+    {
+      "id": "arena-082-count-by",
+      "function_name": "count_by",
+      "prompt": "Write count_by(items) that returns a dict mapping each item to its number of occurrences.",
+      "test_source": "assert module['count_by']([1, 1, 2]) == {1: 2, 2: 1}\nassert module['count_by']([]) == {}\nassert module['count_by'](['a']) == {'a': 1}\n"
+    },
+    {
+      "id": "arena-083-max-by-value",
+      "function_name": "max_by_value",
+      "prompt": "Write max_by_value(d) that returns the key with the largest value in a non-empty dict; on a tie the smallest key.",
+      "test_source": "assert module['max_by_value']({'a': 1, 'b': 3}) == 'b'\nassert module['max_by_value']({'a': 2, 'b': 2}) == 'a'\nassert module['max_by_value']({'x': 5}) == 'x'\n"
+    },
+    {
+      "id": "arena-084-sort-by-length",
+      "function_name": "sort_by_length",
+      "prompt": "Write sort_by_length(words) that returns the list of words sorted by length ascending, stable.",
+      "test_source": "assert module['sort_by_length'](['ccc', 'a', 'bb']) == ['a', 'bb', 'ccc']\nassert module['sort_by_length']([]) == []\nassert module['sort_by_length'](['ab', 'cd']) == ['ab', 'cd']\n"
+    },
+    {
+      "id": "arena-085-partition",
+      "function_name": "partition",
+      "prompt": "Write partition(nums, pivot) that returns a tuple (less, ge): values < pivot then values >= pivot, preserving order.",
+      "test_source": "assert module['partition']([1, 5, 2, 8], 5) == ([1, 2], [5, 8])\nassert module['partition']([], 0) == ([], [])\nassert module['partition']([3, 3], 3) == ([], [3, 3])\n"
+    },
+    {
+      "id": "arena-086-binary-search",
+      "function_name": "binary_search",
+      "prompt": "Write binary_search(sorted_list, target) that returns the index of target in an ascending list, or -1 if absent.",
+      "test_source": "assert module['binary_search']([1, 3, 5, 7], 5) == 2\nassert module['binary_search']([1, 2, 3], 4) == -1\nassert module['binary_search']([], 1) == -1\n"
+    },
+    {
+      "id": "arena-087-bubble-sort",
+      "function_name": "bubble_sort",
+      "prompt": "Write bubble_sort(nums) that returns a new ascending-sorted list using bubble sort; the input is not modified.",
+      "test_source": "assert module['bubble_sort']([3, 1, 2]) == [1, 2, 3]\nassert module['bubble_sort']([]) == []\nassert module['bubble_sort']([2, 2, 1]) == [1, 2, 2]\n"
+    },
+    {
+      "id": "arena-088-merge-sorted",
+      "function_name": "merge_sorted",
+      "prompt": "Write merge_sorted(a, b) that merges two ascending-sorted lists into one ascending-sorted list.",
+      "test_source": "assert module['merge_sorted']([1, 3], [2, 4]) == [1, 2, 3, 4]\nassert module['merge_sorted']([], [1]) == [1]\nassert module['merge_sorted']([1, 2], []) == [1, 2]\n"
+    },
+    {
+      "id": "arena-089-argmax",
+      "function_name": "argmax",
+      "prompt": "Write argmax(nums) that returns the index of the maximum value in a non-empty list; on a tie the first index.",
+      "test_source": "assert module['argmax']([1, 3, 2]) == 1\nassert module['argmax']([5]) == 0\nassert module['argmax']([2, 2]) == 0\n"
+    },
+    {
+      "id": "arena-090-is-sorted",
+      "function_name": "is_sorted",
+      "prompt": "Write is_sorted(nums) that returns True if the list is in non-decreasing order.",
+      "test_source": "assert module['is_sorted']([1, 2, 2, 3]) is True\nassert module['is_sorted']([1, 3, 2]) is False\nassert module['is_sorted']([]) is True\n"
+    },
+    {
+      "id": "arena-091-moving-average",
+      "function_name": "moving_average",
+      "prompt": "Write moving_average(nums, k) that returns the averages of each window of size k (k >= 1); if the list is shorter than k, return [].",
+      "test_source": "assert module['moving_average']([1, 2, 3, 4], 2) == [1.5, 2.5, 3.5]\nassert module['moving_average']([1], 2) == []\nassert module['moving_average']([2, 2, 2], 3) == [2.0]\n"
+    },
+    {
+      "id": "arena-092-count-inversions",
+      "function_name": "count_inversions",
+      "prompt": "Write count_inversions(nums) that returns the number of pairs (i, j) with i < j and nums[i] > nums[j].",
+      "test_source": "assert module['count_inversions']([1, 2, 3]) == 0\nassert module['count_inversions']([3, 2, 1]) == 3\nassert module['count_inversions']([]) == 0\n"
+    },
+    {
+      "id": "arena-093-hamming-weight",
+      "function_name": "hamming_weight",
+      "prompt": "Write hamming_weight(n) that returns the number of set bits in a non-negative integer n.",
+      "test_source": "assert module['hamming_weight'](7) == 3\nassert module['hamming_weight'](0) == 0\nassert module['hamming_weight'](8) == 1\n"
+    },
+    {
+      "id": "arena-094-hex-to-int",
+      "function_name": "hex_to_int",
+      "prompt": "Write hex_to_int(s) that parses a hexadecimal string (no '0x' prefix) into an integer.",
+      "test_source": "assert module['hex_to_int']('ff') == 255\nassert module['hex_to_int']('10') == 16\nassert module['hex_to_int']('0') == 0\n"
+    },
+    {
+      "id": "arena-095-int-to-hex",
+      "function_name": "int_to_hex",
+      "prompt": "Write int_to_hex(n) that returns the lowercase hexadecimal string of a non-negative integer without a '0x' prefix.",
+      "test_source": "assert module['int_to_hex'](255) == 'ff'\nassert module['int_to_hex'](0) == '0'\nassert module['int_to_hex'](16) == '10'\n"
+    },
+    {
+      "id": "arena-096-xor-cipher",
+      "function_name": "xor_cipher",
+      "prompt": "Write xor_cipher(data, key) that returns a list of ints, each byte of data XORed with key (0..255).",
+      "test_source": "assert module['xor_cipher']([1, 2, 3], 0) == [1, 2, 3]\nassert module['xor_cipher']([255], 255) == [0]\nassert module['xor_cipher']([], 5) == []\n"
+    },
+    {
+      "id": "arena-097-parity-bit",
+      "function_name": "parity_bit",
+      "prompt": "Write parity_bit(n) that returns 1 if the number of set bits in n is odd, else 0.",
+      "test_source": "assert module['parity_bit'](7) == 1\nassert module['parity_bit'](3) == 0\nassert module['parity_bit'](0) == 0\n"
+    },
+    {
+      "id": "arena-098-matrix-sum",
+      "function_name": "matrix_sum",
+      "prompt": "Write matrix_sum(matrix) that returns the sum of all elements in a list of lists of numbers.",
+      "test_source": "assert module['matrix_sum']([[1, 2], [3, 4]]) == 10\nassert module['matrix_sum']([]) == 0\nassert module['matrix_sum']([[5]]) == 5\n"
+    },
+    {
+      "id": "arena-099-identity-matrix",
+      "function_name": "identity_matrix",
+      "prompt": "Write identity_matrix(n) that returns the n x n identity matrix as a list of lists (n >= 0).",
+      "test_source": "assert module['identity_matrix'](2) == [[1, 0], [0, 1]]\nassert module['identity_matrix'](0) == []\nassert module['identity_matrix'](1) == [[1]]\n"
+    },
+    {
+      "id": "arena-100-diagonal",
+      "function_name": "diagonal",
+      "prompt": "Write diagonal(matrix) that returns the main diagonal of a square matrix as a list.",
+      "test_source": "assert module['diagonal']([[1, 2], [3, 4]]) == [1, 4]\nassert module['diagonal']([]) == []\nassert module['diagonal']([[9]]) == [9]\n"
     }
   ]
 }
