@@ -1,0 +1,37 @@
+[Unit]
+Description=Sovereign Local AI agent arena (sandbox-refereed code matches)
+After=network.target sovereign-bootstrap-chat.service
+Wants=sovereign-bootstrap-chat.service
+
+[Service]
+Type=simple
+User=sovereign-arena
+Group=sovereign
+WorkingDirectory=/opt/sovereign/app
+EnvironmentFile=-/opt/sovereign/credentials/arena.env
+Environment=SOVEREIGN_ARENA_STATE=/var/lib/sovereign-arena
+ExecStart=/usr/bin/python3 -B -m services.arena.runner
+Restart=on-failure
+RestartSec=30
+UMask=0027
+Nice=10
+CPUWeight=20
+MemoryMax=1G
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadOnlyPaths=/opt/sovereign/app
+ReadWritePaths=/var/lib/sovereign-arena
+# bwrap needs user and mount namespaces: no RestrictNamespaces, no PrivateDevices.
+
+[Install]
+WantedBy=multi-user.target
