@@ -296,7 +296,7 @@ class ArenaStore:
                     (profile["profile_id"], RATING_HISTORY_POINTS)).fetchall())]
             packets = [dict(row) for row in connection.execute(
                 "SELECT packet_id,created_at,solutions_sha256,solutions,unique_ratio,max_repetition,status,approved_at,approved_by"
-                " FROM packets ORDER BY created_at DESC LIMIT 20")]
+                " FROM packets ORDER BY created_at DESC, packet_id DESC LIMIT 20")]
             state = {row["key"]: json.loads(row["value"]) for row in connection.execute("SELECT key, value FROM state")}
             totals = dict(connection.execute(
                 "SELECT (SELECT COUNT(*) FROM matches WHERE finished_at IS NOT NULL) AS matches,"

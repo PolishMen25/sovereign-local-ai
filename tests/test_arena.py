@@ -213,6 +213,19 @@ class ArenaRunnerTests(ArenaTestCase):
             ArenaStore(self.root / "missing.sqlite3", read_only=True).overview()
 
 
+class StatusTests(ArenaTestCase):
+    def test_terminal_summary(self) -> None:
+        from datetime import datetime, timezone
+        from services.arena.status import render
+
+        arena = self.arena({"BOOTSTRAP": FakeEngine("BOOTSTRAP")})
+        arena.step()
+        text = render(self.store.overview(), now=datetime.now(timezone.utc))
+        self.assertIn("arène : running", text)
+        self.assertIn("matchs : 1", text)
+        self.assertIn("Bootstrap", text)
+
+
 class EngineTests(unittest.TestCase):
     def test_engines_must_stay_local(self) -> None:
         with self.assertRaises(ValueError):
