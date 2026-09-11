@@ -302,6 +302,79 @@ class GatewayHttpTests(GatewayTestCase):
         self.assertEqual(self.request("DELETE", "/v1/elsewhere", session=True, csrf=True)[0], 404)
 
 
+class ArenaGatewayTests(GatewayTestCase):
+    """The gateway reads the arena database read-only and writes approvals to its inbox."""
+
+    def setUp(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+        from services.arena.store import ArenaStore
+
+        self.os = os
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        writer = ArenaStore(self.root / "arena.sqlite3")
+        writer.initialize()
+        writer.add_profile({"profile_id": "author-direct", "display_name": "Direct", "role": "author", "engine": "QWEN-CODER",
+                            "system_prompt": "Write the function.", "temperature": 0.2})
+        writer.add_event("arena_started", {"engines": ["QWEN-CODER"], "tasks": 50})
+        writer.add_event("match_started", {"match_id": 1, "task_id": "python-01-x", "prompt": "<script>alert(1)</script>",
+                                           "authors": ["author-direct", "author-direct"], "critic_id": None})
+        self.inbox = self.root / "inbox"
+        self.inbox.mkdir()
+        self.start(FakeQwen())
+        self.server.state.arena = ArenaStore(self.root / "arena.sqlite3", read_only=True)
+        self.server.state.arena_inbox = self.inbox
+        self.login()
+
+    def test_arena_page_and_overview(self) -> None:
+        status, headers, _ = self.request("GET", "/arena")
+        self.assertEqual((status, headers["content-type"]), (200, "text/html; charset=utf-8"))
+        self.assertEqual(self.request("GET", "/arena.js")[0], 200)
+        self.assertEqual(self.request("GET", "/v1/arena")[0], 401)
+        body = json.loads(self.request("GET", "/v1/arena", session=True)[2])
+        self.assertTrue(body["available"])
+        self.assertEqual(body["profiles"][0]["profile_id"], "author-direct")
+        self.assertEqual(body["last_event_id"], 2)
+
+    def test_events_are_paged_and_returned_as_data(self) -> None:
+        events = json.loads(self.request("GET", "/v1/arena/events?after=1", session=True)[2])["events"]
+        self.assertEqual([e["kind"] for e in events], ["match_started"])
+        self.assertEqual(events[0]["payload"]["prompt"], "<script>alert(1)</script>")
+        for bad in ("/v1/arena/events?after=-1", "/v1/arena/events?after=x", "/v1/arena/events?after=9999999999999"):
+            self.assertEqual(self.request("GET", bad, session=True)[0], 422, bad)
+
+    def test_approval_requires_csrf_and_a_valid_target(self) -> None:
+        packet = {"kind": "packet", "target_id": "arena-20260911t120000z", "target_sha256": "a" * 64}
+        self.assertEqual(self.request("POST", "/v1/arena/approve", packet, session=True)[0], 401)
+        for bad in ({**packet, "kind": "train_now"}, {**packet, "target_sha256": "short"}, {**packet, "extra": 1},
+                    {"kind": "profile_chat", "target_id": "../../etc/passwd"}, {"kind": "profile_chat", "target_id": "author-x", "target_sha256": "a" * 64}):
+            self.assertEqual(self.request("POST", "/v1/arena/approve", bad, session=True, csrf=True)[0], 422, bad)
+        self.assertEqual(list(self.inbox.iterdir()), [])
+        status, _, body = self.request("POST", "/v1/arena/approve", packet, session=True, csrf=True)
+        self.assertEqual((status, json.loads(body)["status"]), (202, "approval_recorded"))
+        files = list(self.inbox.iterdir())
+        self.assertEqual(len(files), 1)
+        self.assertEqual(self.os.stat(files[0]).st_mode & 0o777, 0o640)
+        recorded = json.loads(files[0].read_text())
+        self.assertEqual((recorded["schema_version"], recorded["approved_by"], recorded["target_sha256"]), ("arena-approval.v1", "owner", "a" * 64))
+        status, _, _ = self.request("POST", "/v1/arena/approve", {"kind": "profile_chat", "target_id": "author-direct"}, session=True, csrf=True)
+        self.assertEqual(status, 202)
+
+    def test_missing_arena_is_reported_not_crashed(self) -> None:
+        self.server.state.arena_inbox = self.root / "absent"
+        body = {"kind": "profile_chat", "target_id": "author-direct"}
+        self.assertEqual(json.loads(self.request("POST", "/v1/arena/approve", body, session=True, csrf=True)[2]), {"error": "arena_unavailable"})
+        from pathlib import Path
+        from services.arena.store import ArenaStore
+        self.server.state.arena = ArenaStore(Path(self.root / "absent.sqlite3"), read_only=True)
+        self.assertEqual(json.loads(self.request("GET", "/v1/arena", session=True)[2]), {"available": False})
+        self.server.state.arena = None
+        self.assertEqual(json.loads(self.request("GET", "/v1/arena/events?after=0", session=True)[2]), {"available": False, "events": []})
+
+
 class UnconfiguredQwenTests(GatewayTestCase):
     """Without SOVEREIGN_QWEN_TOKEN the gateway must answer, not drop the connection."""
 

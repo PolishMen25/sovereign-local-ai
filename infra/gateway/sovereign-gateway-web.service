@@ -29,6 +29,8 @@ MemoryDenyWriteExecute=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ReadOnlyPaths=/opt/sovereign/app
 ReadWritePaths=/var/lib/sovereign-gateway
+# Arena: read its database, drop owner approvals in its inbox (optional paths).
+ReadWritePaths=-/var/lib/sovereign-arena/inbox
 
 [Install]
 WantedBy=multi-user.target

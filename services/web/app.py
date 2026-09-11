@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import hmac
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,8 +11,12 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
+import sqlite3
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
+from services.arena.store import ArenaStore
 from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.web.authentication import AuthenticationStore
@@ -30,6 +35,9 @@ STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/arena": ("arena.html", "text/html; charset=utf-8"),
+    "/arena.css": ("arena.css", "text/css; charset=utf-8"),
+    "/arena.js": ("arena.js", "text/javascript; charset=utf-8"),
 }
 WEB_PROFILES = (
     {
@@ -50,6 +58,9 @@ SESSION_COOKIE_ATTRIBUTES = "Path=/; Max-Age=43200; Secure; HttpOnly; SameSite=S
 EXPIRED_SESSION_COOKIE = "sovereign_session=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict"
 EXPORT_PATH = re.compile(r"/v1/conversations/([A-Za-z0-9_-]{8,80})/export")
 CONVERSATION_PATH = re.compile(r"/v1/conversations/([A-Za-z0-9_-]{8,80})")
+ARENA_TARGET_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{2,79}$")
+ARENA_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+ARENA_APPROVAL_SCHEMA = "arena-approval.v1"
 
 BOOTSTRAP_SYSTEM_PROMPT = "Tu es BOOTSTRAP, moteur local temporaire distinct de CORE-700M. Tu n'as ni outil ni accès Internet. Réponds clairement sans prétendre être CORE."
 QWEN_SYSTEM_PROMPT = "Tu es Qwen Coder, assistant local de programmation distinct de CORE. Réponds dans la langue de l'utilisateur. Tu n'as ni outil ni accès Internet. Ne prétends jamais avoir exécuté le code proposé."
@@ -165,6 +176,41 @@ class WebState:
     knowledge: HybridKnowledgeIndex
     setup_token: str
     qwen_runtime: Any = None
+    arena: Any = None
+    arena_inbox: Path | None = None
+
+    def arena_overview(self) -> dict[str, Any]:
+        if self.arena is None:
+            return {"available": False}
+        try:
+            return {"available": True, **self.arena.overview()}
+        except (OSError, ValueError, sqlite3.Error):
+            return {"available": False}
+
+    def arena_events(self, after: int) -> dict[str, Any]:
+        if self.arena is None:
+            return {"available": False, "events": []}
+        try:
+            return {"available": True, "events": self.arena.events_after(after, limit=100)}
+        except (OSError, ValueError, sqlite3.Error):
+            return {"available": False, "events": []}
+
+    def record_arena_approval(self, approval: dict[str, Any]) -> None:
+        """Drop an approval file in the arena inbox; the arena daemon applies it.
+
+        The gateway never writes the arena database.  The file is created
+        exclusively and made group-readable so the arena user can read it.
+        """
+
+        if self.arena_inbox is None or not self.arena_inbox.is_dir():
+            raise FileNotFoundError("arena inbox is not available")
+        name = f"{approval['approved_at'].replace(':', '')}-{secrets.token_hex(4)}.json"
+        descriptor = os.open(self.arena_inbox / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+        try:
+            os.fchmod(descriptor, 0o640)
+            os.write(descriptor, (json.dumps(approval, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+        finally:
+            os.close(descriptor)
 
     def _bootstrap_state(self) -> tuple[bool, str]:
         try:
@@ -302,9 +348,18 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/engines": lambda: self.send_json(200, {"engines": self.state.engines()}),
             "/v1/knowledge-status": lambda: self.send_json(200, self.state.knowledge.status()),
             "/v1/conversations": lambda: self.send_json(200, {"conversations": self.state.memory.list_conversations()}),
+            "/v1/arena": lambda: self.send_json(200, self.state.arena_overview()),
         }.get(self.path)
         if route is not None:
             route()
+            return
+        parts = urlsplit(self.path)
+        if parts.path == "/v1/arena/events":
+            after = parse_qs(parts.query).get("after", ["0"])[0]
+            if not after.isdigit() or len(after) > 12:
+                self.send_json(422, {"error": "invalid_request"})
+                return
+            self.send_json(200, self.state.arena_events(int(after)))
             return
         match = EXPORT_PATH.fullmatch(self.path)
         if match:
@@ -348,6 +403,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/login": self._post_login,
             "/v1/logout": self._post_logout,
             "/v1/chat": self._post_chat,
+            "/v1/arena/approve": self._post_arena_approval,
         }.get(self.path)
         if handler is None:
             self.send_json(404, {"error": "not_found"})
@@ -390,6 +446,46 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             return
         self.state.authentication.logout(self.session_token())
         self.send_json(200, {"status": "logged_out"}, extra_headers={"Set-Cookie": EXPIRED_SESSION_COOKIE})
+
+    def _post_arena_approval(self) -> None:
+        """Owner approval of an arena packet (training data) or of a profile for the chat."""
+
+        try:
+            username = self.require_session(csrf=True)
+            body = self.read_json()
+        except PermissionError:
+            self.send_json(401, {"error": "unauthorized"})
+            return
+        except TypeError:
+            self.send_json(415, {"error": "unsupported_media_type"})
+            return
+        except ValueError:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        kind, target_id, digest = body.get("kind"), body.get("target_id"), body.get("target_sha256")
+        valid = (
+            set(body) <= {"kind", "target_id", "target_sha256"}
+            and kind in {"packet", "profile_chat"}
+            and isinstance(target_id, str) and ARENA_TARGET_ID.fullmatch(target_id) is not None
+            and (kind != "packet" or (isinstance(digest, str) and ARENA_SHA256.fullmatch(digest) is not None))
+            and (kind != "profile_chat" or digest is None)
+        )
+        if not valid:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        approval = {
+            "schema_version": ARENA_APPROVAL_SCHEMA, "kind": kind, "target_id": target_id,
+            "approved_by": username,
+            "approved_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
+        if kind == "packet":
+            approval["target_sha256"] = digest
+        try:
+            self.state.record_arena_approval(approval)
+        except OSError:
+            self.send_json(503, {"error": "arena_unavailable"})
+            return
+        self.send_json(202, {"status": "approval_recorded", "kind": kind, "target_id": target_id})
 
     # --- chat ------------------------------------------------------------
 
@@ -548,7 +644,9 @@ def main() -> int:
     if len(qwen_token) >= 32:
         qwen_runtime = QwenClient(os.environ.get("SOVEREIGN_QWEN_ENDPOINT", "http://192.168.0.144:8790"), qwen_token)
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
-    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime)  # type: ignore[attr-defined]
+    arena = ArenaStore(Path(os.environ.get("SOVEREIGN_ARENA_DB", "/var/lib/sovereign-arena/arena.sqlite3")), read_only=True)
+    arena_inbox = Path(os.environ.get("SOVEREIGN_ARENA_INBOX", "/var/lib/sovereign-arena/inbox"))
+    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox)  # type: ignore[attr-defined]
     server.serve_forever()
     return 0
 

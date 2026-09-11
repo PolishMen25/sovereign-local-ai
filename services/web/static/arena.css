@@ -1,0 +1,52 @@
+.status-dot.is-paused { background: #ffd59a; }
+.status-dot.is-stopped { background: var(--danger); }
+.arena { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 1.25rem; padding: 0 1.75rem 2.5rem; }
+.kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .75rem; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: .9rem 1rem; display: flex; flex-direction: column; gap: .15rem; }
+.kpi-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.kpi-label { color: var(--muted); font-size: .75rem; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem 1.2rem; min-width: 0; }
+.panel-heading { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .9rem; }
+.packets-panel { grid-column: 1 / -1; }
+.subheading { font-size: .8rem; color: var(--muted); font-weight: 600; margin: 1.2rem 0 .5rem; }
+.table-scroll { overflow-x: auto; }
+.leaderboard { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.leaderboard th { text-align: left; color: var(--muted); font-weight: 500; font-size: .72rem; padding: .45rem .5rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.leaderboard td { padding: .55rem .5rem; border-bottom: 1px solid #25313c; vertical-align: middle; }
+.leaderboard .num { text-align: right; font-variant-numeric: tabular-nums; }
+.leaderboard tr.leader td:first-child { color: var(--accent); font-weight: 700; }
+.agent-name { font-weight: 600; white-space: nowrap; }
+.origin { min-width: 8.5rem; font-size: .72rem; line-height: 1.35; }
+.agent-id { display: block; color: var(--muted); font-size: .68rem; }
+.chip { display: inline-block; border-radius: 99px; padding: .1rem .5rem; font-size: .68rem; font-weight: 650; border: 1px solid var(--line); white-space: nowrap; }
+.chip.qwen { color: #b9d7ff; border-color: #3c5577; }
+.chip.bootstrap { color: #e5d3a6; border-color: #6d5d38; }
+.chip.ok { color: var(--accent); border-color: #3f6f5c; }
+.chip.fail { color: var(--danger); border-color: #7a4644; }
+.chip.warn { color: #ffd59a; border-color: #7a6034; }
+.chip.muted { color: var(--muted); }
+.spark { display: block; }
+.spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.spark circle { fill: var(--accent); }
+.small-button { padding: .3rem .6rem; font-size: .72rem; white-space: nowrap; }
+.feed-panel { display: flex; flex-direction: column; max-height: 78rem; }
+.feed { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .6rem; }
+.event { border: 1px solid #2b3844; border-left: 3px solid var(--line); border-radius: 9px; padding: .6rem .75rem; background: var(--page); font-size: .82rem; }
+.event.pass { border-left-color: var(--accent); }
+.event.fail { border-left-color: var(--danger); }
+.event.birth { border-left-color: #b9d7ff; }
+.event.alert { border-left-color: #ffd59a; }
+.event-head { display: flex; justify-content: space-between; gap: .5rem; align-items: baseline; }
+.event-head time { color: var(--muted); font-size: .68rem; flex-shrink: 0; }
+.event p { margin-top: .3rem; overflow-wrap: anywhere; }
+.event details { margin-top: .4rem; }
+.event summary { cursor: pointer; color: var(--muted); font-size: .74rem; }
+.event pre { margin: .4rem 0 0; padding: .6rem; background: #0b0f14; border-radius: 7px; overflow-x: auto; font-size: .74rem; line-height: 1.45; white-space: pre; }
+.delta-up { color: var(--accent); }
+.delta-down { color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; max-width: 30rem; padding: 1.4rem; }
+dialog::backdrop { background: rgb(0 0 0 / .6); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.2rem; }
+@media (max-width: 62rem) { .arena { grid-template-columns: 1fr; padding: 0 1rem 2rem; } .feed-panel { max-height: 40rem; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
