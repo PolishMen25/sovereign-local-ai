@@ -8,6 +8,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from services.inference.checkpoint_envelope import (
+    ACCEPTED_ENVELOPE_KEY_SETS,
+    allowed_checkpoint_schemas,
+)
 from services.inference.configuration import load_core_candidate_configuration
 from services.inference.model import build_model, require_cpu_torch
 from services.inference.tokenizer import EOS_TOKEN_ID, load_tokenizer
@@ -27,18 +31,19 @@ class InferenceUnavailable(RuntimeError):
     """Raised when local inference cannot prove its complete contract."""
 
 
-def allowed_checkpoint_schemas(model_name: str) -> frozenset[str]:
-    """Return the exact checkpoint envelopes accepted for one CORE candidate.
+__all__ = [
+    "InferenceUnavailable",
+    "LocalInferenceRuntime",
+    "RuntimeStatus",
+    "allowed_checkpoint_schemas",
+    "is_collapsed_output",
+    "runtime_state",
+    "validate_inference_checkpoint",
+]
 
-    Checkpoint provenance is model-specific: accepting a generic ``core-*``
-    schema would make it possible to load weights produced for a different
-    candidate.  The historical inference envelope is a CORE-700M-only format.
-    """
-
-    schemas = {f"{model_name.lower()}-checkpoint.v1"}
-    if model_name == "CORE-700M":
-        schemas.add("core-700m-inference-checkpoint.v1")
-    return frozenset(schemas)
+# Periods checked by the quality gate.  Width 7 is not in the list: keep it
+# that way unless the gate itself is deliberately changed.
+_COLLAPSE_PERIODS = (1, 2, 3, 4, 5, 6, 8)
 
 
 def _sha256(path: Path) -> str:
@@ -46,6 +51,55 @@ def _sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError as error:
         raise InferenceUnavailable("CORE contract artifact is unavailable") from error
+
+
+def runtime_state(*, ready: bool, loaded: bool, weights_present: bool) -> str:
+    """Return the public runtime state label for one combination of facts."""
+
+    if ready and loaded:
+        return "ready_experimental"
+    if ready:
+        return "checkpoint_pending_validation"
+    if weights_present:
+        return "weights_detected_runtime_disabled"
+    return "awaiting_local_weights"
+
+
+def validate_inference_checkpoint(
+    checkpoint: Any, *, model_name: str, expected_contract: dict[str, str]
+) -> dict[str, Any]:
+    """Return the model state of an envelope that belongs to this candidate.
+
+    Pure function: no torch, no file access, so every refusal is unit-testable.
+    """
+
+    if not isinstance(checkpoint, dict) or set(checkpoint) not in ACCEPTED_ENVELOPE_KEY_SETS:
+        raise InferenceUnavailable("CORE checkpoint envelope is incompatible")
+    contract = checkpoint.get("contract")
+    if (
+        checkpoint.get("schema_version") not in allowed_checkpoint_schemas(model_name)
+        or checkpoint.get("model_name") != model_name
+        or not isinstance(contract, dict)
+        or any(contract.get(key) != value for key, value in expected_contract.items())
+        or not isinstance(checkpoint.get("model"), dict)
+    ):
+        raise InferenceUnavailable("CORE checkpoint provenance is incompatible")
+    return checkpoint["model"]
+
+
+def is_collapsed_output(answer: str) -> bool:
+    """Return True when an answer is one short pattern repeated.
+
+    A 20-step checkpoint can be mechanically loadable yet collapse into one
+    repeated token.  Such output is refused instead of shown as an answer.
+    """
+
+    if len(answer) < 16:
+        return False
+    for width in _COLLAPSE_PERIODS:
+        if len(answer) >= width * 4 and answer == answer[:width] * (len(answer) // width) + answer[: len(answer) % width]:
+            return True
+    return False
 
 
 class LocalInferenceRuntime:
@@ -74,10 +128,11 @@ class LocalInferenceRuntime:
                 self._load()
             except InferenceUnavailable:
                 return RuntimeStatus(state="checkpoint_refused", backend="cpu_only", model_name=self.model_name, weights_present=weights_present, generation_available=False)
+        loaded = self._model is not None
         return RuntimeStatus(
-            state="ready_experimental" if ready and self._model is not None else ("checkpoint_pending_validation" if ready else ("weights_detected_runtime_disabled" if weights_present else "awaiting_local_weights")),
+            state=runtime_state(ready=ready, loaded=loaded, weights_present=weights_present),
             backend="cpu_only", model_name=self.model_name, weights_present=weights_present,
-            generation_available=ready and self._model is not None,
+            generation_available=ready and loaded,
         )
 
     def _load(self) -> None:
@@ -88,31 +143,36 @@ class LocalInferenceRuntime:
         assert self.config_path and self.tokenizer_path and self.manifest_path and self.preflight_path
         document, config, config_sha = load_core_candidate_configuration(self.config_path)
         tokenizer = load_tokenizer(self.tokenizer_path)
-        try:
-            manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-            preflight = json.loads(self.preflight_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise InferenceUnavailable("CORE lineage receipt is invalid") from error
+        manifest, preflight = self._read_lineage_receipts()
         if document.get("name") != self.model_name or tokenizer.vocabulary_size != config.vocabulary_size or not isinstance(manifest, dict) or not isinstance(preflight, dict):
             raise InferenceUnavailable("CORE lineage is incompatible")
-        expected = {"config_sha256": config_sha, "manifest_sha256": _sha256(self.manifest_path), "tokenizer_sha256": _sha256(self.tokenizer_path), "preflight_sha256": _sha256(self.preflight_path)}
+        expected = self._expected_contract(config_sha)
         torch = require_cpu_torch()
         try:
             checkpoint = torch.load(self.weights_path, map_location="cpu", weights_only=True)
         except Exception as error:
             raise InferenceUnavailable("CORE checkpoint cannot be loaded safely") from error
-        if not isinstance(checkpoint, dict) or set(checkpoint) not in ({"schema_version", "model_name", "step", "contract", "model"}, {"schema_version", "model_name", "step", "contract", "model", "optimizer"}):
-            raise InferenceUnavailable("CORE checkpoint envelope is incompatible")
-        contract = checkpoint.get("contract")
-        if checkpoint.get("schema_version") not in allowed_checkpoint_schemas(self.model_name) or checkpoint.get("model_name") != self.model_name or not isinstance(contract, dict) or any(contract.get(key) != value for key, value in expected.items()) or not isinstance(checkpoint.get("model"), dict):
-            raise InferenceUnavailable("CORE checkpoint provenance is incompatible")
+        model_state = validate_inference_checkpoint(checkpoint, model_name=self.model_name, expected_contract=expected)
         model = build_model(torch, config)
         try:
-            model.load_state_dict(checkpoint["model"], strict=True)
+            model.load_state_dict(model_state, strict=True)
         except Exception as error:
             raise InferenceUnavailable("CORE checkpoint tensors are incompatible") from error
         model.eval()
         self._model, self._tokenizer = model, tokenizer
+
+    def _read_lineage_receipts(self) -> tuple[Any, Any]:
+        assert self.manifest_path and self.preflight_path
+        try:
+            manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+            preflight = json.loads(self.preflight_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise InferenceUnavailable("CORE lineage receipt is invalid") from error
+        return manifest, preflight
+
+    def _expected_contract(self, config_sha: str) -> dict[str, str]:
+        assert self.manifest_path and self.tokenizer_path and self.preflight_path
+        return {"config_sha256": config_sha, "manifest_sha256": _sha256(self.manifest_path), "tokenizer_sha256": _sha256(self.tokenizer_path), "preflight_sha256": _sha256(self.preflight_path)}
 
     def generate(self, prompt: str, *, max_new_tokens: int = 64, seed: int = 20260907) -> dict[str, Any]:
         if not isinstance(prompt, str) or not 1 <= len(prompt) <= 12_000:
@@ -133,11 +193,6 @@ class LocalInferenceRuntime:
                 ids.append(token_id)
                 output.append(token_id)
         answer = self._tokenizer.decode(output)
-        # A 20-step checkpoint can be mechanically loadable yet collapse into
-        # one repeated token.  Refuse that output instead of showing gibberish
-        # as if it were an answer.
-        if len(answer) >= 16:
-            for width in (1, 2, 3, 4, 5, 6, 8):
-                if len(answer) >= width * 4 and answer == answer[:width] * (len(answer) // width) + answer[: len(answer) % width]:
-                    raise InferenceUnavailable("CORE quality gate refused repetitive output")
+        if is_collapsed_output(answer):
+            raise InferenceUnavailable("CORE quality gate refused repetitive output")
         return {"engine": self.model_name, "experimental": True, "answer": answer, "seed": seed}

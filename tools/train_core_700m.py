@@ -16,6 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from services.inference.checkpoint_envelope import (
+    TRAINING_ENVELOPE_KEYS,
+    build_training_envelope,
+    checkpoint_schema,
+)
 from services.inference.configuration import load_core_candidate_configuration
 from services.inference.model import build_model, require_cpu_torch
 from tools.authorized_text_bundle import load_authorized_text_bundle
@@ -90,12 +95,10 @@ def load_resume(
         checkpoint = torch.load(path, map_location="cpu", weights_only=True)
     except Exception as error:
         raise RuntimeError("CORE checkpoint cannot be loaded safely") from error
-    if not isinstance(checkpoint, dict) or set(checkpoint) != {
-        "schema_version", "model_name", "step", "contract", "model", "optimizer"
-    }:
+    if not isinstance(checkpoint, dict) or set(checkpoint) != TRAINING_ENVELOPE_KEYS:
         raise RuntimeError("CORE checkpoint envelope is incompatible")
     if (
-        checkpoint["schema_version"] != f"{model_name.lower()}-checkpoint.v1"
+        checkpoint["schema_version"] != checkpoint_schema(model_name)
         or checkpoint["model_name"] != model_name
         or checkpoint["contract"] != contract
         or type(checkpoint["step"]) is not int
@@ -185,7 +188,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             ), sort_keys=True) + "\n")
             metrics.flush()
     checkpoint = args.output_dir / f"{args.model_name.lower()}-step-{final_step:06d}.pt"
-    atomic_save(torch, checkpoint, {"schema_version": f"{args.model_name.lower()}-checkpoint.v1", "model_name": document["name"], "step": final_step, "contract": contract, "model": model.state_dict(), "optimizer": optimizer.state_dict()})
+    atomic_save(torch, checkpoint, build_training_envelope(model_name=document["name"], step=final_step, contract=contract, model_state=model.state_dict(), optimizer_state=optimizer.state_dict()))
     return {"checkpoint": str(checkpoint), "metrics": str(metrics_path), "steps": final_step}
 
 
