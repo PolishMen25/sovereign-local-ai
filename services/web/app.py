@@ -22,6 +22,7 @@ from services.arena.store import ArenaStore
 from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.knowledge.document_ingest import ingest as ingest_document, IngestError
+from services.knowledge import document_analysis
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
 from services.web.core_client import CoreClient
@@ -68,6 +69,7 @@ ARENA_TARGET_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{2,79}$")
 ARENA_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 ARENA_APPROVAL_SCHEMA = "arena-approval.v1"
 CORPUS_APPROVAL_SCHEMA = "arena-increment-approval.v1"
+UPLOAD_PROVENANCE = re.compile(r"^upload:[A-Za-z0-9_-]{1,120}$")
 
 BOOTSTRAP_SYSTEM_PROMPT = "Tu es BOOTSTRAP, moteur local temporaire distinct de CORE-700M. Tu n'as ni outil ni accès Internet. Réponds clairement sans prétendre être CORE."
 QWEN_SYSTEM_PROMPT = "Tu es Qwen Coder, assistant local de programmation distinct de CORE. Réponds dans la langue de l'utilisateur. Tu n'as ni outil ni accès Internet. Ne prétends jamais avoir exécuté le code proposé."
@@ -506,6 +508,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/arena/approve": self._post_arena_approval,
             "/v1/corpus/promote": self._post_corpus_promotion,
             "/v1/documents": self._post_document,
+            "/v1/documents/analyze": self._post_document_analyze,
         }.get(self.path)
         if handler is None:
             self.send_json(404, {"error": "not_found"})
@@ -668,6 +671,49 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             return
         self.send_json(201, {"status": "indexed", **result})
 
+    def _post_document_analyze(self) -> None:
+        """Full-document analysis by map-reduce over its chunks, streamed with progress."""
+
+        try:
+            self.require_session(csrf=True)
+            body = self.read_json()
+        except PermissionError:
+            self.send_json(401, {"error": "unauthorized"})
+            return
+        except TypeError:
+            self.send_json(415, {"error": "unsupported_media_type"})
+            return
+        except ValueError:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        provenance_id = body.get("provenance_id")
+        if set(body) != {"provenance_id"} or not isinstance(provenance_id, str) or UPLOAD_PROVENANCE.fullmatch(provenance_id) is None:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        try:
+            chunks = self.state.knowledge.chunks_for_provenance(provenance_id)
+        except (ValueError, sqlite3.Error, OSError):
+            chunks = []
+        if not chunks:
+            self.send_json(404, {"error": "document_not_found"})
+            return
+        self.begin_event_stream()
+        self.send_event("metadata", {"total_chunks": len(chunks), "title": chunks[0]["title"]})
+        try:
+            result = document_analysis.analyze(
+                self.state.runtime.generate, chunks,
+                on_progress=lambda done, total: self.send_event("progress", {"done": done, "total": total}),
+            )
+        except (ValueError, RuntimeError):
+            self.send_event("error", {"error": "analysis_failed", "answer": "L'analyse a échoué (le moteur est peut-être indisponible)."})
+            return
+        self.send_event("completed", {
+            "answer": result["analysis"],
+            "analyzed_chunks": result["analyzed_chunks"],
+            "total_chunks": result["total_chunks"],
+            "truncated": result["truncated"],
+        })
+
     # --- chat ------------------------------------------------------------
 
     def _post_chat(self) -> None:
@@ -734,7 +780,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         history = self.state.memory.export_conversation(conversation_id)["messages"][-20:]
         messages = [{"role": "system", "content": system_prompt or BOOTSTRAP_SYSTEM_PROMPT}]
         try:
-            retrieval = self.state.knowledge.search(message, query_embedding=None, limit=2)
+            retrieval = self.state.knowledge.search(message, query_embedding=None, limit=6)
         except ValueError:
             retrieval = {"hits": []}
         citations = [

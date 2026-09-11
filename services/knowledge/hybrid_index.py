@@ -123,6 +123,24 @@ class HybridKnowledgeIndex:
             "documents": count,
         }
 
+    def chunks_for_provenance(self, provenance_id: str) -> list[dict[str, str]]:
+        """Ordered chunks of one document (by provenance_id) — for full-document analysis."""
+        provenance_id = _validated_identifier(provenance_id, "provenance_id")
+        with closing(self._connect(read_only=True)) as connection:
+            rows = connection.execute(
+                "SELECT document_id,title,content FROM validated_chunks WHERE provenance_id=? ORDER BY document_id",
+                (provenance_id,)).fetchall()
+        return [{"document_id": row["document_id"], "title": row["title"], "content": row["content"]} for row in rows]
+
+    def documents(self) -> list[dict[str, Any]]:
+        """One row per uploaded document (provenance_id starting with 'upload:')."""
+        with closing(self._connect(read_only=True)) as connection:
+            rows = connection.execute(
+                "SELECT provenance_id, MIN(title) AS title, COUNT(*) AS chunks, SUM(LENGTH(content)) AS characters "
+                "FROM validated_chunks WHERE provenance_id LIKE 'upload:%' GROUP BY provenance_id ORDER BY MIN(rowid) DESC"
+            ).fetchall()
+        return [{"provenance_id": r["provenance_id"], "title": r["title"], "chunks": r["chunks"], "characters": r["characters"]} for r in rows]
+
     def upsert_validated(
         self,
         *,

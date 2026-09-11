@@ -80,7 +80,7 @@
   if (typeof document === "undefined") return;
 
   const q = (id) => document.getElementById(id);
-  const state = {csrf: "", conversation: "", engine: "unavailable", ragMode: "", busy: false, profiles: [], engines: []};
+  const state = {csrf: "", conversation: "", engine: "unavailable", ragMode: "", busy: false, profiles: [], engines: [], lastDocument: null};
 
   function notice(message = "") {
     q("notice").textContent = message;
@@ -130,7 +130,8 @@
 
   function setBusy(busy) {
     state.busy = busy;
-    for (const id of ["new", "history", "engine", "profile", "logout"]) q(id).disabled = busy;
+    for (const id of ["new", "history", "engine", "profile", "logout", "share-document"]) q(id).disabled = busy;
+    q("analyze-document").disabled = busy || !state.lastDocument;
     q("send").disabled = busy || !q("engine").value;
     for (const button of q("conversations").querySelectorAll("button")) button.disabled = busy;
     q("export").disabled = busy || !state.conversation;
@@ -515,12 +516,70 @@
       const content_base64 = await readAsBase64(file);
       const result = await api("/v1/documents", {method: "POST", body: JSON.stringify({filename: file.name, content_base64})});
       const how = result.method && result.method.startsWith("ocr") ? " · texte reconnu par OCR" : "";
-      q("status").textContent = "Document indexé : « " + result.title + " » — " + result.chunks + " passage(s), " + result.characters + " caractères" + how + ". Posez votre question.";
+      q("status").textContent = "Document indexé : « " + result.title + " » — " + result.chunks + " passage(s), " + result.characters + " caractères" + how + ". Posez votre question ou analysez tout le document.";
+      if (typeof result.provenance_id === "string" && /^upload:[A-Za-z0-9_-]{1,120}$/.test(result.provenance_id)) {
+        state.lastDocument = {provenance_id: result.provenance_id, title: result.title || file.name};
+        q("analyze-document").hidden = false;
+        q("analyze-document").disabled = state.busy;
+      }
     } catch (error) {
       q("status").textContent = "Connecté · " + engineLabel(state.engine);
       notice(error.detail || errorMessage(error));
     } finally {
       q("share-document").disabled = false;
+    }
+  });
+  // --- full-document analysis: map-reduce over every chunk, streamed with progress ---
+  q("analyze-document").addEventListener("click", async () => {
+    if (state.busy || !state.lastDocument) return;
+    const doc = state.lastDocument;
+    notice();
+    setBusy(true);
+    addMessage("user", "Analyse complète du document : « " + doc.title + " »");
+    const answer = addMessage("assistant", "", state.engine);
+    answer.article.classList.add("pending");
+    scrollMessages(true);
+    const progress = document.createElement("p");
+    progress.className = "field-help";
+    progress.textContent = "Préparation de l’analyse…";
+    answer.article.append(progress);
+    try {
+      const result = await checkedResponse("/v1/documents/analyze", {method: "POST", headers: {Accept: "text/event-stream"}, body: JSON.stringify({provenance_id: doc.provenance_id})});
+      if (!(result.headers.get("Content-Type") || "").includes("text/event-stream")) throw new Error("La réponse progressive n’est pas disponible.");
+      await readEventStream(result.body, (type, data) => {
+        if (type === "progress" && Number.isInteger(data.done) && Number.isInteger(data.total)) {
+          progress.textContent = "Analyse en cours… passage " + data.done + " / " + data.total;
+        }
+        if (type === "completed") {
+          if (typeof data.answer !== "string" || data.answer.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
+          progress.remove();
+          answer.render(data.answer);
+          if (data.truncated) {
+            const note = document.createElement("p");
+            note.className = "field-help";
+            note.textContent = "Document long : les " + data.analyzed_chunks + " premiers passages (sur " + data.total_chunks + ") ont été analysés.";
+            answer.article.append(note);
+          }
+        }
+        if (type === "error") {
+          const error = new Error(data.answer || "L’analyse a échoué.");
+          error.code = data.error;
+          throw error;
+        }
+        scrollMessages();
+      });
+    } catch (error) {
+      progress.remove();
+      answer.article.classList.add("error");
+      const detail = document.createElement("p");
+      detail.className = "field-help";
+      detail.textContent = errorMessage(error);
+      answer.article.append(detail);
+      notice(errorMessage(error));
+    } finally {
+      answer.article.classList.remove("pending");
+      setBusy(false);
+      if (!q("workspace").hidden) q("message").focus();
     }
   });
   q("new").addEventListener("click", () => { if (!state.busy) { notice(); newConversation(); } });
