@@ -145,6 +145,65 @@
     if (force || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 180) messages.scrollTop = messages.scrollHeight;
   }
 
+  // --- safe markdown rendering (DOM only, no innerHTML of model text) ---
+  const INLINE = /(`[^`]+`)|(\*\*[^*]+?\*\*)|(\*[^*]+?\*)|(__[^_]+?__)|(_[^_]+?_)|(\[[^\]]+?\]\([^)\s]+?\))/g;
+  function parseInline(text, parent) {
+    let last = 0, m;
+    INLINE.lastIndex = 0;
+    while ((m = INLINE.exec(text)) !== null) {
+      if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const tok = m[0];
+      if (tok.startsWith("`")) { const c = document.createElement("code"); c.textContent = tok.slice(1, -1); parent.appendChild(c); }
+      else if (tok.startsWith("**") || tok.startsWith("__")) { const s = document.createElement("strong"); s.textContent = tok.slice(2, -2); parent.appendChild(s); }
+      else if (tok.startsWith("*") || tok.startsWith("_")) { const e = document.createElement("em"); e.textContent = tok.slice(1, -1); parent.appendChild(e); }
+      else if (tok.startsWith("[")) {
+        const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(tok);
+        if (link && /^https?:\/\//i.test(link[2])) { const a = document.createElement("a"); a.href = link[2]; a.textContent = link[1]; a.target = "_blank"; a.rel = "noopener noreferrer"; parent.appendChild(a); }
+        else parent.appendChild(document.createTextNode(tok));
+      }
+      last = m.index + tok.length;
+    }
+    if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+  }
+  function renderMarkdown(text) {
+    const frag = document.createDocumentFragment();
+    const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+    const isUl = (l) => /^\s*[-*+]\s+/.test(l), isOl = (l) => /^\s*\d+\.\s+/.test(l);
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (/^```/.test(line.trim())) {
+        const buf = []; i++;
+        while (i < lines.length && !/^```/.test(lines[i].trim())) { buf.push(lines[i]); i++; }
+        i++;
+        const pre = document.createElement("pre"), code = document.createElement("code");
+        code.textContent = buf.join("\n"); pre.appendChild(code); frag.appendChild(pre); continue;
+      }
+      const h = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (h) { const el = document.createElement("h" + Math.min(6, h[1].length + 2)); parseInline(h[2], el); frag.appendChild(el); i++; continue; }
+      if (isUl(line) || isOl(line)) {
+        const ordered = isOl(line), list = document.createElement(ordered ? "ol" : "ul"), match = ordered ? isOl : isUl;
+        while (i < lines.length && match(lines[i])) { const li = document.createElement("li"); parseInline(lines[i].replace(/^\s*(?:[-*+]|\d+\.)\s+/, ""), li); list.appendChild(li); i++; }
+        frag.appendChild(list); continue;
+      }
+      if (!line.trim()) { i++; continue; }
+      const para = document.createElement("p"); let first = true;
+      while (i < lines.length && lines[i].trim() && !/^```/.test(lines[i].trim()) && !/^#{1,6}\s/.test(lines[i]) && !isUl(lines[i]) && !isOl(lines[i])) {
+        if (!first) para.appendChild(document.createElement("br"));
+        parseInline(lines[i], para); first = false; i++;
+      }
+      frag.appendChild(para);
+    }
+    return frag;
+  }
+
+  function typingIndicator() {
+    const dots = document.createElement("div");
+    dots.className = "typing";
+    for (let k = 0; k < 3; k++) dots.appendChild(document.createElement("span"));
+    return dots;
+  }
+
   function addMessage(role, content = "", engine = "") {
     q("welcome")?.remove();
     const article = document.createElement("article");
@@ -154,10 +213,12 @@
     label.textContent = role === "user" ? "Vous" : "Assistant · " + (engine ? engineLabel(engine) : "moteur non enregistré");
     const text = document.createElement("div");
     text.className = "message-content";
-    text.textContent = content;
+    const assistant = role !== "user";
+    const render = (raw) => { if (assistant) text.replaceChildren(renderMarkdown(raw)); else text.textContent = raw; };
+    if (content) render(content); else if (assistant) text.appendChild(typingIndicator());
     article.append(label, text);
     q("messages").append(article);
-    return {article, label, text};
+    return {article, label, text, render};
   }
 
   function showCitations(article, citations) {
@@ -376,10 +437,11 @@
         answer.label.textContent = "Assistant · " + engineLabel(data.engine);
       }
     };
+    let streamed = "";
     const complete = (data) => {
       applyMetadata(data);
       if (typeof data.answer !== "string" || data.answer.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
-      answer.text.textContent = data.answer;
+      answer.render(data.answer);
       showCitations(answer.article, data.citations);
     };
     try {
@@ -388,8 +450,9 @@
         await readEventStream(result.body, (type, data) => {
           if (type === "metadata") applyMetadata(data);
           if (type === "delta") {
-            if (typeof data.delta !== "string" || answer.text.textContent.length + data.delta.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
-            answer.text.textContent += data.delta;
+            if (typeof data.delta !== "string" || streamed.length + data.delta.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
+            streamed += data.delta;
+            answer.render(streamed);
           }
           if (type === "completed") complete(data);
           if (type === "error") {
