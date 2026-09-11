@@ -26,7 +26,7 @@
   }
 
   function engineLabel(value) {
-    return value === "BOOTSTRAP" ? "BOOTSTRAP · modèle local provisoire"
+    return value === "BOOTSTRAP" ? "CHAT-14B · Qwen2.5-14B local"
       : value === "CORE-700M" ? "CORE-700M expérimental"
         : value === "QWEN-CODER" ? "Qwen Coder · programmation locale"
         : value === "" ? "Aucun moteur vérifié" : "Moteur indisponible";
@@ -286,7 +286,7 @@
       option.value = "";
       option.disabled = true;
       option.selected = true;
-      option.textContent = "BOOTSTRAP indisponible · choisissez CORE seulement pour un test";
+      option.textContent = "CHAT-14B indisponible · choisissez CORE seulement pour un test";
       q("engine").append(option);
     }
     for (const engine of state.engines) {

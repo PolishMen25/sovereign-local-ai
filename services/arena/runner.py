@@ -205,6 +205,9 @@ class Arena:
 
     def maybe_packet(self) -> dict[str, Any] | None:
         accepted = [dict(row) for row in self.store.unpacked_accepted()]
+        # Only bundle solutions whose task still exists in the active suite; a
+        # suite change can leave older accepted solutions whose task is gone.
+        accepted = [row for row in accepted if row["task_id"] in self.tasks_by_id]
         if len(accepted) < self.config.packet_size:
             return None
         selection, metrics = league.packet_selection(accepted)
@@ -305,6 +308,9 @@ def main() -> int:
     qwen_token = os.environ.get("SOVEREIGN_QWEN_TOKEN", "")
     if len(qwen_token) >= 32:
         engines["QWEN-CODER"] = ChatEngine("QWEN-CODER", os.environ.get("SOVEREIGN_QWEN_ENDPOINT", "http://192.168.0.144:8790"), qwen_token)
+    chat14b_endpoint = os.environ.get("SOVEREIGN_CHAT14B_ENDPOINT", "")
+    if chat14b_endpoint:
+        engines["CHAT-14B"] = ChatEngine("CHAT-14B", chat14b_endpoint)
     store = ArenaStore(state_dir / "arena.sqlite3")
     store.initialize()
     try:

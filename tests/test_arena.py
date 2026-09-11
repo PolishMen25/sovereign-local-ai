@@ -112,6 +112,18 @@ class LeagueRulesTests(unittest.TestCase):
         diverse = [{"task_id": f"t{i}", "normalized_sha256": f"n{i}"} for i in range(25)]
         self.assertEqual(league.packet_status(league.packet_selection(diverse)[1]), "awaiting_owner_approval")
 
+    def test_packet_lines_skip_tasks_outside_the_active_suite(self) -> None:
+        selection = [
+            {"task_id": "known", "normalized_sha256": "n1", "source": "def f():\n    return 1",
+             "source_sha256": "s1", "profile_id": "p", "engine": "E", "attempt": 1},
+            {"task_id": "gone-from-suite", "normalized_sha256": "n2", "source": "def g():\n    return 2",
+             "source_sha256": "s2", "profile_id": "p", "engine": "E", "attempt": 1},
+        ]
+        tasks = {"known": {"prompt": "p", "test_source": "t"}}
+        body = league.packet_lines(selection, tasks)  # must not raise KeyError on the missing task
+        rows = [json.loads(line) for line in body.splitlines()]
+        self.assertEqual([r["task_id"] for r in rows], ["known"])
+
 
 class ArenaRunnerTests(ArenaTestCase):
     def test_seed_uses_only_configured_engines(self) -> None:

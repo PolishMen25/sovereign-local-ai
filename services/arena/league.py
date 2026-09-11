@@ -49,6 +49,9 @@ SEED_PROFILES: tuple[dict[str, Any], ...] = (
     {"profile_id": "critic-bootstrap", "display_name": "Relecteur Bootstrap", "role": "critic", "engine": "BOOTSTRAP", "temperature": 0.2,
      "system_prompt": "You review failing Python code. In at most five short lines, say which requirement the code breaks and how "
                       "to fix it. Do not write the full solution."},
+    {"profile_id": "critic-14b", "display_name": "Relecteur 14B", "role": "critic", "engine": "CHAT-14B", "temperature": 0.2,
+     "system_prompt": "You are a senior reviewer of failing Python code. Read the task, the code and the test failure, then explain "
+                      "in at most five short lines the exact cause and the smallest fix. Do not write the full solution."},
 )
 
 CODE_BLOCK = re.compile(r"```(?:python)?\s*\n(.*?)```", re.S)
@@ -187,7 +190,11 @@ def packet_status(metrics: dict[str, float]) -> str:
 def packet_lines(selection: Sequence[dict[str, Any]], tasks: dict[str, dict[str, str]]) -> str:
     lines = []
     for row in selection:
-        task = tasks[row["task_id"]]
+        task = tasks.get(row["task_id"])
+        if task is None:
+            # Solution from a task no longer in the active suite: skip it rather
+            # than crash the packet builder (the suite can change between runs).
+            continue
         lines.append(json.dumps({
             "task_id": row["task_id"],
             "prompt_sha256": sha256_text(task["prompt"]),
