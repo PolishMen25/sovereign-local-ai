@@ -14,7 +14,7 @@ import sqlite3
 from typing import Any, Iterable
 
 ROLES = ("author", "critic")
-ENGINES = ("QWEN-CODER", "BOOTSTRAP")
+ENGINES = ("QWEN-CODER", "BOOTSTRAP", "CHAT-14B")
 PROFILE_STATUSES = ("active", "retired")
 PACKET_STATUSES = ("awaiting_owner_approval", "flagged", "approved")
 EVENT_PAYLOAD_BYTES = 8_192
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     profile_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('author','critic')),
-    engine TEXT NOT NULL CHECK (engine IN ('QWEN-CODER','BOOTSTRAP')),
+    engine TEXT NOT NULL CHECK (engine IN ('QWEN-CODER','BOOTSTRAP','CHAT-14B')),
     system_prompt TEXT NOT NULL,
     temperature REAL NOT NULL CHECK (temperature >= 0 AND temperature <= 1),
     parent_id TEXT REFERENCES profiles(profile_id),

@@ -48,7 +48,8 @@
   }
 
   function engineChip(engine) {
-    return el("span", { className: "chip " + (engine === "QWEN-CODER" ? "qwen" : "bootstrap"), text: engine === "QWEN-CODER" ? "Qwen Coder 7B" : "Bootstrap 1.5B" });
+    const label = engine === "QWEN-CODER" ? "Qwen Coder 7B" : engine === "CHAT-14B" ? "Qwen 14B" : "Bootstrap 1.5B";
+    return el("span", { className: "chip " + (engine === "BOOTSTRAP" ? "bootstrap" : "qwen"), text: label });
   }
 
   function percent(part, whole) {
