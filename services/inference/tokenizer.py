@@ -108,13 +108,7 @@ class BpeTrainingResult:
         return len(SPECIAL_TOKENS) + len(self.tokens_hex)
 
 
-def train_byte_bpe(
-    texts: Iterable[str],
-    vocabulary_size: int,
-    *,
-    minimum_frequency: int = 2,
-) -> BpeTrainingResult:
-    """Learn bounded BPE merges deterministically from NFC-normalized text."""
+def _require_training_limits(vocabulary_size: int, minimum_frequency: int) -> None:
     if type(vocabulary_size) is not int or not 260 <= vocabulary_size <= MAXIMUM_VOCABULARY_SIZE:
         fail(
             "vocabulary_size must be between 260 and "
@@ -123,6 +117,8 @@ def train_byte_bpe(
     if type(minimum_frequency) is not int or not 1 <= minimum_frequency <= 1_000_000_000:
         fail("minimum_frequency must be an integer between 1 and 1000000000")
 
+
+def _normalized_training_texts(texts: Iterable[str]) -> list[str]:
     if isinstance(texts, (str, bytes)):
         fail("texts must be an iterable of strings, not a single string")
     try:
@@ -131,15 +127,11 @@ def train_byte_bpe(
         raise ValueError("texts must be an iterable of strings") from error
     if not normalized or any(not text for text in normalized):
         fail("texts must be a non-empty iterable of non-empty strings")
+    return normalized
 
-    # Incremental implementation with output identical to the reference BPE.
-    # The representation and pair accounting change, not eligibility, tie
-    # breaking, or left-to-right non-overlapping merge semantics.
-    symbol_strings = list(canonical_byte_tokens())
-    symbol_lengths = [1] * 256
-    tokens = list(symbol_strings)
-    vocabulary = set(tokens)
-    merges: list[tuple[str, str]] = []
+
+def _linked_byte_symbols(normalized: list[str]) -> tuple[array, array, array]:
+    """Return one byte symbol per position, doubly linked within each text."""
 
     symbols = array("i")
     previous_index = array("i")
@@ -154,12 +146,17 @@ def train_byte_bpe(
         previous_index[base] = -1
         next_index[base + length - 1] = -1
         base += length
-    del normalized
-    total = len(symbols)
+    return symbols, previous_index, next_index
+
+
+def _initial_pair_index(
+    symbols: array, next_index: array
+) -> tuple[dict[tuple[int, int], int], dict[tuple[int, int], array]]:
+    """Count every adjacent pair and remember where each one starts."""
 
     counts: dict[tuple[int, int], int] = {}
     positions: dict[tuple[int, int], array] = {}
-    for position in range(total):
+    for position in range(len(symbols)):
         following = next_index[position]
         if following == -1:
             continue
@@ -173,32 +170,151 @@ def train_byte_bpe(
         else:
             counts[key] = count + 1
             positions[key].append(position)
+    return counts, positions
+
+
+def _pair_heap(
+    counts: dict[tuple[int, int], int], symbol_strings: list[str]
+) -> list[tuple[int, str, str, int, int]]:
+    """Max-count heap; ties break on the hexadecimal strings, left then right."""
 
     heap = [
         (-count, symbol_strings[key[0]], symbol_strings[key[1]], key[0], key[1])
         for key, count in counts.items()
     ]
     heapify(heap)
+    return heap
+
+
+def _pop_best_pair(
+    heap: list[tuple[int, str, str, int, int]],
+    counts: dict[tuple[int, int], int],
+    symbol_lengths: list[int],
+    vocabulary: set[str],
+    minimum_frequency: int,
+) -> tuple[int, int] | None:
+    """Pop stale entries until the most frequent eligible pair is found."""
+
+    while heap:
+        recorded, left_string, right_string, left, right = heappop(heap)
+        key = (left, right)
+        current = counts.get(key, 0)
+        if current != -recorded:
+            if current > 0:
+                heappush(heap, (-current, left_string, right_string, left, right))
+            continue
+        if current < minimum_frequency:
+            continue
+        if symbol_lengths[left] + symbol_lengths[right] > MAXIMUM_TOKEN_BYTES:
+            continue
+        if left_string + right_string in vocabulary:
+            continue
+        return key
+    return None
+
+
+def _apply_merge(
+    chosen: tuple[int, int],
+    merged_id: int,
+    symbols: array,
+    previous_index: array,
+    next_index: array,
+    counts: dict[tuple[int, int], int],
+    positions: dict[tuple[int, int], array],
+    heap: list[tuple[int, str, str, int, int]],
+    symbol_strings: list[str],
+) -> None:
+    """Replace every non-overlapping occurrence, left to right, and update pairs."""
+
+    left, right = chosen
+    merged = symbol_strings[merged_id]
+    occurrences = positions.pop(chosen, array("i"))
+    counts.pop(chosen, None)
+
+    for position in sorted(occurrences):
+        if symbols[position] != left:
+            continue
+        following = next_index[position]
+        if following == -1 or symbols[following] != right:
+            continue
+        preceding = previous_index[position]
+        trailing = next_index[following]
+
+        # Hot loop: pair bookkeeping stays inline, helper calls cost ~6 %.
+        if preceding != -1:
+            key = (symbols[preceding], left)
+            count = counts.get(key)
+            if count is not None:
+                if count <= 1:
+                    del counts[key]
+                    positions.pop(key, None)
+                else:
+                    counts[key] = count - 1
+        if trailing != -1:
+            key = (right, symbols[trailing])
+            count = counts.get(key)
+            if count is not None:
+                if count <= 1:
+                    del counts[key]
+                    positions.pop(key, None)
+                else:
+                    counts[key] = count - 1
+
+        symbols[position] = merged_id
+        symbols[following] = -1
+        next_index[position] = trailing
+        if trailing != -1:
+            previous_index[trailing] = position
+
+        if preceding != -1:
+            key = (symbols[preceding], merged_id)
+            count = counts.get(key, 0) + 1
+            counts[key] = count
+            slot = positions.get(key)
+            if slot is None:
+                slot = array("i")
+                positions[key] = slot
+            slot.append(preceding)
+            heappush(heap, (-count, symbol_strings[key[0]], merged, key[0], merged_id))
+        if trailing != -1:
+            key = (merged_id, symbols[trailing])
+            count = counts.get(key, 0) + 1
+            counts[key] = count
+            slot = positions.get(key)
+            if slot is None:
+                slot = array("i")
+                positions[key] = slot
+            slot.append(position)
+            heappush(heap, (-count, merged, symbol_strings[key[1]], merged_id, key[1]))
+
+
+def train_byte_bpe(
+    texts: Iterable[str],
+    vocabulary_size: int,
+    *,
+    minimum_frequency: int = 2,
+) -> BpeTrainingResult:
+    """Learn bounded BPE merges deterministically from NFC-normalized text."""
+    _require_training_limits(vocabulary_size, minimum_frequency)
+    normalized = _normalized_training_texts(texts)
+
+    # Incremental implementation with output identical to the reference BPE.
+    # The representation and pair accounting change, not eligibility, tie
+    # breaking, or left-to-right non-overlapping merge semantics.
+    symbol_strings = list(canonical_byte_tokens())
+    symbol_lengths = [1] * 256
+    tokens = list(symbol_strings)
+    vocabulary = set(tokens)
+    merges: list[tuple[str, str]] = []
+
+    symbols, previous_index, next_index = _linked_byte_symbols(normalized)
+    del normalized
+    counts, positions = _initial_pair_index(symbols, next_index)
+    heap = _pair_heap(counts, symbol_strings)
     rebuild_at = max(4 * len(heap), 1_000_000)
 
     while len(SPECIAL_TOKENS) + len(tokens) < vocabulary_size:
-        chosen = None
-        while heap:
-            recorded, left_string, right_string, left, right = heappop(heap)
-            key = (left, right)
-            current = counts.get(key, 0)
-            if current != -recorded:
-                if current > 0:
-                    heappush(heap, (-current, left_string, right_string, left, right))
-                continue
-            if current < minimum_frequency:
-                continue
-            if symbol_lengths[left] + symbol_lengths[right] > MAXIMUM_TOKEN_BYTES:
-                continue
-            if left_string + right_string in vocabulary:
-                continue
-            chosen = key
-            break
+        chosen = _pop_best_pair(heap, counts, symbol_lengths, vocabulary, minimum_frequency)
         if chosen is None:
             break
 
@@ -211,70 +327,10 @@ def train_byte_bpe(
         tokens.append(merged)
         merges.append((symbol_strings[left], symbol_strings[right]))
 
-        occurrences = positions.pop(chosen, array("i"))
-        counts.pop(chosen, None)
-
-        for position in sorted(occurrences):
-            if symbols[position] != left:
-                continue
-            following = next_index[position]
-            if following == -1 or symbols[following] != right:
-                continue
-            preceding = previous_index[position]
-            trailing = next_index[following]
-
-            if preceding != -1:
-                key = (symbols[preceding], left)
-                count = counts.get(key)
-                if count is not None:
-                    if count <= 1:
-                        del counts[key]
-                        positions.pop(key, None)
-                    else:
-                        counts[key] = count - 1
-            if trailing != -1:
-                key = (right, symbols[trailing])
-                count = counts.get(key)
-                if count is not None:
-                    if count <= 1:
-                        del counts[key]
-                        positions.pop(key, None)
-                    else:
-                        counts[key] = count - 1
-
-            symbols[position] = merged_id
-            symbols[following] = -1
-            next_index[position] = trailing
-            if trailing != -1:
-                previous_index[trailing] = position
-
-            if preceding != -1:
-                key = (symbols[preceding], merged_id)
-                count = counts.get(key, 0) + 1
-                counts[key] = count
-                slot = positions.get(key)
-                if slot is None:
-                    slot = array("i")
-                    positions[key] = slot
-                slot.append(preceding)
-                heappush(heap, (-count, symbol_strings[key[0]], merged, key[0], merged_id))
-            if trailing != -1:
-                key = (merged_id, symbols[trailing])
-                count = counts.get(key, 0) + 1
-                counts[key] = count
-                slot = positions.get(key)
-                if slot is None:
-                    slot = array("i")
-                    positions[key] = slot
-                slot.append(position)
-                heappush(heap, (-count, merged, symbol_strings[key[1]], merged_id, key[1]))
+        _apply_merge(chosen, merged_id, symbols, previous_index, next_index, counts, positions, heap, symbol_strings)
 
         if len(heap) > rebuild_at:
-            heap = [
-                (-count, symbol_strings[key[0]], symbol_strings[key[1]], key[0], key[1])
-                for key, count in counts.items()
-            ]
-            heapify(heap)
+            heap = _pair_heap(counts, symbol_strings)
             rebuild_at = max(4 * len(heap), 1_000_000)
 
     return BpeTrainingResult(tokens_hex=tuple(tokens), merges=tuple(merges))
@@ -330,8 +386,7 @@ def _require_canonical_token(value: Any, context: str) -> str:
     return value
 
 
-def validate_tokenizer_document(document: Any) -> dict[str, Any]:
-    """Validate every field and prove that the ordered merge graph is sound."""
+def _validate_header(document: Any) -> None:
     if not isinstance(document, dict) or set(document) != DOCUMENT_KEYS:
         fail(f"tokenizer artifact keys must be exactly {sorted(DOCUMENT_KEYS)}")
     if document["schema_version"] != SCHEMA_VERSION:
@@ -364,7 +419,8 @@ def validate_tokenizer_document(document: Any) -> dict[str, Any]:
     if document["maximum_token_bytes"] != MAXIMUM_TOKEN_BYTES:
         fail("invalid tokenizer maximum_token_bytes")
 
-    tokens = document["tokens_hex"]
+
+def _validate_tokens(tokens: Any) -> list[str]:
     if not isinstance(tokens, list):
         fail("tokenizer tokens_hex must be a list")
     if not 256 <= len(tokens) <= MAXIMUM_VOCABULARY_SIZE - len(SPECIAL_TOKENS):
@@ -377,8 +433,12 @@ def validate_tokenizer_document(document: Any) -> dict[str, Any]:
         fail("tokenizer tokens_hex contains a duplicate token")
     if canonical_tokens[:256] != list(canonical_byte_tokens()):
         fail("tokenizer must contain exactly one canonical token for each byte")
+    return canonical_tokens
 
-    merges = document["merges"]
+
+def _validate_merge_graph(merges: Any, canonical_tokens: list[str]) -> None:
+    """Replay the merges in rank order; each must build the token of its rank."""
+
     if not isinstance(merges, list) or len(merges) != len(canonical_tokens) - 256:
         fail("tokenizer merge count must match its learned tokens")
     available = set(canonical_byte_tokens())
@@ -398,11 +458,20 @@ def validate_tokenizer_document(document: Any) -> dict[str, Any]:
             fail(f"merges[{rank}] does not produce the token assigned to its rank")
         available.add(merged)
 
-    vocabulary_size = document["vocabulary_size"]
+
+def _validate_vocabulary_size(vocabulary_size: Any, canonical_tokens: list[str]) -> None:
     if type(vocabulary_size) is not int or vocabulary_size != len(SPECIAL_TOKENS) + len(canonical_tokens):
         fail("tokenizer vocabulary_size does not match its token ids")
     if vocabulary_size > MAXIMUM_VOCABULARY_SIZE:
         fail("tokenizer vocabulary_size exceeds the bounded maximum")
+
+
+def validate_tokenizer_document(document: Any) -> dict[str, Any]:
+    """Validate every field and prove that the ordered merge graph is sound."""
+    _validate_header(document)
+    canonical_tokens = _validate_tokens(document["tokens_hex"])
+    _validate_merge_graph(document["merges"], canonical_tokens)
+    _validate_vocabulary_size(document["vocabulary_size"], canonical_tokens)
     return document
 
 
