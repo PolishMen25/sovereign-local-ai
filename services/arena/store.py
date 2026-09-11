@@ -248,6 +248,15 @@ class ArenaStore:
         with closing(self._connect()) as connection:
             return [dict(row) for row in connection.execute(query + " ORDER BY rating DESC, profile_id", parameters)]
 
+    def chat_profiles(self) -> list[dict[str, Any]]:
+        """Active author profiles the owner has approved for the chat."""
+
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT profile_id, display_name, system_prompt, engine FROM profiles"
+                " WHERE chat_approved=1 AND status='active' ORDER BY rating DESC, profile_id").fetchall()
+        return [dict(row) for row in rows]
+
     def recent_failures(self, profile_id: str, limit: int = 5) -> list[dict[str, str]]:
         with closing(self._connect()) as connection:
             rows = connection.execute(

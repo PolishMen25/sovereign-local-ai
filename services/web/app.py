@@ -29,7 +29,7 @@ from services.inference.runtime import LocalInferenceRuntime
 MAX_BODY_BYTES = 1_048_576
 CONVERSATION_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
-PROFILE_ID = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
+PROFILE_ID = re.compile(r"^[a-z][a-z0-9_-]{2,63}$")
 STATIC_ROOT = Path(__file__).with_name("static")
 STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -252,6 +252,36 @@ class WebState:
         except (OSError, ValueError, sqlite3.Error):
             return {"available": False, "events": []}
 
+    def chat_profiles(self) -> list[dict[str, Any]]:
+        """Built-in profiles plus arena agents the owner approved for the chat."""
+
+        profiles = [dict(profile) for profile in WEB_PROFILES]
+        if self.arena is None:
+            return profiles
+        try:
+            for agent in self.arena.chat_profiles():
+                profiles.append({
+                    "profile_id": agent["profile_id"],
+                    "display_name": agent["display_name"],
+                    "description": f"Agent de l'arène ({agent['engine']}), approuvé pour le chat — spécialiste programmation.",
+                })
+        except (OSError, ValueError, sqlite3.Error):
+            pass
+        return profiles
+
+    def arena_chat_profile(self, profile_id: str) -> dict[str, Any] | None:
+        """Return the persona (system prompt + engine) of a chat-approved arena agent."""
+
+        if self.arena is None:
+            return None
+        try:
+            for agent in self.arena.chat_profiles():
+                if agent["profile_id"] == profile_id:
+                    return {"system_prompt": agent["system_prompt"], "engine": agent["engine"]}
+        except (OSError, ValueError, sqlite3.Error):
+            return None
+        return None
+
     def record_arena_approval(self, approval: dict[str, Any]) -> None:
         """Drop an approval file in the arena inbox; the arena daemon applies it.
 
@@ -401,7 +431,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             return
         route = {
             "/v1/session": self._get_session,
-            "/v1/profiles": lambda: self.send_json(200, {"profiles": list(WEB_PROFILES)}),
+            "/v1/profiles": lambda: self.send_json(200, {"profiles": self.state.chat_profiles()}),
             "/v1/engines": lambda: self.send_json(200, {"engines": self.state.engines()}),
             "/v1/knowledge-status": lambda: self.send_json(200, self.state.knowledge.status()),
             "/v1/conversations": lambda: self.send_json(200, {"conversations": self.state.memory.list_conversations()}),
@@ -594,20 +624,24 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         if request_value is None:
             return
         profile_id = request_value.get("profile_id", "coordination")
+        agent = None
         if profile_id != "coordination":
-            self.send_json(422, {"error": "unknown_profile"})
-            return
-        requested_engine = request_value.get("engine", "BOOTSTRAP")
+            agent = self.state.arena_chat_profile(profile_id)
+            if agent is None:
+                self.send_json(422, {"error": "unknown_profile"})
+                return
+        requested_engine = agent["engine"] if agent else request_value.get("engine", "BOOTSTRAP")
+        system_prompt = agent["system_prompt"] if agent else None
         conversation_id = request_value.get("conversation_id")
         if conversation_id is None:
             conversation_id = self.state.memory.create_conversation(title=request_value["message"][:80])
         try:
             self.state.memory.append_message(conversation_id, role="user", content=request_value["message"])
-            messages, citations = self._conversation_messages(request_value["message"], conversation_id)
-            if requested_engine == "BOOTSTRAP" and self.wants_event_stream():
+            messages, citations = self._conversation_messages(request_value["message"], conversation_id, system_prompt=system_prompt)
+            if agent is None and requested_engine == "BOOTSTRAP" and self.wants_event_stream():
                 self._stream_bootstrap(request_value, conversation_id, messages, citations)
                 return
-            answer, selected_engine = self._generate(requested_engine, request_value["message"], messages)
+            answer, selected_engine = self._generate(requested_engine, request_value["message"], messages, keep_system=agent is not None)
             self.state.memory.append_message(conversation_id, role="assistant", content=answer)
         except KeyError:
             self.send_json(404, {"error": "conversation_not_found"})
@@ -643,11 +677,11 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.send_json(422, {"error": "invalid_request"})
         return None
 
-    def _conversation_messages(self, message: str, conversation_id: str) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    def _conversation_messages(self, message: str, conversation_id: str, *, system_prompt: str | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
         """System prompt, bounded local references, then the last 20 turns."""
 
         history = self.state.memory.export_conversation(conversation_id)["messages"][-20:]
-        messages = [{"role": "system", "content": BOOTSTRAP_SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": system_prompt or BOOTSTRAP_SYSTEM_PROMPT}]
         try:
             retrieval = self.state.knowledge.search(message, query_embedding=None, limit=2)
         except ValueError:
@@ -688,15 +722,17 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         payload = response(request_value["request_id"], profile_id, "completed", answer, engine="BOOTSTRAP", conversation_id=conversation_id, citations=citations)
         self.send_event("completed", payload)
 
-    def _generate(self, requested_engine: str, message: str, messages: list[dict[str, str]]) -> tuple[str, str]:
+    def _generate(self, requested_engine: str, message: str, messages: list[dict[str, str]], *, keep_system: bool = False) -> tuple[str, str]:
         if requested_engine == "CORE-700M":
             return self.state.core_runtime.generate(message), "CORE-700M"
         if requested_engine == "QWEN-CODER":
-            if self.state.qwen_runtime is None:
+            if self.state.qwen_runtime is None or isinstance(self.state.qwen_runtime, UnconfiguredEngine):
                 raise RuntimeError("QWEN-CODER is not configured")
-            messages[0] = {"role": "system", "content": QWEN_SYSTEM_PROMPT}
+            if not keep_system:
+                messages[0] = {"role": "system", "content": QWEN_SYSTEM_PROMPT}
             return self.state.qwen_runtime.generate(messages), "QWEN-CODER"
-        return self.state.runtime.generate(messages), self.state.runtime.engine
+        answer = self.state.runtime.generate(messages)
+        return answer, (requested_engine if keep_system else self.state.runtime.engine)
 
     # --- DELETE ----------------------------------------------------------
 
