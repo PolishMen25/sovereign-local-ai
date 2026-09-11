@@ -145,18 +145,15 @@ class QuietHandler(gateway.LocalWebHandler):
         pass
 
 
-class GatewayHttpTests(unittest.TestCase):
-    def setUp(self) -> None:
+class GatewayTestCase(unittest.TestCase):
+    def start(self, qwen_runtime: Any) -> None:
         self.auth, self.memory = FakeAuthentication(), FakeMemory()
-        self.bootstrap, self.qwen = FakeBootstrap(), FakeQwen()
+        self.bootstrap = FakeBootstrap()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
-        self.server.state = gateway.WebState(self.auth, self.memory, self.bootstrap, FakeCore(), FakeKnowledge(), SETUP_TOKEN, self.qwen)  # type: ignore[attr-defined]
-        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
-        self.thread.start()
-
-    def tearDown(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
+        self.server.state = gateway.WebState(self.auth, self.memory, self.bootstrap, FakeCore(), FakeKnowledge(), SETUP_TOKEN, qwen_runtime)  # type: ignore[attr-defined]
+        threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
 
     def request(self, method: str, path: str, body: Any = None, *, headers: dict[str, str] | None = None, session: bool = False, csrf: bool = False) -> tuple[int, dict[str, str], bytes]:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=10)
@@ -187,6 +184,13 @@ class GatewayHttpTests(unittest.TestCase):
             event_line, data_line = block.split("\n")
             result.append((event_line[len("event: "):], json.loads(data_line[len("data: "):])))
         return result
+
+
+
+class GatewayHttpTests(GatewayTestCase):
+    def setUp(self) -> None:
+        self.qwen = FakeQwen()
+        self.start(self.qwen)
 
     def test_public_routes_and_security_headers(self) -> None:
         status, headers, body = self.request("GET", "/healthz")
@@ -296,6 +300,36 @@ class GatewayHttpTests(unittest.TestCase):
         self.assertEqual(json.loads(self.request("DELETE", "/v1/conversations/conversation_001", session=True, csrf=True)[2]), {"status": "deleted", "conversation_id": "conversation_001"})
         self.assertEqual(self.request("DELETE", "/v1/conversations/conversation_001", session=True, csrf=True)[0], 404)
         self.assertEqual(self.request("DELETE", "/v1/elsewhere", session=True, csrf=True)[0], 404)
+
+
+class UnconfiguredQwenTests(GatewayTestCase):
+    """Without SOVEREIGN_QWEN_TOKEN the gateway must answer, not drop the connection."""
+
+    def check(self, qwen_runtime: Any, expected_state: str) -> None:
+        self.start(qwen_runtime)
+        self.login()
+        status, _, body = self.request("GET", "/v1/engines", session=True)
+        qwen = json.loads(body)["engines"][2]
+        self.assertEqual((status, qwen["engine"], qwen["available"]), (200, "QWEN-CODER", False))
+        self.assertIn(expected_state, qwen["description"])
+        status, _, body = self.request("POST", "/v1/chat", self.chat("code", engine="QWEN-CODER"), session=True, csrf=True)
+        self.assertEqual((status, json.loads(body)["status"], json.loads(body)["engine"]), (503, "error", "QWEN-CODER"))
+        status, _, body = self.request("POST", "/v1/chat", self.chat("code", engine="QWEN-CODER"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        self.assertEqual([name for name, _ in self.events(body)], ["error"])
+
+    def test_unconfigured_engine_placeholder(self) -> None:
+        self.check(gateway.UnconfiguredEngine("QWEN-CODER"), "not_configured")
+
+    def test_missing_qwen_runtime(self) -> None:
+        self.check(None, "unavailable")
+
+    def test_local_runtime_placeholder_does_not_crash_the_engine_list(self) -> None:
+        from pathlib import Path
+        from services.inference.runtime import LocalInferenceRuntime
+        self.start(LocalInferenceRuntime("QWEN-CODER", Path("/nonexistent-qwen-checkpoint")))
+        self.login()
+        status, _, body = self.request("GET", "/v1/engines", session=True)
+        self.assertEqual((status, json.loads(body)["engines"][2]["available"]), (200, False))
 
 
 if __name__ == "__main__":

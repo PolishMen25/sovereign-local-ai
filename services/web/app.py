@@ -139,6 +139,23 @@ def response(
     }
 
 
+class UnconfiguredEngine:
+    """Stand-in for an engine whose endpoint or token is not configured.
+
+    It is listed as unavailable and refuses generation with RuntimeError, which
+    the gateway already turns into a clean 503 / SSE error answer.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def status(self) -> dict[str, Any]:
+        return {"available": False, "state": "not_configured"}
+
+    def generate(self, *_: Any, **__: Any) -> str:
+        raise RuntimeError(f"{self.name} is not configured")
+
+
 @dataclass
 class WebState:
     authentication: AuthenticationStore
@@ -168,6 +185,8 @@ class WebState:
     def _qwen_state(self) -> tuple[bool, Any]:
         try:
             qwen = self.qwen_runtime.status() if self.qwen_runtime is not None else {}
+            if not isinstance(qwen, dict):
+                return bool(qwen.generation_available), qwen.state
             return bool(qwen.get("available")), qwen.get("state", "unavailable")
         except RuntimeError:
             return False, "unavailable"
@@ -477,6 +496,8 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         if requested_engine == "CORE-700M":
             return self.state.core_runtime.generate(message), "CORE-700M"
         if requested_engine == "QWEN-CODER":
+            if self.state.qwen_runtime is None:
+                raise RuntimeError("QWEN-CODER is not configured")
             messages[0] = {"role": "system", "content": QWEN_SYSTEM_PROMPT}
             return self.state.qwen_runtime.generate(messages), "QWEN-CODER"
         return self.state.runtime.generate(messages), self.state.runtime.engine
@@ -522,7 +543,7 @@ def main() -> int:
     core_runtime: Any = LocalInferenceRuntime("CORE-700M", Path("/nonexistent-core-checkpoint"))
     if len(core_token) >= 32:
         core_runtime = CoreClient(os.environ.get("SOVEREIGN_CORE_ENDPOINT", "http://192.168.0.143:9000"), core_token)
-    qwen_runtime: Any = LocalInferenceRuntime("QWEN-CODER", Path("/nonexistent-qwen-checkpoint"))
+    qwen_runtime: Any = UnconfiguredEngine("QWEN-CODER")
     qwen_token = os.environ.get("SOVEREIGN_QWEN_TOKEN", "")
     if len(qwen_token) >= 32:
         qwen_runtime = QwenClient(os.environ.get("SOVEREIGN_QWEN_ENDPOINT", "http://192.168.0.144:8790"), qwen_token)
