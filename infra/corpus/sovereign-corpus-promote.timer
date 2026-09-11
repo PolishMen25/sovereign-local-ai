@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule the Sovereign Local AI gated corpus promotion applier
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=2min
+Persistent=true
+Unit=sovereign-corpus-promote.service
+
+[Install]
+WantedBy=timers.target

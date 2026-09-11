@@ -1,0 +1,20 @@
+[Unit]
+Description=Sovereign Local AI gated corpus promotion applier (RAW -> validated)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sovereign/app
+# Applies only owner-approved increment promotions dropped in the inbox by the
+# gateway. It verifies each approval's digest before promoting and never trains.
+ExecStart=/usr/bin/python3 -B -m tools.apply_corpus_promotions
+UMask=0027
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+ReadOnlyPaths=/opt/sovereign/app
+ReadWritePaths=/var/lib/sovereign-gateway /mnt/sovereign-ai

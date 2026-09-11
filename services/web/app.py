@@ -38,6 +38,8 @@ STATIC_FILES = {
     "/arena": ("arena.html", "text/html; charset=utf-8"),
     "/arena.css": ("arena.css", "text/css; charset=utf-8"),
     "/arena.js": ("arena.js", "text/javascript; charset=utf-8"),
+    "/corpus": ("corpus.html", "text/html; charset=utf-8"),
+    "/corpus.js": ("corpus.js", "text/javascript; charset=utf-8"),
 }
 WEB_PROFILES = (
     {
@@ -61,6 +63,7 @@ CONVERSATION_PATH = re.compile(r"/v1/conversations/([A-Za-z0-9_-]{8,80})")
 ARENA_TARGET_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{2,79}$")
 ARENA_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 ARENA_APPROVAL_SCHEMA = "arena-approval.v1"
+CORPUS_APPROVAL_SCHEMA = "arena-increment-approval.v1"
 
 BOOTSTRAP_SYSTEM_PROMPT = "Tu es BOOTSTRAP, moteur local temporaire distinct de CORE-700M. Tu n'as ni outil ni accès Internet. Réponds clairement sans prétendre être CORE."
 QWEN_SYSTEM_PROMPT = "Tu es Qwen Coder, assistant local de programmation distinct de CORE. Réponds dans la langue de l'utilisateur. Tu n'as ni outil ni accès Internet. Ne prétends jamais avoir exécuté le code proposé."
@@ -178,6 +181,60 @@ class WebState:
     qwen_runtime: Any = None
     arena: Any = None
     arena_inbox: Path | None = None
+    corpus_raw_root: Path | None = None
+    corpus_validated_root: Path | None = None
+    corpus_inbox: Path | None = None
+
+    def corpus_increments(self) -> dict[str, Any]:
+        """List RAW arena corpus increments with their promotion status.
+
+        Read-only: each RAW increment carries its own manifest; an increment is
+        reported ``validated`` when a directory of the same id exists under the
+        validated root.  The gateway never promotes here — that is the gated
+        applier's job.
+        """
+
+        if self.corpus_raw_root is None or not self.corpus_raw_root.is_dir():
+            return {"available": False, "increments": []}
+        promoted: set[str] = set()
+        if self.corpus_validated_root is not None and self.corpus_validated_root.is_dir():
+            promoted = {p.name for p in self.corpus_validated_root.iterdir() if p.is_dir()}
+        increments: list[dict[str, Any]] = []
+        for manifest_path in sorted(self.corpus_raw_root.glob("*/manifest.json")):
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            increment_id = manifest.get("increment_id")
+            if not isinstance(increment_id, str):
+                continue
+            increments.append({
+                "increment_id": increment_id,
+                "record_count": manifest.get("record_count"),
+                "classification": manifest.get("classification"),
+                "content_sha256": manifest.get("content_sha256"),
+                "max_share_in_corpus_increment": manifest.get("max_share_in_corpus_increment"),
+                "arena_packet_id": manifest.get("arena_packet_id"),
+                "status": "validated" if increment_id in promoted else "raw",
+            })
+        return {"available": True, "increments": increments}
+
+    def record_corpus_approval(self, approval: dict[str, Any]) -> None:
+        """Drop a signed corpus-promotion approval in the inbox for the applier.
+
+        The gateway never writes the corpus.  The file is created exclusively
+        and made group-readable so the applier can read it.
+        """
+
+        if self.corpus_inbox is None or not self.corpus_inbox.is_dir():
+            raise FileNotFoundError("corpus inbox is not available")
+        name = f"{approval['approved_at'].replace(':', '')}-{secrets.token_hex(4)}.json"
+        descriptor = os.open(self.corpus_inbox / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+        try:
+            os.fchmod(descriptor, 0o640)
+            os.write(descriptor, (json.dumps(approval, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+        finally:
+            os.close(descriptor)
 
     def arena_overview(self) -> dict[str, Any]:
         if self.arena is None:
@@ -349,6 +406,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/knowledge-status": lambda: self.send_json(200, self.state.knowledge.status()),
             "/v1/conversations": lambda: self.send_json(200, {"conversations": self.state.memory.list_conversations()}),
             "/v1/arena": lambda: self.send_json(200, self.state.arena_overview()),
+            "/v1/corpus/increments": lambda: self.send_json(200, self.state.corpus_increments()),
         }.get(self.path)
         if route is not None:
             route()
@@ -404,6 +462,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/logout": self._post_logout,
             "/v1/chat": self._post_chat,
             "/v1/arena/approve": self._post_arena_approval,
+            "/v1/corpus/promote": self._post_corpus_promotion,
         }.get(self.path)
         if handler is None:
             self.send_json(404, {"error": "not_found"})
@@ -486,6 +545,47 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.send_json(503, {"error": "arena_unavailable"})
             return
         self.send_json(202, {"status": "approval_recorded", "kind": kind, "target_id": target_id})
+
+    def _post_corpus_promotion(self) -> None:
+        """Owner approval to promote a RAW arena increment into the validated corpus.
+
+        Writes a signed approval to the corpus inbox; the gated applier verifies
+        the digest and the share cap and does the promotion. The gateway never
+        writes the corpus, and this never trains anything.
+        """
+
+        try:
+            username = self.require_session(csrf=True)
+            body = self.read_json()
+        except PermissionError:
+            self.send_json(401, {"error": "unauthorized"})
+            return
+        except TypeError:
+            self.send_json(415, {"error": "unsupported_media_type"})
+            return
+        except ValueError:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        target_id, digest = body.get("target_id"), body.get("target_sha256")
+        valid = (
+            set(body) <= {"target_id", "target_sha256"}
+            and isinstance(target_id, str) and ARENA_TARGET_ID.fullmatch(target_id) is not None
+            and isinstance(digest, str) and ARENA_SHA256.fullmatch(digest) is not None
+        )
+        if not valid:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        approval = {
+            "schema_version": CORPUS_APPROVAL_SCHEMA, "kind": "increment",
+            "target_id": target_id, "target_sha256": digest, "approved_by": username,
+            "approved_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
+        try:
+            self.state.record_corpus_approval(approval)
+        except OSError:
+            self.send_json(503, {"error": "corpus_unavailable"})
+            return
+        self.send_json(202, {"status": "approval_recorded", "kind": "increment", "target_id": target_id})
 
     # --- chat ------------------------------------------------------------
 
@@ -646,7 +746,12 @@ def main() -> int:
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
     arena = ArenaStore(Path(os.environ.get("SOVEREIGN_ARENA_DB", "/var/lib/sovereign-arena/arena.sqlite3")), read_only=True)
     arena_inbox = Path(os.environ.get("SOVEREIGN_ARENA_INBOX", "/var/lib/sovereign-arena/inbox"))
-    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox)  # type: ignore[attr-defined]
+    corpus_raw_root = Path(os.environ.get("SOVEREIGN_CORPUS_RAW_ROOT", "/mnt/sovereign-ai/raw/corpus/arena"))
+    corpus_validated_root = Path(os.environ.get("SOVEREIGN_CORPUS_VALIDATED_ROOT", "/mnt/sovereign-ai/validated/corpus/arena-increments"))
+    corpus_inbox = Path(os.environ.get("SOVEREIGN_CORPUS_INBOX", str(state_root / "corpus-inbox")))
+    corpus_inbox.mkdir(parents=True, exist_ok=True)
+    server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox,  # type: ignore[attr-defined]
+                            corpus_raw_root, corpus_validated_root, corpus_inbox)
     server.serve_forever()
     return 0
 

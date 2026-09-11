@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sovereign — Corpus</title>
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/arena.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">S</span> Sovereign <span class="section">Corpus</span></div>
+    <a class="link" href="/arena">Arène</a>
+    <a class="link" href="/">Retour au chat</a>
+  </header>
+  <main class="wrap">
+    <section class="card">
+      <h2>Incréments de corpus (arène → CORE)</h2>
+      <p class="field-help">
+        Chaque incrément est du code validé par les tests de l'arène, classé <strong>synthétique</strong> et plafonné à
+        sa part maximale. Approuver le promeut de RAW vers le corpus <strong>validé</strong> — les données seulement.
+        Aucun entraînement n'est lancé ici ; la gateway n'écrit jamais le corpus, un worker gaté applique ta décision.
+      </p>
+      <div id="status" class="field-help"></div>
+      <table class="ranking">
+        <thead>
+          <tr><th>Incrément</th><th>Records</th><th>Classe</th><th>Part max</th><th>Paquet source</th><th>État</th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/corpus.js"></script>
+</body>
+</html>
