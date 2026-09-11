@@ -51,7 +51,7 @@
     rows.textContent = "";
     if (!increments.length) {
       const tr = el("tr");
-      const td = el("td", { text: "Aucun incrément pour l'instant." });
+      const td = el("td", { className: "muted", text: "Aucun incrément pour l'instant." });
       td.colSpan = 7;
       tr.append(td);
       rows.append(tr);
@@ -60,18 +60,20 @@
     for (const inc of increments) {
       const tr = el("tr");
       tr.append(el("td", { text: inc.increment_id }));
-      tr.append(el("td", { text: String(inc.record_count ?? "—") }));
+      tr.append(el("td", { className: "num", text: String(inc.record_count ?? "—") }));
       tr.append(el("td", { text: inc.classification || "—" }));
-      tr.append(el("td", { text: pct(inc.max_share_in_corpus_increment) }));
+      tr.append(el("td", { className: "num", text: pct(inc.max_share_in_corpus_increment) }));
       tr.append(el("td", { text: inc.arena_packet_id || "—" }));
       const stateCell = el("td");
       stateCell.append(statusChip(inc.status));
       tr.append(stateCell);
       const action = el("td");
       if (inc.status === "raw") {
-        const btn = el("button", { className: "btn", text: "Approuver la promotion" });
+        const btn = el("button", { className: "small-button", text: "Approuver la promotion" });
         btn.onclick = () => promote(inc);
         action.append(btn);
+      } else {
+        action.append(el("span", { className: "muted", text: "—" }));
       }
       tr.append(action);
       rows.append(tr);
