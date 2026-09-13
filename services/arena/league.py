@@ -25,6 +25,10 @@ PROMPT_MAX_CHARS = 1_200
 # Anti-collapse thresholds from docs/model/self-training-loop-spec.md, section 5.
 MIN_UNIQUE_RATIO = 0.80
 MAX_REPETITION = 0.05
+# Measured on the 28 real packets of 2026-09: 22-27 distinct tasks each, the
+# most frequent task weighing 0.05 to 0.14. 0.25 leaves that margin untouched
+# and still refuses a packet where a handful of tasks drown the rest.
+MAX_TASK_SHARE = 0.25
 SYNTHETIC_SHARE_CAP = 0.20
 
 BASE_RULES = "Answer with a single Python code block and nothing else. No tests, no explanation, no example usage."
@@ -210,7 +214,17 @@ def packet_selection(accepted: Sequence[dict[str, Any]]) -> tuple[list[dict[str,
 
 
 def packet_status(metrics: dict[str, float]) -> str:
+    """Healthy means: no collapsed answer, enough distinct solutions, and a
+    spread of tasks rather than one task repeated under different guises.
+
+    ``max_task_share`` is absent from packets measured before it existed; those
+    keep the two original checks rather than being flagged for a missing field.
+    """
+
     healthy = metrics["unique_ratio"] >= MIN_UNIQUE_RATIO and metrics["max_repetition"] <= MAX_REPETITION
+    task_share = metrics.get("max_task_share")
+    if task_share is not None and task_share > MAX_TASK_SHARE:
+        healthy = False
     return "awaiting_owner_approval" if healthy else "flagged"
 
 

@@ -135,6 +135,23 @@ class LeagueRulesTests(unittest.TestCase):
         self.assertEqual(metrics["max_repetition"], 0.5)
         self.assertEqual(league.packet_status(metrics), "flagged")
 
+    def test_packet_status_flags_a_packet_drowned_by_one_task(self) -> None:
+        # 30 distinct solutions, but 12 of them answer the same task: the packet
+        # teaches CORE one exercise twelve ways instead of a spread of problems.
+        rows = [{"task_id": "t1", "normalized_sha256": f"n{i}"} for i in range(12)]
+        rows += [{"task_id": f"t{i}", "normalized_sha256": f"m{i}"} for i in range(2, 20)]
+        _, metrics = league.packet_selection(rows)
+        self.assertEqual(metrics["unique_ratio"], 1.0)          # nothing collapsed
+        self.assertLessEqual(metrics["max_repetition"], league.MAX_REPETITION)
+        self.assertEqual(metrics["max_task_share"], 0.4)        # but one task owns 40 %
+        self.assertEqual(league.packet_status(metrics), "flagged")
+
+    def test_packet_status_ignores_a_missing_task_share(self) -> None:
+        # Packets measured before max_task_share existed must not be flagged for
+        # lacking a field they could not have carried.
+        old = {"unique_ratio": 1.0, "max_repetition": 0.03}
+        self.assertEqual(league.packet_status(old), "awaiting_owner_approval")
+
     def test_packet_lines_skip_tasks_outside_the_active_suite(self) -> None:
         selection = [
             {"task_id": "known", "normalized_sha256": "n1", "source": "def f():\n    return 1",

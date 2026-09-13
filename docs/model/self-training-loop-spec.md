@@ -66,7 +66,14 @@ redondant (l'arène qui rejoue la même tâche) est du gaspillage, pas un
 effondrement : il reste mesuré et affiché (`pool_unique_ratio`, `accepted` dans
 le manifeste) mais ne bloque aucun paquet. Ce qui bloque, c'est la même réponse
 normalisée retenue pour plusieurs tâches — ça, la déduplication ne peut pas le
-masquer. Les paquets créés avant cette correction portent l'ancien verdict figé
+masquer. Un troisième seuil complète les deux premiers : une seule tâche ne
+peut peser plus de **25 %** des retenus (`max_task_share`). Il vient d'une
+mesure, pas d'une intuition — sur les 28 paquets réels de septembre 2026, la
+tâche la plus représentée pesait entre 5 % et 14 %. Un paquet qui enseigne le
+même exercice sous douze formes n'apprend pas grand-chose à CORE, même si ses
+douze solutions sont distinctes.
+
+Les paquets créés avant cette correction portent l'ancien verdict figé
 dans leur manifeste : `tools/recheck_packet_health.py` les remesure à partir de
 leur propre `solutions.jsonl`, sans jamais rien approuver.
 
