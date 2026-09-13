@@ -26,6 +26,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from services.knowledge import corpus_paths
+
 INCREMENT_SCHEMA = "arena-corpus-increment.v1"
 APPROVAL_SCHEMA = "arena-increment-approval.v1"
 VALIDATED_SCHEMA = "arena-corpus-increment.validated.v1"
@@ -100,6 +102,7 @@ def build_validated_manifest(manifest: dict[str, Any], approval: dict[str, Any],
 
 
 def promote(increment_dir: Path, approval_path: Path, validated_root: Path) -> dict[str, Any]:
+    corpus_paths.require_share(validated_root)
     manifest, body = read_raw_increment(increment_dir)
     approval = json.loads(approval_path.read_text(encoding="utf-8"))
     check_approval(approval, manifest)
@@ -118,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("increment_dir", type=Path, help="RAW increment directory (records.jsonl + manifest.json)")
     parser.add_argument("--approval", type=Path, required=True, help="owner approval JSON for this increment")
-    parser.add_argument("--validated-root", type=Path, default=Path("/mnt/sovereign-ai/validated/corpus/arena-increments"),
+    parser.add_argument("--validated-root", type=Path, default=corpus_paths.validated_arena_root(),
                         help="validated destination root")
     args = parser.parse_args(argv)
     try:

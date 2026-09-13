@@ -18,4 +18,4 @@ ProtectControlGroups=yes
 RestrictSUIDSGID=yes
 RestrictRealtime=yes
 ReadOnlyPaths=/opt/sovereign/app
-ReadWritePaths=/var/lib/sovereign-gateway /mnt/sovereign-ai
+ReadWritePaths=/var/lib/sovereign-gateway /mnt/sovereign-memory

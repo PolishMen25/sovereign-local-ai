@@ -30,6 +30,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from services.knowledge import corpus_paths
+
 INCREMENT_SCHEMA = "arena-corpus-increment.v1"
 APPROVAL_SCHEMA = "arena-approval.v1"
 RECORD_TEMPLATE = "### Instruction\n{prompt}\n\n### Réponse\n```python\n{source}\n```\n"
@@ -134,6 +136,7 @@ def write_increment(records: list[dict[str, str]], manifest: dict[str, Any], out
 
 
 def build(packet_dir: Path, suite_path: Path, raw_root: Path) -> dict[str, Any]:
+    corpus_paths.require_share(raw_root)
     prompts = load_task_prompts(suite_path)
     manifest, solutions = read_approved_packet(packet_dir)
     records = build_records(solutions, prompts, manifest["packet_id"])
@@ -145,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("packet_dir", type=Path, help="approved arena packet directory")
     parser.add_argument("--suite", type=Path, default=Path("configs/evaluation/core-python-e2.candidate.json"))
-    parser.add_argument("--raw-root", type=Path, default=Path("/mnt/sovereign-ai/raw/corpus/arena"),
+    parser.add_argument("--raw-root", type=Path, default=corpus_paths.raw_arena_root(),
                         help="RAW destination root (never a validated path)")
     args = parser.parse_args(argv)
     try:

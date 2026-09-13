@@ -17,6 +17,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from services.knowledge import corpus_paths
 from tools import promote_arena_increment as promote
 
 
@@ -69,8 +70,8 @@ def apply_inbox(inbox: Path, raw_root: Path, validated_root: Path) -> list[dict[
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inbox", type=Path, default=Path("/var/lib/sovereign-gateway/corpus-inbox"))
-    parser.add_argument("--raw-root", type=Path, default=Path("/mnt/sovereign-ai/raw/corpus/arena"))
-    parser.add_argument("--validated-root", type=Path, default=Path("/mnt/sovereign-ai/validated/corpus/arena-increments"))
+    parser.add_argument("--raw-root", type=Path, default=corpus_paths.raw_arena_root())
+    parser.add_argument("--validated-root", type=Path, default=corpus_paths.validated_arena_root())
     args = parser.parse_args(argv)
     outcomes = apply_inbox(args.inbox, args.raw_root, args.validated_root)
     applied = sum(1 for o in outcomes if o["outcome"] == "applied")

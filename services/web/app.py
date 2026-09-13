@@ -25,6 +25,7 @@ from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.knowledge.document_ingest import ingest as ingest_document, IngestError
 from services.knowledge import document_analysis
+from services.knowledge import corpus_paths
 from services.web import agent_tools
 from services.web import code_sandbox
 from services.web.catalog_profiles import load_catalog_profiles
@@ -1086,8 +1087,8 @@ def main() -> int:
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
     arena = ArenaStore(Path(os.environ.get("SOVEREIGN_ARENA_DB", "/var/lib/sovereign-arena/arena.sqlite3")), read_only=True)
     arena_inbox = Path(os.environ.get("SOVEREIGN_ARENA_INBOX", "/var/lib/sovereign-arena/inbox"))
-    corpus_raw_root = Path(os.environ.get("SOVEREIGN_CORPUS_RAW_ROOT", "/mnt/sovereign-ai/raw/corpus/arena"))
-    corpus_validated_root = Path(os.environ.get("SOVEREIGN_CORPUS_VALIDATED_ROOT", "/mnt/sovereign-ai/validated/corpus/arena-increments"))
+    corpus_raw_root = corpus_paths.raw_arena_root()
+    corpus_validated_root = corpus_paths.validated_arena_root()
     corpus_inbox = Path(os.environ.get("SOVEREIGN_CORPUS_INBOX", str(state_root / "corpus-inbox")))
     corpus_inbox.mkdir(parents=True, exist_ok=True)
     documents_dir = Path(os.environ.get("SOVEREIGN_DOCUMENTS_DIR", str(state_root / "documents")))
