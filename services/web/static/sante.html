@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Sovereign — État du système</title>
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/arena.css">
+  <script src="/sante.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Sovereign, retour au chat"><span class="brand-mark" aria-hidden="true">S</span> Sovereign <span class="brand-detail">État du système</span></a>
+    <nav class="session-actions"><a href="/arena">Arène</a><a href="/corpus">Corpus</a><a href="/">Retour au chat</a></nav>
+  </header>
+  <div class="status-bar"><span id="status-dot" class="status-dot" aria-hidden="true"></span><span id="status" role="status" aria-live="polite">Lecture de l’état…</span></div>
+  <main id="main" class="arena">
+    <section class="panel" aria-labelledby="engines-heading">
+      <div class="panel-heading">
+        <h2 id="engines-heading">Moteurs locaux</h2>
+        <p class="field-help">Chaque moteur est interrogé par son propre point de santé, sans lui faire générer un seul token.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="leaderboard">
+          <thead><tr><th scope="col">Moteur</th><th scope="col">Rôle</th><th scope="col">État</th></tr></thead>
+          <tbody id="engines"><tr><td colspan="3" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="stack-heading">
+      <div class="panel-heading"><h2 id="stack-heading">Chaîne de connaissance et d’action</h2></div>
+      <div class="table-scroll">
+        <table class="leaderboard">
+          <thead><tr><th scope="col">Élément</th><th scope="col">État</th></tr></thead>
+          <tbody id="stack"><tr><td colspan="2" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="resources-heading">
+      <div class="panel-heading">
+        <h2 id="resources-heading">Ressources du conteneur</h2>
+        <p class="field-help">Ces chiffres décrivent le conteneur de la passerelle, pas l’hôte Proxmox entier.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="leaderboard">
+          <thead><tr><th scope="col">Mesure</th><th scope="col">Valeur</th></tr></thead>
+          <tbody id="resources"><tr><td colspan="2" class="muted">Chargement…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

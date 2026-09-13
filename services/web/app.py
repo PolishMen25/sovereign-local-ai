@@ -28,6 +28,7 @@ from services.knowledge import document_analysis
 from services.knowledge import corpus_paths
 from services.web import agent_tools
 from services.web import code_sandbox
+from services.web import health
 from services.web import workspace
 from services.web.catalog_profiles import load_catalog_profiles
 from services.web.authentication import AuthenticationStore
@@ -53,6 +54,8 @@ STATIC_FILES = {
     "/arena.js": ("arena.js", "text/javascript; charset=utf-8"),
     "/corpus": ("corpus.html", "text/html; charset=utf-8"),
     "/corpus.js": ("corpus.js", "text/javascript; charset=utf-8"),
+    "/sante": ("sante.html", "text/html; charset=utf-8"),
+    "/sante.js": ("sante.js", "text/javascript; charset=utf-8"),
 }
 WEB_PROFILES = (
     {
@@ -216,6 +219,7 @@ class WebState:
     tools_enabled: bool = True
     embed_runtime: Any = None
     catalog: list[dict[str, Any]] | None = None
+    state_root: Path | None = None
     actions_enabled: bool = True
     pending_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
     pending_lock: Any = field(default_factory=threading.Lock)
@@ -517,6 +521,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/arena": lambda: self.send_json(200, self.state.arena_overview()),
             "/v1/corpus/increments": lambda: self.send_json(200, self.state.corpus_increments()),
             "/v1/workspace": self._get_workspace_listing,
+            "/v1/health": self._get_health,
         }.get(self.path)
         if route is not None:
             route()
@@ -785,6 +790,10 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         })
 
     # --- chat ------------------------------------------------------------
+
+    def _get_health(self) -> None:
+        self.send_json(200, health.snapshot(
+            self.state, state_root=self.state.state_root, sandbox_available=code_sandbox.available()))
 
     def _get_workspace_listing(self) -> None:
         root = self.state.workspace_dir
@@ -1175,7 +1184,7 @@ def main() -> int:
     embed_runtime = EmbedClient(embed_endpoint) if embed_endpoint else None
     catalog = load_catalog_profiles(Path(os.environ.get("SOVEREIGN_AGENT_REGISTRY", "configs/agents/registry.json")))
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox,  # type: ignore[attr-defined]
-                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, workspace_dir, tools_enabled, embed_runtime, catalog)
+                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, workspace_dir, tools_enabled, embed_runtime, catalog, state_root)
     server.serve_forever()
     return 0
 

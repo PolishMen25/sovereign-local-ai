@@ -424,6 +424,19 @@ class GatewayHttpTests(GatewayTestCase):
         # traversal is refused
         self.assertEqual(self.request("GET", "/v1/workspace/../app.py", session=True)[0], 404)
 
+    def test_health_snapshot(self) -> None:
+        self.assertEqual(self.request("GET", "/v1/health")[0], 401)  # authenticated only
+        self.login()
+        status, _, body = self.request("GET", "/v1/health", session=True)
+        payload = json.loads(body)
+        self.assertEqual(status, 200)
+        engines = {row["engine"]: row for row in payload["engines"]}
+        self.assertTrue(engines["CHAT-14B"]["available"])
+        self.assertFalse(engines["CORE-700M"]["available"])
+        for section in ("knowledge", "arena", "corpus", "workspace", "actions", "resources"):
+            self.assertIn(section, payload)
+        self.assertEqual(self.request("GET", "/sante")[0], 200)  # the page itself is public, its data is not
+
     def test_other_engines_and_failures(self) -> None:
         self.login()
         body = json.loads(self.request("POST", "/v1/chat", self.chat("écris une fonction", engine="QWEN-CODER"), session=True, csrf=True)[2])
