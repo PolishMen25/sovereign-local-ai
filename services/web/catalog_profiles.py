@@ -18,6 +18,27 @@ from services.orchestrator.registry import load_registry
 
 PROFILE_ID = re.compile(r"^[a-z][a-z0-9_-]{2,63}$")
 CODE_FAMILIES = frozenset({"development"})
+FAMILY_LABELS = {
+    "coordination": "Coordination",
+    "development": "Développement",
+    "data": "Données",
+    "training": "Entraînement",
+    "operations": "Opérations",
+    "evaluation": "Évaluation",
+    "security": "Sécurité",
+    "research": "Recherche",
+    "governance": "Gouvernance",
+}
+
+
+def family_label(family: str) -> str:
+    return FAMILY_LABELS.get(family, (family or "Autres").capitalize())
+
+
+def pretty_name(value: str) -> str:
+    """Registry names are lowercase snake/space; make them readable in a menu."""
+    text = str(value).replace("_", " ").strip()
+    return text[:1].upper() + text[1:] if text else text
 GUARDRAILS = (
     "Reste dans ton domaine ; si la demande en sort, dis-le et oriente vers le bon profil. "
     "Tu proposes, tu n'exécutes jamais une action à effet externe ou durable sans confirmation humaine explicite. "
@@ -60,7 +81,8 @@ def load_catalog_profiles(path: Path) -> list[dict[str, Any]]:
         engine = engine_for_family(family)
         profiles.append({
             "profile_id": identifier,
-            "display_name": str(profile.get("display_name") or identifier)[:80],
+            "display_name": pretty_name(profile.get("display_name") or identifier)[:80],
+            "family_label": family_label(family),
             "family": family,
             "mission": str(profile.get("mission") or "")[:300],
             "engine": engine,

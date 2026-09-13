@@ -317,13 +317,14 @@ class WebState:
     def chat_profiles(self) -> list[dict[str, Any]]:
         """Built-in profiles plus arena agents the owner approved for the chat."""
 
-        profiles = [dict(profile) for profile in WEB_PROFILES]
+        profiles = [{**profile, "group": "Général", "engine": "BOOTSTRAP"} for profile in WEB_PROFILES]
         for profile in self.catalog or []:
-            engine_label = "Qwen-Coder 7B" if profile["engine"] == "QWEN-CODER" else "14B"
             profiles.append({
                 "profile_id": profile["profile_id"],
                 "display_name": profile["display_name"],
-                "description": f"{profile['mission']} — {profile['family']} ({engine_label}).",
+                "description": profile["mission"],
+                "group": profile.get("family_label") or profile["family"],
+                "engine": profile["engine"],
             })
         if self.arena is None:
             return profiles
@@ -332,7 +333,9 @@ class WebState:
                 profiles.append({
                     "profile_id": agent["profile_id"],
                     "display_name": agent["display_name"],
-                    "description": f"Agent de l'arène ({agent['engine']}), approuvé pour le chat — spécialiste programmation.",
+                    "description": "Agent de l'arène approuvé pour le chat — spécialiste programmation.",
+                    "group": "Agents de l'arène",
+                    "engine": agent["engine"],
                 })
         except (OSError, ValueError, sqlite3.Error):
             pass

@@ -312,21 +312,42 @@
     finally { setBusy(false); }
   }
 
+  function engineShortLabel(engine) {
+    return engine === "QWEN-CODER" ? "Qwen-Coder 7B" : engine === "CORE-700M" ? "CORE-700M" : "14B";
+  }
+
   function describeProfile() {
     const profile = state.profiles.find((item) => item.profile_id === q("profile").value);
-    q("profile-description").textContent = profile?.description || "";
+    if (!profile) { q("profile-description").textContent = ""; return; }
+    const parts = [profile.description, profile.engine ? "Moteur : " + engineShortLabel(profile.engine) : ""];
+    q("profile-description").textContent = parts.filter(Boolean).join(" · ");
   }
 
   async function loadProfiles() {
     const data = await api("/v1/profiles");
-    state.profiles = (data.profiles || []).filter((item) => /^[a-z][a-z0-9_-]{1,63}$/.test(item.profile_id)).slice(0, 100);
+    state.profiles = (data.profiles || []).filter((item) => /^[a-z][a-z0-9_-]{1,63}$/.test(item.profile_id)).slice(0, 200);
     if (!state.profiles.length) return;
-    q("profile").replaceChildren();
+    // Group by family so 60 profiles stay readable; "Général" first, arena last.
+    const groups = new Map();
     for (const profile of state.profiles) {
-      const option = document.createElement("option");
-      option.value = profile.profile_id;
-      option.textContent = profile.display_name || profile.profile_id;
-      q("profile").append(option);
+      const name = profile.group || "Autres";
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(profile);
+    }
+    const rank = (name) => (name === "Général" ? 0 : name === "Agents de l’arène" || name === "Agents de l'arène" ? 2 : 1);
+    const ordered = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "fr"));
+    q("profile").replaceChildren();
+    for (const name of ordered) {
+      const items = groups.get(name);
+      const group = document.createElement("optgroup");
+      group.label = name + " (" + items.length + ")";
+      for (const profile of items) {
+        const option = document.createElement("option");
+        option.value = profile.profile_id;
+        option.textContent = (profile.display_name || profile.profile_id) + " — " + engineShortLabel(profile.engine);
+        group.append(option);
+      }
+      q("profile").append(group);
     }
     if (state.profiles.some((item) => item.profile_id === "coordination")) q("profile").value = "coordination";
     describeProfile();

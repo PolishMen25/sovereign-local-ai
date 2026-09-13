@@ -58,7 +58,9 @@ class CatalogProfilesTests(unittest.TestCase):
         self.assertIn("coordination", by_id)
         self.assertIn("test_designer", by_id)
         self.assertIn("threat_modeler", by_id)
-        self.assertIn("Qwen-Coder 7B", by_id["test_designer"]["description"])
+        self.assertEqual(by_id["test_designer"]["engine"], "QWEN-CODER")
+        self.assertEqual(by_id["test_designer"]["group"], "development")
+        self.assertEqual(by_id["coordination"]["group"], "Général")
 
     def test_catalog_profile_resolves_persona(self) -> None:
         state = self.state()
@@ -79,6 +81,8 @@ class CatalogLoaderTests(unittest.TestCase):
         for profile in profiles:
             self.assertIn(profile["engine"], {"BOOTSTRAP", "QWEN-CODER"})
             self.assertIn("Sovereign", profile["system_prompt"])
+            self.assertTrue(profile["family_label"])
+            self.assertTrue(profile["display_name"][:1].isupper(), profile["display_name"])
 
     def test_family_engine_mapping(self) -> None:
         self.assertEqual(engine_for_family("development"), "QWEN-CODER")
