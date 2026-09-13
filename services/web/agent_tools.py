@@ -85,6 +85,32 @@ TOOL_SPECS: list[dict[str, Any]] = [
 
 TOOL_NAMES = frozenset(spec["function"]["name"] for spec in TOOL_SPECS)
 
+# Action tools have side effects: the model only PROPOSES them; nothing runs until
+# a human approves it in the UI. The loop stops (returns "confirm") on such a call.
+ACTION_TOOL_SPECS: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "run_python",
+            "description": (
+                "Propose du code Python à EXÉCUTER dans un bac à sable local isolé (hors ligne, "
+                "sans réseau ni accès aux fichiers de l'utilisateur). Rien ne s'exécute sans la "
+                "confirmation explicite de l'utilisateur. Utilise-le pour calculer, vérifier ou "
+                "produire un résultat par le code plutôt que de le deviner. Écris sur la sortie standard."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "Le code Python complet à exécuter."},
+                    "purpose": {"type": "string", "description": "Une phrase : ce que ce code fait / pourquoi."},
+                },
+                "required": ["code"],
+            },
+        },
+    },
+]
+ACTION_TOOL_NAMES = frozenset(spec["function"]["name"] for spec in ACTION_TOOL_SPECS)
+
 
 class ToolError(Exception):
     """A tool could not run with the arguments given (reported back to the model)."""
@@ -200,6 +226,73 @@ ExecFn = Callable[[str, Any], tuple[str, list[dict[str, Any]]]]
 OnTool = Callable[[str, str], None]
 
 
+def _merge_citations(into: list[dict[str, Any]], seen: set[str], new: list[dict[str, Any]]) -> None:
+    for citation in new:
+        key = str(citation.get("provenance_id") or citation.get("document_id") or "")
+        if key and key not in seen:
+            seen.add(key)
+            into.append(citation)
+
+
+def drive(
+    chat: ChatFn,
+    work: list[dict[str, Any]],
+    *,
+    execute: ExecFn,
+    action_tools: frozenset[str] = frozenset(),
+    citations: list[dict[str, Any]] | None = None,
+    seen_provenance: set[str] | None = None,
+    max_rounds: int = MAX_TOOL_ROUNDS,
+    on_tool: OnTool | None = None,
+) -> dict[str, Any]:
+    """Advance the tool-calling exchange over ``work`` (mutated in place).
+
+    Read-only tools run immediately.  The first *action* tool call stops the loop
+    and is returned for human confirmation (nothing is executed); the caller
+    resumes by appending the action's tool result to ``work`` and calling drive
+    again.  Returns {status:'final', answer, work, citations} or
+    {status:'confirm', call:{id,name,arguments}, work, citations}.
+    """
+
+    citations = citations if citations is not None else []
+    seen = seen_provenance if seen_provenance is not None else set()
+    offer_actions = bool(action_tools)
+    for round_index in range(max_rounds):
+        last_round = round_index == max_rounds - 1
+        tools = [] if last_round else (TOOL_SPECS + ACTION_TOOL_SPECS if offer_actions else TOOL_SPECS)
+        assistant = chat(work, tools)
+        content = assistant.get("content")
+        tool_calls = assistant.get("tool_calls") or []
+        if not tool_calls:
+            return {"status": "final", "answer": (content or "").strip(), "work": work, "citations": citations}
+        calls = tool_calls[:MAX_TOOL_CALLS_PER_ROUND]
+        work.append({"role": "assistant", "content": content or "", "tool_calls": calls})
+        pending: dict[str, Any] | None = None
+        for call in calls:
+            function = call.get("function", {}) if isinstance(call, dict) else {}
+            name = str(function.get("name", ""))
+            call_id = call.get("id") or f"call_{round_index}_{name}"
+            if name in action_tools and pending is None:
+                # Stop for confirmation; its tool result is appended on resume.
+                pending = {"id": call_id, "name": name, "arguments": function.get("arguments", "{}")}
+                continue
+            if pending is not None:
+                work.append({"role": "tool", "tool_call_id": call_id, "content": "Non traité : une seule action à la fois."})
+                continue
+            if on_tool is not None:
+                on_tool(name, call_id)
+            try:
+                result, new_citations = execute(name, function.get("arguments", "{}"))
+            except ToolError as failure:
+                result, new_citations = f"Erreur outil: {failure}", []
+            _merge_citations(citations, seen, new_citations)
+            work.append({"role": "tool", "tool_call_id": call_id, "content": result[:8_000]})
+        if pending is not None:
+            return {"status": "confirm", "call": pending, "work": work, "citations": citations}
+    assistant = chat(work, [])
+    return {"status": "final", "answer": (assistant.get("content") or "").strip(), "work": work, "citations": citations}
+
+
 def run_tool_loop(
     chat: ChatFn,
     messages: list[dict[str, Any]],
@@ -208,41 +301,6 @@ def run_tool_loop(
     max_rounds: int = MAX_TOOL_ROUNDS,
     on_tool: OnTool | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Drive a multi-turn tool-calling exchange and return (final_answer, citations).
-
-    ``chat(messages, tools)`` returns an assistant message dict with optional
-    ``content`` and ``tool_calls``.  On the last allowed round tools are withheld
-    so the model must produce a final textual answer.
-    """
-
-    work = list(messages)
-    citations: list[dict[str, Any]] = []
-    seen_provenance: set[str] = set()
-    for round_index in range(max_rounds):
-        tools = TOOL_SPECS if round_index < max_rounds - 1 else []
-        assistant = chat(work, tools)
-        content = assistant.get("content")
-        tool_calls = assistant.get("tool_calls") or []
-        if not tool_calls:
-            return (content or "").strip(), citations
-        # Record the assistant turn verbatim so tool results attach to it.
-        work.append({"role": "assistant", "content": content or "", "tool_calls": tool_calls[:MAX_TOOL_CALLS_PER_ROUND]})
-        for call in tool_calls[:MAX_TOOL_CALLS_PER_ROUND]:
-            function = call.get("function", {}) if isinstance(call, dict) else {}
-            name = function.get("name", "")
-            call_id = call.get("id") or f"call_{round_index}_{name}"
-            if on_tool is not None:
-                on_tool(str(name), call_id)
-            try:
-                result, new_citations = execute(str(name), function.get("arguments", "{}"))
-            except ToolError as failure:
-                result, new_citations = f"Erreur outil: {failure}", []
-            for citation in new_citations:
-                key = str(citation.get("provenance_id") or citation.get("document_id") or "")
-                if key and key not in seen_provenance:
-                    seen_provenance.add(key)
-                    citations.append(citation)
-            work.append({"role": "tool", "tool_call_id": call_id, "content": result[:8_000]})
-    # Exhausted rounds without a final answer: ask once more with no tools.
-    assistant = chat(work, [])
-    return (assistant.get("content") or "").strip(), citations
+    """Read-only convenience wrapper over ``drive`` (no action tools)."""
+    result = drive(chat, list(messages), execute=execute, max_rounds=max_rounds, on_tool=on_tool)
+    return result["answer"], result["citations"]

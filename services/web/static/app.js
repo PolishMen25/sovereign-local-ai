@@ -48,7 +48,7 @@
       }
       if (!lines.length) return;
       const payload = JSON.parse(lines.join("\n"));
-      if (event === "completed") completed = true;
+      if (event === "completed" || event === "confirmation_required") completed = true;
       onEvent(event, payload);
     };
     try {
@@ -417,6 +417,123 @@
     finally { q("login-button").disabled = false; }
   });
 
+  const TOOL_LABELS = {
+    search_knowledge: "Recherche dans la base de connaissances locale…",
+    list_documents: "Consultation des documents partagés…",
+    read_document: "Lecture d’un document partagé…",
+    current_time: "Vérification de l’heure…",
+    run_python: "Exécution du code dans le bac à sable…",
+  };
+
+  function applyMetadata(answer, data) {
+    if (typeof data.conversation_id === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(data.conversation_id)) state.conversation = data.conversation_id;
+    if (data.engine) {
+      updateEngine(data.engine, data.rag_mode || state.ragMode);
+      answer.label.textContent = "Assistant · " + engineLabel(data.engine);
+    }
+  }
+
+  // Consume one chat SSE response into `answer`. Returns normally on completion,
+  // a pending action confirmation, or throws on error.
+  async function consumeStream(result, answer) {
+    let streamed = "";
+    let toolLog = null;
+    const showTool = (name) => {
+      if (!toolLog) { toolLog = document.createElement("p"); toolLog.className = "tool-activity"; answer.article.append(toolLog); }
+      toolLog.textContent = TOOL_LABELS[name] || ("Outil local : " + String(name).slice(0, 60));
+    };
+    const complete = (data) => {
+      toolLog?.remove();
+      applyMetadata(answer, data);
+      if (typeof data.answer !== "string" || data.answer.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
+      answer.render(data.answer);
+      showCitations(answer.article, data.citations);
+    };
+    if (!(result.headers.get("Content-Type") || "").includes("text/event-stream")) { complete(await result.json()); return; }
+    await readEventStream(result.body, (type, data) => {
+      if (type === "metadata") applyMetadata(answer, data);
+      if (type === "tool" && data && typeof data.name === "string") showTool(data.name);
+      if (type === "delta") {
+        if (typeof data.delta !== "string" || streamed.length + data.delta.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
+        streamed += data.delta;
+        answer.render(streamed);
+      }
+      if (type === "completed") complete(data);
+      if (type === "confirmation_required") { toolLog?.remove(); renderConfirmation(answer, data); }
+      if (type === "error") {
+        applyMetadata(answer, data);
+        const error = new Error(data.answer || "La réponse a été interrompue. Consultez l’historique avant de réessayer.");
+        error.code = data.error;
+        throw error;
+      }
+      scrollMessages();
+    });
+  }
+
+  async function runTurn(answer, sendRequest) {
+    try {
+      await consumeStream(await sendRequest(), answer);
+      await refreshHistory();
+    } catch (error) {
+      answer.article.querySelector(".tool-activity")?.remove();
+      answer.article.classList.add("error");
+      const detail = document.createElement("p");
+      detail.className = "field-help";
+      detail.textContent = errorMessage(error);
+      answer.article.append(detail);
+      notice(errorMessage(error));
+      if (!q("workspace").hidden) await refreshHistory().catch(() => {});
+    } finally {
+      answer.article.classList.remove("pending");
+      setBusy(false);
+      if (!q("workspace").hidden) q("message").focus();
+    }
+  }
+
+  function renderConfirmation(answer, data) {
+    answer.article.querySelector(".action-confirm")?.remove();
+    const card = document.createElement("div");
+    card.className = "action-confirm";
+    const title = document.createElement("p");
+    title.className = "action-title";
+    title.textContent = "L’assistant propose d’exécuter du code (bac à sable isolé)" + (data.purpose ? " — " + String(data.purpose).slice(0, 300) : "");
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = String(data.code || "");
+    pre.append(code);
+    const actions = document.createElement("div");
+    actions.className = "dialog-actions";
+    const reject = document.createElement("button");
+    reject.type = "button"; reject.className = "quiet"; reject.textContent = "Refuser";
+    const approve = document.createElement("button");
+    approve.type = "button"; approve.textContent = "Approuver et exécuter";
+    const decide = (decision) => {
+      if (state.busy) return;
+      approve.disabled = reject.disabled = true;
+      sendDecision(answer, String(data.action_id || ""), decision);
+    };
+    reject.addEventListener("click", () => decide("reject"));
+    approve.addEventListener("click", () => decide("approve"));
+    actions.append(reject, approve);
+    card.append(title, pre, actions);
+    answer.article.append(card);
+    scrollMessages(true);
+  }
+
+  async function sendDecision(answer, actionId, decision) {
+    if (!state.conversation || !/^[0-9a-f]{16}$/.test(actionId)) return;
+    notice();
+    setBusy(true);
+    answer.article.querySelector(".action-confirm")?.remove();
+    answer.article.classList.add("pending");
+    if (decision === "approve") { answer.text.replaceChildren(typingIndicator()); }
+    scrollMessages(true);
+    await runTurn(answer, () => checkedResponse("/v1/chat/confirm", {
+      method: "POST", headers: {Accept: "text/event-stream"},
+      body: JSON.stringify({conversation_id: state.conversation, action_id: actionId, decision}),
+    }));
+  }
+
   q("chat-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = q("message").value.trim();
@@ -431,68 +548,7 @@
     answer.article.classList.add("pending");
     q("message").value = "";
     scrollMessages(true);
-    const applyMetadata = (data) => {
-      if (typeof data.conversation_id === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(data.conversation_id)) state.conversation = data.conversation_id;
-      if (data.engine) {
-        updateEngine(data.engine, data.rag_mode || state.ragMode);
-        answer.label.textContent = "Assistant · " + engineLabel(data.engine);
-      }
-    };
-    let streamed = "";
-    let toolLog = null;
-    const TOOL_LABELS = {
-      search_knowledge: "Recherche dans la base de connaissances locale…",
-      list_documents: "Consultation des documents partagés…",
-      read_document: "Lecture d’un document partagé…",
-      current_time: "Vérification de l’heure…",
-    };
-    const showTool = (name) => {
-      if (!toolLog) { toolLog = document.createElement("p"); toolLog.className = "tool-activity"; answer.article.append(toolLog); }
-      toolLog.textContent = TOOL_LABELS[name] || ("Outil local : " + String(name).slice(0, 60));
-    };
-    const complete = (data) => {
-      toolLog?.remove();
-      applyMetadata(data);
-      if (typeof data.answer !== "string" || data.answer.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
-      answer.render(data.answer);
-      showCitations(answer.article, data.citations);
-    };
-    try {
-      const result = await checkedResponse("/v1/chat", {method: "POST", headers: {Accept: "text/event-stream"}, body: JSON.stringify(request)});
-      if ((result.headers.get("Content-Type") || "").includes("text/event-stream")) {
-        await readEventStream(result.body, (type, data) => {
-          if (type === "metadata") applyMetadata(data);
-          if (type === "tool" && data && typeof data.name === "string") showTool(data.name);
-          if (type === "delta") {
-            if (typeof data.delta !== "string" || streamed.length + data.delta.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
-            streamed += data.delta;
-            answer.render(streamed);
-          }
-          if (type === "completed") complete(data);
-          if (type === "error") {
-            applyMetadata(data);
-            const error = new Error(data.answer || "La réponse a été interrompue. Consultez l’historique avant de réessayer.");
-            error.code = data.error;
-            throw error;
-          }
-          scrollMessages();
-        });
-      } else complete(await result.json());
-      await refreshHistory();
-    } catch (error) {
-      toolLog?.remove();
-      answer.article.classList.add("error");
-      const detail = document.createElement("p");
-      detail.className = "field-help";
-      detail.textContent = errorMessage(error);
-      answer.article.append(detail);
-      notice(errorMessage(error));
-      if (!q("workspace").hidden) await refreshHistory().catch(() => {});
-    } finally {
-      answer.article.classList.remove("pending");
-      setBusy(false);
-      if (!q("workspace").hidden) q("message").focus();
-    }
+    await runTurn(answer, () => checkedResponse("/v1/chat", {method: "POST", headers: {Accept: "text/event-stream"}, body: JSON.stringify(request)}));
   });
 
   q("engine").addEventListener("change", () => {

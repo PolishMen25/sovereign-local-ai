@@ -137,5 +137,52 @@ class ToolLoopTests(unittest.TestCase):
         self.assertEqual(answer, "Réponse finale forcée.")
 
 
+class DriveActionTests(unittest.TestCase):
+    def setUp(self):
+        self.k = FakeKnowledge()
+
+    def _exec(self, name, arguments):
+        return at.execute_tool(name, arguments, knowledge=self.k)
+
+    def test_action_call_pauses_for_confirmation(self):
+        def chat(work, tools):
+            return {"content": None, "tool_calls": [
+                {"id": "a1", "function": {"name": "run_python", "arguments": json.dumps({"code": "print(1)"})}}]}
+        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec, action_tools=at.ACTION_TOOL_NAMES)
+        self.assertEqual(res["status"], "confirm")
+        self.assertEqual(res["call"]["name"], "run_python")
+        self.assertEqual(res["work"][-1]["role"], "assistant")  # tool result not appended yet
+
+    def test_resume_after_action_reaches_final(self):
+        calls = {"n": 0}
+
+        def chat(work, tools):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return {"content": None, "tool_calls": [
+                    {"id": "a1", "function": {"name": "run_python", "arguments": json.dumps({"code": "print(1)"})}}]}
+            return {"content": "fini", "tool_calls": []}
+
+        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec, action_tools=at.ACTION_TOOL_NAMES)
+        self.assertEqual(res["status"], "confirm")
+        work = res["work"]
+        work.append({"role": "tool", "tool_call_id": res["call"]["id"], "content": "OK"})
+        res2 = at.drive(chat, work, execute=self._exec, action_tools=at.ACTION_TOOL_NAMES, citations=res["citations"])
+        self.assertEqual((res2["status"], res2["answer"]), ("final", "fini"))
+
+    def test_action_tool_ignored_when_not_enabled(self):
+        seq = {"n": 0}
+
+        def chat(work, tools):
+            seq["n"] += 1
+            if seq["n"] == 1:
+                return {"content": None, "tool_calls": [
+                    {"id": "a1", "function": {"name": "run_python", "arguments": "{}"}}]}
+            return {"content": "répondu sans exécuter", "tool_calls": []}
+
+        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec)  # no action_tools
+        self.assertEqual(res["status"], "final")  # run_python treated as unknown tool, error fed back
+
+
 if __name__ == "__main__":
     unittest.main()

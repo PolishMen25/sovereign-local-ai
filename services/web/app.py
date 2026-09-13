@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hmac
 from http import cookies
@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 import re
 import secrets
+import threading
+import time
 import sqlite3
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
@@ -24,6 +26,7 @@ from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.knowledge.document_ingest import ingest as ingest_document, IngestError
 from services.knowledge import document_analysis
 from services.web import agent_tools
+from services.web import code_sandbox
 from services.web.catalog_profiles import load_catalog_profiles
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
@@ -208,6 +211,29 @@ class WebState:
     tools_enabled: bool = True
     embed_runtime: Any = None
     catalog: list[dict[str, Any]] | None = None
+    actions_enabled: bool = True
+    pending_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    pending_lock: Any = field(default_factory=threading.Lock)
+
+    def store_pending_action(self, action_id: str, payload: dict[str, Any], *, ttl: int = 900, cap: int = 100) -> None:
+        now = time.time()
+        with self.pending_lock:
+            for key in [k for k, v in self.pending_actions.items() if now - v.get("created_at", 0) > ttl]:
+                self.pending_actions.pop(key, None)
+            while len(self.pending_actions) >= cap:
+                oldest = min(self.pending_actions, key=lambda k: self.pending_actions[k].get("created_at", 0))
+                self.pending_actions.pop(oldest, None)
+            stored = dict(payload)
+            stored["created_at"] = now
+            self.pending_actions[action_id] = stored
+
+    def pop_pending_action(self, action_id: str, *, ttl: int = 900) -> dict[str, Any] | None:
+        now = time.time()
+        with self.pending_lock:
+            payload = self.pending_actions.pop(action_id, None)
+        if payload is None or now - payload.get("created_at", 0) > ttl:
+            return None
+        return payload
 
     def corpus_increments(self) -> dict[str, Any]:
         """List RAW arena corpus increments with their promotion status.
@@ -536,6 +562,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/login": self._post_login,
             "/v1/logout": self._post_logout,
             "/v1/chat": self._post_chat,
+            "/v1/chat/confirm": self._post_chat_confirm,
             "/v1/arena/approve": self._post_arena_approval,
             "/v1/corpus/promote": self._post_corpus_promotion,
             "/v1/documents": self._post_document,
@@ -892,11 +919,13 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         )
         self.begin_event_stream()
         self.send_event("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "tools"})
+        action_tools = agent_tools.ACTION_TOOL_NAMES if (self.state.actions_enabled and code_sandbox.available()) else frozenset()
         try:
-            answer, citations = agent_tools.run_tool_loop(
+            result = agent_tools.drive(
                 lambda msgs, tools: self.state.runtime.chat_with_tools(msgs, tools),
                 base,
                 execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query),
+                action_tools=action_tools,
                 on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
             )
         except RuntimeError:
@@ -904,13 +933,98 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             payload["error"] = "runtime_unavailable"
             self.send_event("error", payload)
             return
-        answer = answer.strip() or "Je n'ai pas pu produire de réponse exploitable."
+        self._finish_tool_result(request_value["request_id"], profile_id, conversation_id, result)
+
+    def _finish_tool_result(self, request_id: str, profile_id: str, conversation_id: str, result: dict[str, Any]) -> None:
+        """Emit the final answer, or a confirmation request for a pending action."""
+        if result["status"] == "confirm":
+            call = result["call"]
+            try:
+                arguments = agent_tools._parse_arguments(call["arguments"])
+            except agent_tools.ToolError:
+                arguments = {}
+            action_id = secrets.token_hex(8)
+            self.state.store_pending_action(action_id, {
+                "conversation_id": conversation_id, "profile_id": profile_id, "request_id": request_id,
+                "work": result["work"], "citations": result["citations"], "call": call,
+            })
+            self.send_event("confirmation_required", {
+                "action_id": action_id,
+                "tool": call["name"],
+                "code": str(arguments.get("code", ""))[:8000],
+                "purpose": str(arguments.get("purpose", ""))[:400],
+            })
+            return
+        answer = result["answer"].strip() or "Je n'ai pas pu produire de réponse exploitable."
         try:
             self.state.memory.append_message(conversation_id, role="assistant", content=answer)
         except KeyError:
             pass
-        payload = response(request_value["request_id"], profile_id, "completed", answer, engine="BOOTSTRAP", conversation_id=conversation_id, citations=citations)
+        payload = response(request_id, profile_id, "completed", answer, engine="BOOTSTRAP", conversation_id=conversation_id, citations=result["citations"])
         self.send_event("completed", payload)
+
+    def _post_chat_confirm(self) -> None:
+        """Approve or reject a pending action, then resume the tool loop (streamed)."""
+        try:
+            self.require_session(csrf=True)
+            body = self.read_json()
+        except PermissionError:
+            self.send_json(401, {"error": "unauthorized"})
+            return
+        except TypeError:
+            self.send_json(415, {"error": "unsupported_media_type"})
+            return
+        except ValueError:
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        action_id = body.get("action_id")
+        decision = body.get("decision")
+        conversation_id = body.get("conversation_id")
+        if (set(body) != {"action_id", "decision", "conversation_id"}
+                or not isinstance(action_id, str) or not re.fullmatch(r"[0-9a-f]{16}", action_id)
+                or decision not in {"approve", "reject"}
+                or not isinstance(conversation_id, str)):
+            self.send_json(422, {"error": "invalid_request"})
+            return
+        pending = self.state.pop_pending_action(action_id)
+        if pending is None or pending["conversation_id"] != conversation_id:
+            self.send_json(404, {"error": "action_not_found"})
+            return
+        profile_id = pending["profile_id"]
+        work = pending["work"]
+        call = pending["call"]
+        self.begin_event_stream()
+        self.send_event("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "tools"})
+        if decision == "approve":
+            self.send_event("tool", {"name": call["name"]})
+            try:
+                arguments = agent_tools._parse_arguments(call["arguments"])
+                outcome = code_sandbox.run_python(str(arguments.get("code", "")))
+                header = "Exécution réussie" if outcome["ok"] else ("Délai dépassé" if outcome["timed_out"] else f"Terminé avec le code {outcome['exit_code']}")
+                tool_result = f"{header}. Sortie :\n{outcome['output']}"
+            except (agent_tools.ToolError, ValueError, RuntimeError) as failure:
+                tool_result = f"Exécution impossible : {failure}"
+        else:
+            tool_result = "L'utilisateur a refusé d'exécuter ce code. N'exécute rien ; propose une alternative ou réponds sans exécuter."
+        work.append({"role": "tool", "tool_call_id": call["id"], "content": tool_result[:8000]})
+        citations = pending["citations"]
+        seen = {str(c.get("provenance_id") or c.get("document_id") or "") for c in citations}
+        action_tools = agent_tools.ACTION_TOOL_NAMES if (self.state.actions_enabled and code_sandbox.available()) else frozenset()
+        try:
+            result = agent_tools.drive(
+                lambda msgs, tools: self.state.runtime.chat_with_tools(msgs, tools),
+                work,
+                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query),
+                action_tools=action_tools,
+                citations=citations, seen_provenance=seen,
+                on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
+            )
+        except RuntimeError:
+            payload = response(pending["request_id"], profile_id, "error", STREAM_INTERRUPTED_ANSWER, engine="BOOTSTRAP", conversation_id=conversation_id)
+            payload["error"] = "runtime_unavailable"
+            self.send_event("error", payload)
+            return
+        self._finish_tool_result(pending["request_id"], profile_id, conversation_id, result)
 
     def _generate(self, requested_engine: str, message: str, messages: list[dict[str, str]], *, keep_system: bool = False) -> tuple[str, str]:
         if requested_engine == "CORE-700M":

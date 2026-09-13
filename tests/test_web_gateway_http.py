@@ -127,9 +127,13 @@ class FakeBootstrap:
 
     def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
         self.last_messages = messages
+        if messages[-1].get("role") == "tool":  # resuming after a tool/action result
+            return {"content": "résultat intégré: " + (messages[-1].get("content") or "")[:40], "tool_calls": []}
         last = messages[-1].get("content") or ""
         if "PANNE" in last:
             raise RuntimeError("down")
+        if "EXECUTE" in last and tools:
+            return {"content": None, "tool_calls": [{"id": "a1", "function": {"name": "run_python", "arguments": '{"code": "print(1)", "purpose": "test"}'}}]}
         if "CHERCHE" in last and tools:
             return {"content": None, "tool_calls": [{"id": "c1", "function": {"name": "search_knowledge", "arguments": '{"query": "RAG local"}'}}]}
         return {"content": "outil:" + last, "tool_calls": []}
@@ -334,6 +338,55 @@ class GatewayHttpTests(GatewayTestCase):
                                        session=True, csrf=True)[2])
         self.assertEqual(body["engine"], "QWEN-CODER")
         self.assertEqual(self.qwen.last_messages[0]["content"], "PERSONA-CODE")
+
+    def test_action_confirmation_flow(self) -> None:
+        self.login()
+        self.server.state.tools_enabled = True
+        import services.web.code_sandbox as cs
+        orig = (cs.available, cs.run_python)
+        cs.available = lambda: True
+        cs.run_python = lambda code: {"ok": True, "timed_out": False, "exit_code": 0, "output": "SANDBOX_OK"}
+        self.addCleanup(lambda: (setattr(cs, "available", orig[0]), setattr(cs, "run_python", orig[1])))
+        # 1) the model proposes run_python -> confirmation required, nothing executed
+        _, _, body = self.request("POST", "/v1/chat", self.chat("EXECUTE ceci"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        events = self.events(body)
+        self.assertEqual([n for n, _ in events], ["metadata", "confirmation_required"])
+        conf = events[-1][1]
+        self.assertEqual(conf["tool"], "run_python")
+        self.assertIn("print(1)", conf["code"])
+        action_id = conf["action_id"]
+        # 2) approve -> sandbox runs, loop resumes, final answer references the output
+        _, _, body = self.request("POST", "/v1/chat/confirm",
+                                  {"conversation_id": "conversation_001", "action_id": action_id, "decision": "approve"},
+                                  headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        ev = self.events(body)
+        self.assertEqual([n for n, _ in ev], ["metadata", "tool", "completed"])
+        self.assertIn("SANDBOX_OK", ev[-1][1]["answer"])
+        # 3) the action id is single-use
+        status, _, _ = self.request("POST", "/v1/chat/confirm",
+                                    {"conversation_id": "conversation_001", "action_id": action_id, "decision": "approve"},
+                                    session=True, csrf=True)
+        self.assertEqual(status, 404)
+
+    def test_action_reject_does_not_execute(self) -> None:
+        self.login()
+        self.server.state.tools_enabled = True
+        import services.web.code_sandbox as cs
+        orig = (cs.available, cs.run_python)
+        calls = {"n": 0}
+        def _run(code):
+            calls["n"] += 1
+            return {"ok": True, "timed_out": False, "exit_code": 0, "output": "X"}
+        cs.available = lambda: True
+        cs.run_python = _run
+        self.addCleanup(lambda: (setattr(cs, "available", orig[0]), setattr(cs, "run_python", orig[1])))
+        _, _, body = self.request("POST", "/v1/chat", self.chat("EXECUTE ceci"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        action_id = self.events(body)[-1][1]["action_id"]
+        _, _, body = self.request("POST", "/v1/chat/confirm",
+                                  {"conversation_id": "conversation_001", "action_id": action_id, "decision": "reject"},
+                                  headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        self.assertEqual([n for n, _ in self.events(body)], ["metadata", "completed"])
+        self.assertEqual(calls["n"], 0)  # sandbox never ran
 
     def test_other_engines_and_failures(self) -> None:
         self.login()
