@@ -340,7 +340,12 @@ EXTRA_TASKS: list[tuple[str, str, str, str, list[str]]] = [
      ["assert module['diagonal']([[1, 2], [3, 4]]) == [1, 4]", "assert module['diagonal']([]) == []", "assert module['diagonal']([[9]]) == [9]"]),
 ]
 
-TASKS = TASKS + EXTRA_TASKS
+try:  # importable as tools.arena_tasks_v2, or as a plain module when run as a script
+    from tools.arena_tasks_v2 import HARDER_TASKS
+except ImportError:  # pragma: no cover - depends only on how the generator is invoked
+    from arena_tasks_v2 import HARDER_TASKS
+
+TASKS = TASKS + EXTRA_TASKS + HARDER_TASKS
 
 
 def build_suite() -> dict:

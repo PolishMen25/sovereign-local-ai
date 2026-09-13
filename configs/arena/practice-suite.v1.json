@@ -1,7 +1,7 @@
 {
   "schema_version": "arena-practice-suite.v1",
   "language": "python",
-  "task_count": 100,
+  "task_count": 182,
   "tasks": [
     {
       "id": "arena-001-reverse-words",
@@ -602,6 +602,498 @@
       "function_name": "diagonal",
       "prompt": "Write diagonal(matrix) that returns the main diagonal of a square matrix as a list.",
       "test_source": "assert module['diagonal']([[1, 2], [3, 4]]) == [1, 4]\nassert module['diagonal']([]) == []\nassert module['diagonal']([[9]]) == [9]\n"
+    },
+    {
+      "id": "arena-101-parse-ini",
+      "function_name": "parse_ini",
+      "prompt": "Write parse_ini(text) that parses INI text into a dict of section -> dict of key -> value. Lines starting with ; or # are comments, blank lines are ignored, keys and values are stripped. Keys before any section header belong to the section ''.",
+      "test_source": "assert module['parse_ini']('[a]\\nx = 1\\n; c\\ny=2') == {'a': {'x': '1', 'y': '2'}}\nassert module['parse_ini']('k=v\\n[s]\\nn=1') == {'': {'k': 'v'}, 's': {'n': '1'}}\nassert module['parse_ini']('') == {}\n"
+    },
+    {
+      "id": "arena-102-parse-semver",
+      "function_name": "parse_semver",
+      "prompt": "Write parse_semver(version) that splits a semantic version like '1.2.3-beta.1' into the tuple (major, minor, patch, prerelease) where the first three are ints and prerelease is a string ('' when absent). Raise ValueError if the version is malformed.",
+      "test_source": "assert module['parse_semver']('1.2.3') == (1, 2, 3, '')\nassert module['parse_semver']('0.10.0-rc.2') == (0, 10, 0, 'rc.2')\ntry:\n    module['parse_semver']('1.2')\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-103-compare-versions",
+      "function_name": "compare_versions",
+      "prompt": "Write compare_versions(a, b) that compares two dotted numeric versions and returns -1, 0 or 1. Missing components count as zero, so '1.2' equals '1.2.0'.",
+      "test_source": "assert module['compare_versions']('1.2', '1.2.0') == 0\nassert module['compare_versions']('1.10', '1.9') == 1\nassert module['compare_versions']('2.0', '10.0') == -1\n"
+    },
+    {
+      "id": "arena-104-parse-cookie",
+      "function_name": "parse_cookie",
+      "prompt": "Write parse_cookie(header) that parses a Cookie header like 'a=1; b=2' into a dict. Pairs are separated by ';', names and values are stripped, and a pair without '=' is ignored.",
+      "test_source": "assert module['parse_cookie']('a=1; b=2') == {'a': '1', 'b': '2'}\nassert module['parse_cookie']('sid=xyz; broken; k=') == {'sid': 'xyz', 'k': ''}\nassert module['parse_cookie']('') == {}\n"
+    },
+    {
+      "id": "arena-105-parse-syslog",
+      "function_name": "parse_syslog",
+      "prompt": "Write parse_syslog(line) that splits a syslog line like '<34>Oct 11 22:14:15 host app: message' into the dict {'priority': 34, 'host': 'host', 'tag': 'app', 'message': 'message'}. Return None if the line does not start with a <priority>.",
+      "test_source": "assert module['parse_syslog']('<34>Oct 11 22:14:15 web01 sshd: failed login') == {'priority': 34, 'host': 'web01', 'tag': 'sshd', 'message': 'failed login'}\nassert module['parse_syslog']('no priority here at all') is None\nassert module['parse_syslog']('<x>Oct 11 22:14:15 h a: m') is None\n"
+    },
+    {
+      "id": "arena-106-parse-http-request-line",
+      "function_name": "parse_request_line",
+      "prompt": "Write parse_request_line(line) that splits an HTTP request line such as 'GET /a?b=1 HTTP/1.1' into (method, path, query, version). The query excludes the '?' and is '' when absent. Return None when the line does not have exactly three space-separated parts.",
+      "test_source": "assert module['parse_request_line']('GET /a?b=1 HTTP/1.1') == ('GET', '/a', 'b=1', 'HTTP/1.1')\nassert module['parse_request_line']('POST /submit HTTP/1.0') == ('POST', '/submit', '', 'HTTP/1.0')\nassert module['parse_request_line']('GET /only-two-parts') is None\n"
+    },
+    {
+      "id": "arena-107-parse-header-block",
+      "function_name": "parse_headers",
+      "prompt": "Write parse_headers(text) that parses HTTP header lines into a dict with lowercase names. A header repeated several times has its values joined with ', '. Lines without ':' are ignored.",
+      "test_source": "assert module['parse_headers']('Host: a\\nAccept: b') == {'host': 'a', 'accept': 'b'}\nassert module['parse_headers']('Set-Cookie: a\\nSet-Cookie: b') == {'set-cookie': 'a, b'}\nassert module['parse_headers']('garbage') == {}\n"
+    },
+    {
+      "id": "arena-108-split-csv-quoted",
+      "function_name": "split_csv_quoted",
+      "prompt": "Write split_csv_quoted(line) that splits a CSV line on commas, honouring double quotes. A quoted field may contain commas, and a doubled quote inside a quoted field means one quote. Surrounding quotes are removed.",
+      "test_source": "assert module['split_csv_quoted']('a,b,c') == ['a', 'b', 'c']\nassert module['split_csv_quoted']('a,\"b,c\",d') == ['a', 'b,c', 'd']\nassert module['split_csv_quoted']('\"he said \"\"hi\"\"\",x') == ['he said \"hi\"', 'x']\n"
+    },
+    {
+      "id": "arena-109-parse-size",
+      "function_name": "parse_size",
+      "prompt": "Write parse_size(text) that converts a size such as '10K', '2.5M' or '512' into a number of bytes as an int, using binary units (K=1024, M=1024**2, G=1024**3, T=1024**4). The suffix is case-insensitive. Raise ValueError on an unknown suffix.",
+      "test_source": "assert module['parse_size']('512') == 512\nassert module['parse_size']('10K') == 10240\nassert module['parse_size']('2.5m') == 2621440\ntry:\n    module['parse_size']('4X')\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-110-format-table",
+      "function_name": "format_table",
+      "prompt": "Write format_table(rows) that renders a list of equal-length string rows as lines where every column is left-padded to the widest cell in that column and columns are joined by a single space. Trailing spaces are stripped from each line. Return [] for no rows.",
+      "test_source": "assert module['format_table']([['a', 'bbb'], ['cc', 'd']]) == ['a  bbb', 'cc d']\nassert module['format_table']([]) == []\nassert module['format_table']([['x']]) == ['x']\n"
+    },
+    {
+      "id": "arena-111-cidr-contains",
+      "function_name": "cidr_contains",
+      "prompt": "Write cidr_contains(cidr, ip) that returns True when the IPv4 address ip lies inside the CIDR block cidr (for example '10.0.0.0/8'). Both are dotted-quad strings; do not import any module.",
+      "test_source": "assert module['cidr_contains']('10.0.0.0/8', '10.1.2.3') is True\nassert module['cidr_contains']('192.168.1.0/24', '192.168.2.1') is False\nassert module['cidr_contains']('0.0.0.0/0', '8.8.8.8') is True\n"
+    },
+    {
+      "id": "arena-112-cidr-overlap",
+      "function_name": "cidr_overlap",
+      "prompt": "Write cidr_overlap(a, b) that returns True when two IPv4 CIDR blocks share at least one address.",
+      "test_source": "assert module['cidr_overlap']('10.0.0.0/8', '10.1.0.0/16') is True\nassert module['cidr_overlap']('192.168.0.0/24', '192.168.1.0/24') is False\nassert module['cidr_overlap']('0.0.0.0/0', '172.16.0.0/12') is True\n"
+    },
+    {
+      "id": "arena-113-prefix-from-netmask",
+      "function_name": "prefix_from_netmask",
+      "prompt": "Write prefix_from_netmask(mask) that converts a dotted IPv4 netmask into its prefix length. Raise ValueError when the mask is not a run of ones followed by zeros.",
+      "test_source": "assert module['prefix_from_netmask']('255.255.255.0') == 24\nassert module['prefix_from_netmask']('0.0.0.0') == 0\ntry:\n    module['prefix_from_netmask']('255.0.255.0')\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-114-broadcast-address",
+      "function_name": "broadcast_address",
+      "prompt": "Write broadcast_address(cidr) that returns the broadcast address of an IPv4 CIDR block as a dotted-quad string.",
+      "test_source": "assert module['broadcast_address']('192.168.1.0/24') == '192.168.1.255'\nassert module['broadcast_address']('10.0.0.0/8') == '10.255.255.255'\nassert module['broadcast_address']('1.2.3.4/32') == '1.2.3.4'\n"
+    },
+    {
+      "id": "arena-115-summarize-ports",
+      "function_name": "summarize_ports",
+      "prompt": "Write summarize_ports(ports) that turns a list of port numbers into a sorted, compact string of ranges, for example [22, 80, 81, 82] -> '22,80-82'. Duplicates collapse. Return '' for an empty list.",
+      "test_source": "assert module['summarize_ports']([22, 80, 81, 82]) == '22,80-82'\nassert module['summarize_ports']([]) == ''\nassert module['summarize_ports']([5, 5, 4]) == '4-5'\n"
+    },
+    {
+      "id": "arena-116-expand-port-range",
+      "function_name": "expand_port_range",
+      "prompt": "Write expand_port_range(spec) that expands a specification like '22,80-82' into a sorted list of unique ints. Raise ValueError when a range is reversed or a piece is not numeric.",
+      "test_source": "assert module['expand_port_range']('22,80-82') == [22, 80, 81, 82]\nassert module['expand_port_range']('') == []\ntry:\n    module['expand_port_range']('90-80')\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-117-normalize-mac",
+      "function_name": "normalize_mac",
+      "prompt": "Write normalize_mac(mac) that normalises a MAC address written with ':', '-' or '.' separators into lowercase colon-separated form. Raise ValueError when it does not hold exactly 12 hex digits.",
+      "test_source": "assert module['normalize_mac']('AA-BB-CC-DD-EE-FF') == 'aa:bb:cc:dd:ee:ff'\nassert module['normalize_mac']('aabb.ccdd.eeff') == 'aa:bb:cc:dd:ee:ff'\ntry:\n    module['normalize_mac']('aa:bb')\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-118-mac-is-multicast",
+      "function_name": "mac_is_multicast",
+      "prompt": "Write mac_is_multicast(mac) that returns True when the least significant bit of the first octet of a colon-separated MAC address is set, which marks a multicast frame.",
+      "test_source": "assert module['mac_is_multicast']('01:00:5e:00:00:01') is True\nassert module['mac_is_multicast']('aa:bb:cc:dd:ee:ff') is False\nassert module['mac_is_multicast']('ff:ff:ff:ff:ff:ff') is True\n"
+    },
+    {
+      "id": "arena-119-ipv4-class",
+      "function_name": "ipv4_class",
+      "prompt": "Write ipv4_class(ip) that returns the classful letter of an IPv4 address: 'A' for 0-127, 'B' for 128-191, 'C' for 192-223, 'D' for 224-239 and 'E' for 240-255, based on the first octet.",
+      "test_source": "assert module['ipv4_class']('10.0.0.1') == 'A'\nassert module['ipv4_class']('192.168.0.1') == 'C'\nassert module['ipv4_class']('240.0.0.1') == 'E'\n"
+    },
+    {
+      "id": "arena-120-is-private-ip",
+      "function_name": "is_private_ip",
+      "prompt": "Write is_private_ip(ip) that returns True when an IPv4 address is in 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16.",
+      "test_source": "assert module['is_private_ip']('10.255.0.1') is True\nassert module['is_private_ip']('172.32.0.1') is False\nassert module['is_private_ip']('192.168.4.4') is True\n"
+    },
+    {
+      "id": "arena-121-octets-to-cidr-list",
+      "function_name": "split_prefix",
+      "prompt": "Write split_prefix(cidr, count) that splits an IPv4 CIDR block into `count` equal subnets and returns their CIDR strings in order. count must be a power of two, otherwise raise ValueError.",
+      "test_source": "assert module['split_prefix']('10.0.0.0/8', 2) == ['10.0.0.0/9', '10.128.0.0/9']\nassert module['split_prefix']('192.168.1.0/24', 4)[3] == '192.168.1.192/26'\ntry:\n    module['split_prefix']('10.0.0.0/8', 3)\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-122-luhn-check",
+      "function_name": "luhn_check",
+      "prompt": "Write luhn_check(digits) that returns True when a string of digits satisfies the Luhn checksum. Return False when the string is empty or contains a non-digit.",
+      "test_source": "assert module['luhn_check']('79927398713') is True\nassert module['luhn_check']('79927398710') is False\nassert module['luhn_check']('12a4') is False\n"
+    },
+    {
+      "id": "arena-123-checksum16",
+      "function_name": "checksum16",
+      "prompt": "Write checksum16(data) that computes the one's-complement 16-bit Internet checksum of a bytes object, as used by IP headers, and returns it as an int. Pad with a zero byte when the length is odd.",
+      "test_source": "assert module['checksum16'](b'\\x00\\x00') == 0xFFFF\nassert module['checksum16'](b'\\xff\\xff') == 0\nassert isinstance(module['checksum16'](b'abc'), int)\n"
+    },
+    {
+      "id": "arena-124-password-strength",
+      "function_name": "password_strength",
+      "prompt": "Write password_strength(password) that scores a password from 0 to 5: one point each for length at least 12, a lowercase letter, an uppercase letter, a digit, and a character that is none of those three classes.",
+      "test_source": "assert module['password_strength']('abc') == 1\nassert module['password_strength']('Corr3ct!Horse42') == 5\nassert module['password_strength']('') == 0\n"
+    },
+    {
+      "id": "arena-125-symbolic-to-octal",
+      "function_name": "symbolic_to_octal",
+      "prompt": "Write symbolic_to_octal(mode) that converts a 9-character symbolic Unix mode such as 'rwxr-xr--' into its octal string, here '754'. Raise ValueError when the length is not 9.",
+      "test_source": "assert module['symbolic_to_octal']('rwxr-xr--') == '754'\nassert module['symbolic_to_octal']('---------') == '000'\ntry:\n    module['symbolic_to_octal']('rwx')\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-126-apply-umask",
+      "function_name": "apply_umask",
+      "prompt": "Write apply_umask(mode, umask) that takes two octal strings such as '666' and '022' and returns the resulting octal permission string after the umask bits are cleared.",
+      "test_source": "assert module['apply_umask']('666', '022') == '644'\nassert module['apply_umask']('777', '077') == '700'\nassert module['apply_umask']('644', '000') == '644'\n"
+    },
+    {
+      "id": "arena-127-glob-match",
+      "function_name": "glob_match",
+      "prompt": "Write glob_match(pattern, name) that matches a shell-style pattern against a name, supporting '*' for any run of characters and '?' for exactly one. Do not import any module.",
+      "test_source": "assert module['glob_match']('*.log', 'syslog.log') is True\nassert module['glob_match']('a?c', 'abc') is True\nassert module['glob_match']('a?c', 'ac') is False\nassert module['glob_match']('*', '') is True\n"
+    },
+    {
+      "id": "arena-128-acl-decision",
+      "function_name": "acl_decision",
+      "prompt": "Write acl_decision(rules, port) that walks a list of (action, low, high) rules in order, where action is 'allow' or 'deny', and returns the action of the first rule whose inclusive range contains port. Return 'deny' when no rule matches.",
+      "test_source": "assert module['acl_decision']([('allow', 80, 80), ('deny', 0, 65535)], 80) == 'allow'\nassert module['acl_decision']([('allow', 80, 80), ('deny', 0, 65535)], 22) == 'deny'\nassert module['acl_decision']([], 443) == 'deny'\n"
+    },
+    {
+      "id": "arena-129-rate-limit-allows",
+      "function_name": "rate_limit_allows",
+      "prompt": "Write rate_limit_allows(timestamps, window, limit) that returns the list of booleans saying, for each timestamp in the ascending list, whether the request is allowed: a request is allowed when fewer than `limit` requests were already allowed within the preceding `window` (inclusive).",
+      "test_source": "assert module['rate_limit_allows']([0, 1, 2], 10, 2) == [True, True, False]\nassert module['rate_limit_allows']([0, 20, 40], 10, 1) == [True, True, True]\nassert module['rate_limit_allows']([], 5, 1) == []\n"
+    },
+    {
+      "id": "arena-130-rot13-alpha",
+      "function_name": "rot13",
+      "prompt": "Write rot13(text) that applies the ROT13 substitution to ASCII letters and leaves every other character untouched. Do not import any module.",
+      "test_source": "assert module['rot13']('Hello, World!') == 'Uryyb, Jbeyq!'\nassert module['rot13'](module['rot13']('round trip')) == 'round trip'\nassert module['rot13']('') == ''\n"
+    },
+    {
+      "id": "arena-131-vigenere-encrypt",
+      "function_name": "vigenere",
+      "prompt": "Write vigenere(text, key) that applies a Vigenere shift to lowercase letters a-z using a lowercase key, leaving other characters unchanged and not advancing the key on them.",
+      "test_source": "assert module['vigenere']('attack', 'lemon') == 'lxfopv'\nassert module['vigenere']('a b', 'b') == 'b c'\nassert module['vigenere']('', 'key') == ''\n"
+    },
+    {
+      "id": "arena-132-hex-dump-line",
+      "function_name": "hex_dump",
+      "prompt": "Write hex_dump(data) that renders bytes as lines of at most 16 bytes, each line being the offset in 8 hex digits, a space, the bytes as two-digit lowercase hex separated by spaces, then two spaces and the printable ASCII (32..126) with other bytes shown as '.'.",
+      "test_source": "assert module['hex_dump'](b'AB') == ['00000000 41 42  AB']\nassert module['hex_dump'](b'') == []\nassert module['hex_dump'](b'\\x00')[0].endswith('  .')\n"
+    },
+    {
+      "id": "arena-133-merge-intervals",
+      "function_name": "merge_intervals",
+      "prompt": "Write merge_intervals(intervals) that merges a list of [start, end] pairs into the shortest sorted list of non-overlapping intervals. Touching intervals like [1,2] and [2,3] merge into [1,3].",
+      "test_source": "assert module['merge_intervals']([[1, 3], [2, 6], [8, 10]]) == [[1, 6], [8, 10]]\nassert module['merge_intervals']([[1, 2], [2, 3]]) == [[1, 3]]\nassert module['merge_intervals']([]) == []\n"
+    },
+    {
+      "id": "arena-134-interval-gaps",
+      "function_name": "interval_gaps",
+      "prompt": "Write interval_gaps(intervals, start, end) that returns the sorted list of [a, b] gaps inside [start, end] that no interval covers. Intervals may overlap and are not sorted.",
+      "test_source": "assert module['interval_gaps']([[1, 3], [6, 8]], 0, 10) == [[0, 1], [3, 6], [8, 10]]\nassert module['interval_gaps']([], 0, 5) == [[0, 5]]\nassert module['interval_gaps']([[0, 10]], 0, 10) == []\n"
+    },
+    {
+      "id": "arena-135-edit-distance",
+      "function_name": "edit_distance",
+      "prompt": "Write edit_distance(a, b) that returns the Levenshtein distance between two strings, counting insertions, deletions and substitutions as one each.",
+      "test_source": "assert module['edit_distance']('kitten', 'sitting') == 3\nassert module['edit_distance']('', 'abc') == 3\nassert module['edit_distance']('same', 'same') == 0\n"
+    },
+    {
+      "id": "arena-136-longest-common-subsequence",
+      "function_name": "lcs_length",
+      "prompt": "Write lcs_length(a, b) that returns the length of the longest common subsequence of two strings.",
+      "test_source": "assert module['lcs_length']('abcde', 'ace') == 3\nassert module['lcs_length']('abc', 'xyz') == 0\nassert module['lcs_length']('', '') == 0\n"
+    },
+    {
+      "id": "arena-137-longest-increasing",
+      "function_name": "longest_increasing",
+      "prompt": "Write longest_increasing(values) that returns the length of the longest strictly increasing subsequence of a list of numbers.",
+      "test_source": "assert module['longest_increasing']([10, 9, 2, 5, 3, 7, 101, 18]) == 4\nassert module['longest_increasing']([]) == 0\nassert module['longest_increasing']([3, 3, 3]) == 1\n"
+    },
+    {
+      "id": "arena-138-max-subarray",
+      "function_name": "max_subarray",
+      "prompt": "Write max_subarray(values) that returns the largest sum obtainable from a non-empty contiguous slice of the list. Return 0 for an empty list.",
+      "test_source": "assert module['max_subarray']([-2, 1, -3, 4, -1, 2, 1, -5, 4]) == 6\nassert module['max_subarray']([-5, -2, -9]) == -2\nassert module['max_subarray']([]) == 0\n"
+    },
+    {
+      "id": "arena-139-two-sum-indices",
+      "function_name": "two_sum",
+      "prompt": "Write two_sum(values, target) that returns the pair of indices (i, j) with i < j whose values add up to target, choosing the pair with the smallest i then the smallest j. Return None when there is none.",
+      "test_source": "assert module['two_sum']([2, 7, 11, 15], 9) == (0, 1)\nassert module['two_sum']([3, 2, 4], 6) == (1, 2)\nassert module['two_sum']([1, 2], 99) is None\n"
+    },
+    {
+      "id": "arena-140-sliding-window-max",
+      "function_name": "sliding_max",
+      "prompt": "Write sliding_max(values, size) that returns the list of maxima of every contiguous window of the given size. Return [] when size is larger than the list or not positive.",
+      "test_source": "assert module['sliding_max']([1, 3, -1, -3, 5, 3, 6, 7], 3) == [3, 3, 5, 5, 6, 7]\nassert module['sliding_max']([1, 2], 5) == []\nassert module['sliding_max']([4], 1) == [4]\n"
+    },
+    {
+      "id": "arena-141-topological-order",
+      "function_name": "topological_order",
+      "prompt": "Write topological_order(graph) that returns a topological ordering of a dict mapping node -> list of successors. Break ties by taking the smallest available node first. Return None when the graph has a cycle.",
+      "test_source": "assert module['topological_order']({'a': ['b'], 'b': ['c'], 'c': []}) == ['a', 'b', 'c']\nassert module['topological_order']({'a': ['b'], 'b': ['a']}) is None\nassert module['topological_order']({}) == []\n"
+    },
+    {
+      "id": "arena-142-has-cycle",
+      "function_name": "has_cycle",
+      "prompt": "Write has_cycle(graph) that returns True when a directed graph given as a dict node -> list of successors contains a cycle.",
+      "test_source": "assert module['has_cycle']({'a': ['b'], 'b': ['c'], 'c': ['a']}) is True\nassert module['has_cycle']({'a': ['b'], 'b': []}) is False\nassert module['has_cycle']({}) is False\n"
+    },
+    {
+      "id": "arena-143-shortest-path-unweighted",
+      "function_name": "shortest_hops",
+      "prompt": "Write shortest_hops(graph, start, goal) that returns the number of edges on a shortest path in an undirected graph given as a dict node -> list of neighbours. Return -1 when the goal is unreachable, and 0 when start equals goal.",
+      "test_source": "assert module['shortest_hops']({'a': ['b'], 'b': ['c'], 'c': []}, 'a', 'c') == 2\nassert module['shortest_hops']({'a': [], 'b': []}, 'a', 'b') == -1\nassert module['shortest_hops']({'a': []}, 'a', 'a') == 0\n"
+    },
+    {
+      "id": "arena-144-flood-fill-count",
+      "function_name": "flood_fill_count",
+      "prompt": "Write flood_fill_count(grid, row, col) that returns how many cells are reached by a 4-directional flood fill starting at (row, col), moving only across cells equal to the starting cell's value. Return 0 when the coordinates are outside the grid.",
+      "test_source": "assert module['flood_fill_count']([[1, 1, 0], [1, 0, 0]], 0, 0) == 3\nassert module['flood_fill_count']([[1]], 5, 5) == 0\nassert module['flood_fill_count']([[0, 0], [0, 0]], 1, 1) == 4\n"
+    },
+    {
+      "id": "arena-145-count-islands",
+      "function_name": "count_islands",
+      "prompt": "Write count_islands(grid) that counts the groups of 1s connected 4-directionally in a grid of 0s and 1s.",
+      "test_source": "assert module['count_islands']([[1, 0], [0, 1]]) == 2\nassert module['count_islands']([[1, 1], [1, 1]]) == 1\nassert module['count_islands']([]) == 0\n"
+    },
+    {
+      "id": "arena-146-spiral-order",
+      "function_name": "spiral_order",
+      "prompt": "Write spiral_order(matrix) that returns the elements of a rectangular matrix read clockwise from the top-left corner, as a flat list.",
+      "test_source": "assert module['spiral_order']([[1, 2], [3, 4]]) == [1, 2, 4, 3]\nassert module['spiral_order']([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == [1, 2, 3, 6, 9, 8, 7, 4, 5]\nassert module['spiral_order']([]) == []\n"
+    },
+    {
+      "id": "arena-147-rotate-matrix",
+      "function_name": "rotate_matrix",
+      "prompt": "Write rotate_matrix(matrix) that returns a new square matrix rotated 90 degrees clockwise.",
+      "test_source": "assert module['rotate_matrix']([[1, 2], [3, 4]]) == [[3, 1], [4, 2]]\nassert module['rotate_matrix']([[1]]) == [[1]]\nassert module['rotate_matrix']([]) == []\n"
+    },
+    {
+      "id": "arena-148-eval-rpn",
+      "function_name": "eval_rpn",
+      "prompt": "Write eval_rpn(tokens) that evaluates a list of reverse-Polish tokens using +, -, * and / with integer truncation toward zero, and returns an int. Raise ValueError on a malformed expression.",
+      "test_source": "assert module['eval_rpn'](['2', '3', '+']) == 5\nassert module['eval_rpn'](['4', '13', '5', '/', '+']) == 6\ntry:\n    module['eval_rpn'](['+'])\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-149-balanced-with-pairs",
+      "function_name": "balanced_pairs",
+      "prompt": "Write balanced_pairs(text) that returns True when (), [] and {} are correctly nested and matched in text, ignoring every other character.",
+      "test_source": "assert module['balanced_pairs']('a(b[c]{d})') is True\nassert module['balanced_pairs']('([)]') is False\nassert module['balanced_pairs']('') is True\n"
+    },
+    {
+      "id": "arena-150-base-convert",
+      "function_name": "base_convert",
+      "prompt": "Write base_convert(number, base) that renders a non-negative int in the given base from 2 to 36, using lowercase digits, without importing any module. Zero renders as '0'.",
+      "test_source": "assert module['base_convert'](255, 16) == 'ff'\nassert module['base_convert'](0, 2) == '0'\nassert module['base_convert'](35, 36) == 'z'\n"
+    },
+    {
+      "id": "arena-151-from-base",
+      "function_name": "from_base",
+      "prompt": "Write from_base(text, base) that parses a lowercase string in the given base from 2 to 36 into an int, without importing any module. Raise ValueError on an invalid digit or empty text.",
+      "test_source": "assert module['from_base']('ff', 16) == 255\nassert module['from_base']('1010', 2) == 10\ntry:\n    module['from_base']('2', 2)\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-152-sieve-primes",
+      "function_name": "primes_below",
+      "prompt": "Write primes_below(limit) that returns the sorted list of primes strictly below limit, using a sieve. Return [] when limit is 2 or less.",
+      "test_source": "assert module['primes_below'](10) == [2, 3, 5, 7]\nassert module['primes_below'](2) == []\nassert module['primes_below'](3) == [2]\n"
+    },
+    {
+      "id": "arena-153-modular-power",
+      "function_name": "mod_pow",
+      "prompt": "Write mod_pow(base, exponent, modulus) that computes (base ** exponent) % modulus by repeated squaring, without using the three-argument pow. The exponent is non-negative.",
+      "test_source": "assert module['mod_pow'](2, 10, 1000) == 24\nassert module['mod_pow'](5, 0, 7) == 1\nassert module['mod_pow'](3, 200, 50) == pow(3, 200, 50)\n"
+    },
+    {
+      "id": "arena-154-collatz-length",
+      "function_name": "collatz_length",
+      "prompt": "Write collatz_length(n) that returns the number of steps to reach 1 from a positive integer n using the Collatz rule (halve when even, otherwise 3n+1). collatz_length(1) is 0.",
+      "test_source": "assert module['collatz_length'](1) == 0\nassert module['collatz_length'](6) == 8\nassert module['collatz_length'](27) == 111\n"
+    },
+    {
+      "id": "arena-155-coin-change-min",
+      "function_name": "coin_change",
+      "prompt": "Write coin_change(coins, amount) that returns the fewest coins summing exactly to amount, or -1 when it cannot be made. coin_change(anything, 0) is 0.",
+      "test_source": "assert module['coin_change']([1, 5, 10], 12) == 3\nassert module['coin_change']([2], 3) == -1\nassert module['coin_change']([5], 0) == 0\n"
+    },
+    {
+      "id": "arena-156-binary-search-leftmost",
+      "function_name": "search_leftmost",
+      "prompt": "Write search_leftmost(values, target) that returns the index of the first occurrence of target in an ascending list, or -1 when absent. Use binary search, not list.index.",
+      "test_source": "assert module['search_leftmost']([1, 2, 2, 2, 3], 2) == 1\nassert module['search_leftmost']([1, 3], 2) == -1\nassert module['search_leftmost']([], 1) == -1\n"
+    },
+    {
+      "id": "arena-157-kth-smallest",
+      "function_name": "kth_smallest",
+      "prompt": "Write kth_smallest(values, k) that returns the k-th smallest element of a list, counting from 1. Raise ValueError when k is out of range.",
+      "test_source": "assert module['kth_smallest']([5, 1, 3], 2) == 3\nassert module['kth_smallest']([2], 1) == 2\ntry:\n    module['kth_smallest']([1], 5)\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-158-word-wrap",
+      "function_name": "word_wrap",
+      "prompt": "Write word_wrap(text, width) that greedily wraps text into lines of at most width characters, breaking only between words separated by whitespace. A word longer than width goes on its own line unbroken. Return [] for text with no words.",
+      "test_source": "assert module['word_wrap']('the quick brown fox', 10) == ['the quick', 'brown fox']\nassert module['word_wrap']('', 5) == []\nassert module['word_wrap']('supercalifragilistic', 5) == ['supercalifragilistic']\n"
+    },
+    {
+      "id": "arena-159-snake-to-camel",
+      "function_name": "snake_to_camel",
+      "prompt": "Write snake_to_camel(name) that converts snake_case to lowerCamelCase, so 'user_id_value' becomes 'userIdValue'. Leading, trailing and repeated underscores are ignored.",
+      "test_source": "assert module['snake_to_camel']('user_id_value') == 'userIdValue'\nassert module['snake_to_camel']('__a__b__') == 'aB'\nassert module['snake_to_camel']('') == ''\n"
+    },
+    {
+      "id": "arena-160-camel-to-snake",
+      "function_name": "camel_to_snake",
+      "prompt": "Write camel_to_snake(name) that converts CamelCase or lowerCamelCase to snake_case, so 'HTTPServerError' becomes 'http_server_error'. Do not import any module.",
+      "test_source": "assert module['camel_to_snake']('HTTPServerError') == 'http_server_error'\nassert module['camel_to_snake']('userId') == 'user_id'\nassert module['camel_to_snake']('') == ''\n"
+    },
+    {
+      "id": "arena-161-anagram-groups",
+      "function_name": "anagram_groups",
+      "prompt": "Write anagram_groups(words) that groups words that are anagrams of each other. Return a list of groups, each group sorted alphabetically, and the groups sorted by their first word.",
+      "test_source": "assert module['anagram_groups'](['eat', 'tea', 'tan', 'ate']) == [['ate', 'eat', 'tea'], ['tan']]\nassert module['anagram_groups']([]) == []\nassert module['anagram_groups'](['a']) == [['a']]\n"
+    },
+    {
+      "id": "arena-162-template-render",
+      "function_name": "render_template",
+      "prompt": "Write render_template(template, values) that replaces every {name} placeholder with the matching value from the dict, converted with str. A placeholder with no matching key is left as-is. Do not import any module and do not use str.format.",
+      "test_source": "assert module['render_template']('hi {name}', {'name': 'vic'}) == 'hi vic'\nassert module['render_template']('{a}{b}', {'a': 1, 'b': 2}) == '12'\nassert module['render_template']('{missing}', {}) == '{missing}'\n"
+    },
+    {
+      "id": "arena-163-longest-common-prefix",
+      "function_name": "common_prefix",
+      "prompt": "Write common_prefix(words) that returns the longest string that starts every word in the list. Return '' for an empty list or when there is no shared prefix.",
+      "test_source": "assert module['common_prefix'](['flower', 'flow', 'flight']) == 'fl'\nassert module['common_prefix'](['a', 'b']) == ''\nassert module['common_prefix']([]) == ''\n"
+    },
+    {
+      "id": "arena-164-deep-merge",
+      "function_name": "deep_merge",
+      "prompt": "Write deep_merge(base, override) that merges two nested dicts recursively and returns a new dict. When both sides hold a dict for the same key the dicts merge; otherwise the override value wins. Neither input is modified.",
+      "test_source": "assert module['deep_merge']({'a': {'x': 1}}, {'a': {'y': 2}}) == {'a': {'x': 1, 'y': 2}}\nassert module['deep_merge']({'a': 1}, {'a': 2}) == {'a': 2}\nbase = {'a': {'x': 1}}\nmodule['deep_merge'](base, {'a': {'x': 9}})\nassert base == {'a': {'x': 1}}\n"
+    },
+    {
+      "id": "arena-165-flatten-keys",
+      "function_name": "flatten_keys",
+      "prompt": "Write flatten_keys(data) that flattens a nested dict into a single level where keys are joined with '.', so {'a': {'b': 1}} becomes {'a.b': 1}. Empty dicts disappear.",
+      "test_source": "assert module['flatten_keys']({'a': {'b': 1}, 'c': 2}) == {'a.b': 1, 'c': 2}\nassert module['flatten_keys']({}) == {}\nassert module['flatten_keys']({'a': {}}) == {}\n"
+    },
+    {
+      "id": "arena-166-unflatten-keys",
+      "function_name": "unflatten_keys",
+      "prompt": "Write unflatten_keys(data) that rebuilds a nested dict from dotted keys, so {'a.b': 1} becomes {'a': {'b': 1}}.",
+      "test_source": "assert module['unflatten_keys']({'a.b': 1, 'c': 2}) == {'a': {'b': 1}, 'c': 2}\nassert module['unflatten_keys']({}) == {}\nassert module['unflatten_keys']({'x.y.z': 3}) == {'x': {'y': {'z': 3}}}\n"
+    },
+    {
+      "id": "arena-167-group-by-key",
+      "function_name": "group_by_key",
+      "prompt": "Write group_by_key(rows, key) that groups a list of dicts by the value of the given key and returns a dict value -> list of rows, preserving input order. Rows lacking the key are skipped.",
+      "test_source": "assert module['group_by_key']([{'k': 'a'}, {'k': 'b'}, {'k': 'a'}], 'k') == {'a': [{'k': 'a'}, {'k': 'a'}], 'b': [{'k': 'b'}]}\nassert module['group_by_key']([{'x': 1}], 'k') == {}\nassert module['group_by_key']([], 'k') == {}\n"
+    },
+    {
+      "id": "arena-168-sort-by-multiple",
+      "function_name": "sort_by_multiple",
+      "prompt": "Write sort_by_multiple(rows, keys) that sorts a list of dicts by several keys in order. A key prefixed with '-' sorts descending. Assume every row holds every key and the values compare.",
+      "test_source": "assert module['sort_by_multiple']([{'a': 2}, {'a': 1}], ['a']) == [{'a': 1}, {'a': 2}]\nassert module['sort_by_multiple']([{'a': 1}, {'a': 2}], ['-a']) == [{'a': 2}, {'a': 1}]\nrows = [{'a': 1, 'b': 2}, {'a': 1, 'b': 1}]\nassert module['sort_by_multiple'](rows, ['a', 'b']) == [{'a': 1, 'b': 1}, {'a': 1, 'b': 2}]\n"
+    },
+    {
+      "id": "arena-169-top-k-frequent",
+      "function_name": "top_k_frequent",
+      "prompt": "Write top_k_frequent(items, k) that returns the k most frequent items, most frequent first, breaking ties by first appearance in the input.",
+      "test_source": "assert module['top_k_frequent'](['a', 'b', 'a', 'c', 'b', 'a'], 2) == ['a', 'b']\nassert module['top_k_frequent'](['x', 'y'], 5) == ['x', 'y']\nassert module['top_k_frequent']([], 3) == []\n"
+    },
+    {
+      "id": "arena-170-lru-survivors",
+      "function_name": "lru_survivors",
+      "prompt": "Write lru_survivors(keys, capacity) that replays a sequence of key accesses through an LRU cache of the given capacity and returns the keys still cached, most recently used first.",
+      "test_source": "assert module['lru_survivors'](['a', 'b', 'c', 'a'], 2) == ['a', 'c']\nassert module['lru_survivors']([], 3) == []\nassert module['lru_survivors'](['x', 'x', 'x'], 1) == ['x']\n"
+    },
+    {
+      "id": "arena-171-chunk-by-size",
+      "function_name": "chunk_bytes",
+      "prompt": "Write chunk_bytes(items, limit) that splits a list of (name, size) pairs into consecutive groups whose sizes sum to at most limit, starting a new group when adding an item would exceed it. An item larger than limit sits alone in its own group.",
+      "test_source": "assert module['chunk_bytes']([('a', 3), ('b', 4), ('c', 2)], 6) == [[('a', 3)], [('b', 4), ('c', 2)]]\nassert module['chunk_bytes']([], 10) == []\nassert module['chunk_bytes']([('big', 99)], 10) == [[('big', 99)]]\n"
+    },
+    {
+      "id": "arena-172-diff-added-removed",
+      "function_name": "diff_lines",
+      "prompt": "Write diff_lines(before, after) that compares two lists of lines and returns the pair (added, removed): lines present only in after, and lines present only in before, each keeping its original order and without duplicates.",
+      "test_source": "assert module['diff_lines'](['a', 'b'], ['b', 'c']) == (['c'], ['a'])\nassert module['diff_lines']([], []) == ([], [])\nassert module['diff_lines'](['x', 'x'], []) == ([], ['x'])\n"
+    },
+    {
+      "id": "arena-173-normalize-path",
+      "function_name": "normalize_path",
+      "prompt": "Write normalize_path(path) that resolves '.' and '..' in a POSIX absolute path and returns the shortest equivalent path, always starting with '/' and never ending with '/' unless it is root. Do not import any module.",
+      "test_source": "assert module['normalize_path']('/a/./b/../c/') == '/a/c'\nassert module['normalize_path']('/../') == '/'\nassert module['normalize_path']('/a//b') == '/a/b'\n"
+    },
+    {
+      "id": "arena-174-relative-path",
+      "function_name": "relative_path",
+      "prompt": "Write relative_path(source, target) that returns the relative POSIX path from one absolute directory to another, using '..' to climb. Return '.' when they are the same.",
+      "test_source": "assert module['relative_path']('/a/b', '/a/c') == '../c'\nassert module['relative_path']('/a', '/a') == '.'\nassert module['relative_path']('/a/b/c', '/a') == '../..'\n"
+    },
+    {
+      "id": "arena-175-count-log-window",
+      "function_name": "busiest_minute",
+      "prompt": "Write busiest_minute(minutes) that returns the minute value appearing most often in a list of ints, breaking ties by the smallest minute. Return None for an empty list.",
+      "test_source": "assert module['busiest_minute']([1, 2, 2, 3]) == 2\nassert module['busiest_minute']([4, 1]) == 1\nassert module['busiest_minute']([]) is None\n"
+    },
+    {
+      "id": "arena-176-days-in-month",
+      "function_name": "days_in_month",
+      "prompt": "Write days_in_month(year, month) that returns the number of days, handling leap years by the Gregorian rule. Raise ValueError when month is outside 1..12. Do not import any module.",
+      "test_source": "assert module['days_in_month'](2024, 2) == 29\nassert module['days_in_month'](1900, 2) == 28\ntry:\n    module['days_in_month'](2024, 13)\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-177-day-of-year",
+      "function_name": "day_of_year",
+      "prompt": "Write day_of_year(year, month, day) that returns the 1-based ordinal day within the year, handling leap years. Do not import any module.",
+      "test_source": "assert module['day_of_year'](2024, 3, 1) == 61\nassert module['day_of_year'](2023, 1, 1) == 1\nassert module['day_of_year'](2023, 12, 31) == 365\n"
+    },
+    {
+      "id": "arena-178-seconds-to-clock",
+      "function_name": "seconds_to_clock",
+      "prompt": "Write seconds_to_clock(total) that formats a non-negative number of seconds as 'H:MM:SS' with no leading zero on the hours.",
+      "test_source": "assert module['seconds_to_clock'](3661) == '1:01:01'\nassert module['seconds_to_clock'](0) == '0:00:00'\nassert module['seconds_to_clock'](59) == '0:00:59'\n"
+    },
+    {
+      "id": "arena-179-weighted-average",
+      "function_name": "weighted_average",
+      "prompt": "Write weighted_average(pairs) that returns the weighted mean of (value, weight) pairs as a float. Raise ValueError when the list is empty or the weights sum to zero.",
+      "test_source": "assert module['weighted_average']([(10, 1), (20, 3)]) == 17.5\nassert module['weighted_average']([(5, 2)]) == 5.0\ntry:\n    module['weighted_average']([])\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-180-percentile-nearest",
+      "function_name": "percentile",
+      "prompt": "Write percentile(values, fraction) that returns the value at the given fraction (0..1) of a list using nearest-rank on the sorted values. Raise ValueError on an empty list or a fraction outside 0..1.",
+      "test_source": "assert module['percentile']([1, 2, 3, 4], 0.5) == 2\nassert module['percentile']([1, 2, 3, 4], 1) == 4\ntry:\n    module['percentile']([], 0.5)\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
+    },
+    {
+      "id": "arena-181-stddev-population",
+      "function_name": "stddev",
+      "prompt": "Write stddev(values) that returns the population standard deviation of a non-empty list of numbers as a float, without importing any module.",
+      "test_source": "assert abs(module['stddev']([2, 4, 4, 4, 5, 5, 7, 9]) - 2.0) < 1e-9\nassert module['stddev']([3]) == 0.0\nassert abs(module['stddev']([1, 3]) - 1.0) < 1e-9\n"
+    },
+    {
+      "id": "arena-182-histogram-buckets",
+      "function_name": "histogram",
+      "prompt": "Write histogram(values, size) that counts values into consecutive buckets of the given positive size starting at zero, and returns a dict bucket_start -> count. Only non-empty buckets appear.",
+      "test_source": "assert module['histogram']([1, 2, 11], 10) == {0: 2, 10: 1}\nassert module['histogram']([], 5) == {}\ntry:\n    module['histogram']([1], 0)\n    raise AssertionError('should raise')\nexcept ValueError:\n    pass\n"
     }
   ]
 }
