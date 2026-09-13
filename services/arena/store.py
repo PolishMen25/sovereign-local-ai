@@ -225,6 +225,24 @@ class ArenaStore:
             connection.executemany("UPDATE attempts SET packet_id=? WHERE attempt_id=?",
                                    [(packet["packet_id"], attempt_id) for attempt_id in attempt_ids])
 
+    def restate_packet(self, packet_id: str, solutions_sha256: str, metrics: dict[str, float], status: str) -> bool:
+        """Re-record a packet's health after the gate itself was corrected.
+
+        Deliberately narrow: it refuses a packet the owner already approved, and
+        refuses one whose solutions.jsonl no longer matches the recorded digest.
+        It only ever writes health — never ``approved``, never ``approved_by``.
+        """
+
+        if status not in ("awaiting_owner_approval", "flagged"):
+            raise ValueError(f"restate_packet only writes health, not {status!r}")
+        with closing(self._connect()) as connection, connection:
+            row = connection.execute("SELECT status, solutions_sha256 FROM packets WHERE packet_id=?", (packet_id,)).fetchone()
+            if row is None or row["status"] == "approved" or row["solutions_sha256"] != solutions_sha256:
+                return False
+            connection.execute("UPDATE packets SET unique_ratio=?, max_repetition=?, status=? WHERE packet_id=?",
+                               (metrics["unique_ratio"], metrics["max_repetition"], status, packet_id))
+            return True
+
     def approve_packet(self, packet_id: str, solutions_sha256: str, approved_by: str) -> dict[str, Any] | None:
         with closing(self._connect()) as connection, connection:
             row = connection.execute("SELECT * FROM packets WHERE packet_id=?", (packet_id,)).fetchone()

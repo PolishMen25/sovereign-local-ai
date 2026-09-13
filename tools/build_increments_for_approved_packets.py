@@ -35,10 +35,11 @@ def packet_report(packet_dir: Path, raw_root: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         report.update({"status": "sans manifeste", "built": False})
         return report
+    metrics = manifest.get("metrics") or {}
     report["status"] = manifest.get("status", "?")
     report["solutions"] = manifest.get("solutions")
-    report["unique_ratio"] = manifest.get("unique_ratio")
-    report["max_repetition"] = manifest.get("max_repetition")
+    report["unique_ratio"] = metrics.get("unique_ratio", manifest.get("unique_ratio"))
+    report["max_repetition"] = metrics.get("max_repetition", manifest.get("max_repetition"))
     packet_id = manifest.get("packet_id", packet_dir.name)
     report["built"] = (raw_root / f"arena-{packet_id}").is_dir()
     return report
@@ -49,7 +50,7 @@ def run(packets_dir: Path, suite: Path, raw_root: Path, *, dry_run: bool) -> dic
         raise SystemExit(f"dossier de paquets introuvable : {packets_dir}")
     if not dry_run:
         corpus_paths.require_share(raw_root)
-    outcome = {"built": [], "already": [], "not_approved": [], "refused": []}
+    outcome = {"built": [], "already": [], "not_approved": [], "refused": [], "to_build": []}
     for packet_dir in sorted(packets_dir.iterdir()):
         if not packet_dir.is_dir():
             continue
@@ -65,6 +66,7 @@ def run(packets_dir: Path, suite: Path, raw_root: Path, *, dry_run: bool) -> dic
             outcome["not_approved"].append(report["packet_id"])
             continue
         if dry_run:
+            outcome["to_build"].append(report["packet_id"])
             continue
         try:
             increment = builder.build(packet_dir, suite, raw_root)
@@ -87,11 +89,13 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"paquets : {args.packets_dir}\nsuite   : {args.suite}\nRAW     : {args.raw_root}\n")
     outcome = run(args.packets_dir, args.suite, args.raw_root, dry_run=args.dry_run)
-    print("\nrésumé :"
-          f"\n  incréments créés      : {len(outcome['built'])}"
-          f"\n  déjà bâtis            : {len(outcome['already'])}"
-          f"\n  en attente d'approbation : {len(outcome['not_approved'])}"
-          f"\n  refusés               : {len(outcome['refused'])}")
+    lines = ["", "résumé :", f"  incréments créés         : {len(outcome['built'])}"]
+    if outcome["to_build"]:
+        lines.append(f"  approuvés à convertir    : {len(outcome['to_build'])}  (relance sans --dry-run)")
+    lines.append(f"  déjà bâtis               : {len(outcome['already'])}")
+    lines.append(f"  en attente d'approbation : {len(outcome['not_approved'])}")
+    lines.append(f"  refusés                  : {len(outcome['refused'])}")
+    print("\n".join(lines))
     if outcome["not_approved"]:
         print("  → approuve-les dans l'arène, puis relance cet outil.")
     return 0

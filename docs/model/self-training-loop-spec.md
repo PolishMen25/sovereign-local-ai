@@ -60,6 +60,16 @@ une réponse normalisée dépasse 5 % des retenus. La boucle s'arrête si, aprè
 tâches, l'acceptation tombe sous 40 % ou si moins de 80 % des retenus sont
 uniques ; les mesures et l'arrêt sont vérifiables dans le rapport de lot.
 
+Les deux seuils portent sur **les retenus** — le contenu dédupliqué qui irait
+nourrir CORE — et non sur le vivier brut des solutions acceptées. Un vivier
+redondant (l'arène qui rejoue la même tâche) est du gaspillage, pas un
+effondrement : il reste mesuré et affiché (`pool_unique_ratio`, `accepted` dans
+le manifeste) mais ne bloque aucun paquet. Ce qui bloque, c'est la même réponse
+normalisée retenue pour plusieurs tâches — ça, la déduplication ne peut pas le
+masquer. Les paquets créés avant cette correction portent l'ancien verdict figé
+dans leur manifeste : `tools/recheck_packet_health.py` les remesure à partir de
+leur propre `solutions.jsonl`, sans jamais rien approuver.
+
 ## 6. Éligibilité mesurée
 
 Le pilote est éligible uniquement si au moins 100 tâches distinctes donnent un

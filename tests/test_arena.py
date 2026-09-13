@@ -102,15 +102,37 @@ class LeagueRulesTests(unittest.TestCase):
         self.assertIsNone(league.child_profile(parent, "too short", 2, random.Random(0)))
         self.assertIsNone(league.child_profile(parent, "x" * 2000, 3, random.Random(0)))
 
-    def test_packet_selection_dedupes_and_flags_low_diversity(self) -> None:
+    def test_packet_selection_dedupes_and_measures_the_kept_content(self) -> None:
         rows = [{"task_id": "t1", "normalized_sha256": "n1"}, {"task_id": "t1", "normalized_sha256": "n1"},
                 {"task_id": "t2", "normalized_sha256": "n2"}]
         selection, metrics = league.packet_selection(rows)
         self.assertEqual(len(selection), 2)
-        self.assertEqual(metrics, {"unique_ratio": round(2 / 3, 4), "max_repetition": 0.5})
+        # The gate looks at the two kept solutions (both distinct), not at the
+        # three-row pool; the pool's redundancy stays visible but never gates.
+        self.assertEqual(metrics["unique_ratio"], 1.0)
+        self.assertEqual(metrics["max_repetition"], 0.5)
+        self.assertEqual((metrics["pool_unique_ratio"], metrics["accepted"]), (round(2 / 3, 4), 3))
+        self.assertEqual(league.packet_status(metrics), "flagged")  # 2 solutions is still too thin
+
+    def test_packet_status_passes_a_diverse_packet_drawn_from_a_redundant_pool(self) -> None:
+        # 25 distinct solutions, each one accepted 20 times: the arena repeated
+        # itself, but what would reach CORE is clean. The old gate flagged this.
+        pool = [{"task_id": f"t{i}", "normalized_sha256": f"n{i}"} for i in range(25) for _ in range(20)]
+        selection, metrics = league.packet_selection(pool)
+        self.assertEqual(len(selection), 25)
+        self.assertEqual(metrics["unique_ratio"], 1.0)
+        self.assertEqual(metrics["pool_unique_ratio"], 0.05)
+        self.assertEqual(league.packet_status(metrics), "awaiting_owner_approval")
+
+    def test_packet_status_still_flags_the_same_source_across_tasks(self) -> None:
+        # Real collapse: one answer reused for many different tasks. Dedup by
+        # (task, source) cannot hide it, so the gate must still catch it.
+        collapsed = [{"task_id": f"t{i}", "normalized_sha256": "same"} for i in range(30)]
+        collapsed += [{"task_id": f"u{i}", "normalized_sha256": f"n{i}"} for i in range(30)]
+        _, metrics = league.packet_selection(collapsed)
+        self.assertEqual(metrics["unique_ratio"], round(31 / 60, 4))
+        self.assertEqual(metrics["max_repetition"], 0.5)
         self.assertEqual(league.packet_status(metrics), "flagged")
-        diverse = [{"task_id": f"t{i}", "normalized_sha256": f"n{i}"} for i in range(25)]
-        self.assertEqual(league.packet_status(league.packet_selection(diverse)[1]), "awaiting_owner_approval")
 
     def test_packet_lines_skip_tasks_outside_the_active_suite(self) -> None:
         selection = [

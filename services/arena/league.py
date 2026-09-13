@@ -167,19 +167,32 @@ def child_profile(parent: dict[str, Any], new_prompt: str, index: int, rng: rand
 def packet_selection(accepted: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, float]]:
     """Keep one solution per (task, normalized source) and measure diversity.
 
-    ``unique_ratio`` is unique normalized solutions / accepted solutions in the
-    window; ``max_repetition`` is the share of the most frequent normalized
-    solution among the kept ones.
+    The anti-collapse gate must describe **what would reach CORE**, so both
+    ``unique_ratio`` and ``max_repetition`` are measured on ``selection`` — the
+    deduplicated content actually written to the packet — not on the raw
+    accepted pool. Measuring the pool would flag a perfectly diverse packet just
+    because the arena replayed the same task many times, which is waste, not
+    collapse. ``unique_ratio`` below 1.0 on the selection means the *same*
+    normalized source was accepted for *different* tasks: that is real collapse.
+
+    The pool's own redundancy stays visible as ``pool_unique_ratio`` and
+    ``accepted`` — informational, never part of the gate.
     """
 
     kept: dict[tuple[str, str], dict[str, Any]] = {}
     for row in accepted:
         kept.setdefault((row["task_id"], row["normalized_sha256"]), row)
     selection = list(kept.values())
-    unique_ratio = len({row["normalized_sha256"] for row in accepted}) / len(accepted) if accepted else 0.0
     counts = Counter(row["normalized_sha256"] for row in selection)
+    unique_ratio = len(counts) / len(selection) if selection else 0.0
     max_repetition = max(counts.values()) / len(selection) if selection else 0.0
-    return selection, {"unique_ratio": round(unique_ratio, 4), "max_repetition": round(max_repetition, 4)}
+    pool_unique = len({row["normalized_sha256"] for row in accepted}) / len(accepted) if accepted else 0.0
+    return selection, {
+        "unique_ratio": round(unique_ratio, 4),
+        "max_repetition": round(max_repetition, 4),
+        "pool_unique_ratio": round(pool_unique, 4),
+        "accepted": len(accepted),
+    }
 
 
 def packet_status(metrics: dict[str, float]) -> str:
