@@ -82,6 +82,7 @@ h2 { font-size: 1.15rem; line-height: 1.4; }
 .typing span:nth-child(2) { animation-delay: .18s; }
 .typing span:nth-child(3) { animation-delay: .36s; }
 @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: .35; } 30% { transform: translateY(-.35rem); opacity: 1; } }
+.tool-activity { color: var(--muted); font-size: .78rem; margin-top: .35rem; padding-left: .85rem; border-left: 2px solid var(--accent); opacity: .9; }
 @media (prefers-reduced-motion: reduce) { .message { animation: none; } .typing span { animation: none; opacity: .6; } }
 .sources { margin-top: .9rem; color: var(--muted); font-size: .76rem; border-top: 1px solid var(--line); padding-top: .75rem; }
 .sources summary { cursor: pointer; color: var(--accent); }

@@ -439,7 +439,19 @@
       }
     };
     let streamed = "";
+    let toolLog = null;
+    const TOOL_LABELS = {
+      search_knowledge: "Recherche dans la base de connaissances locale…",
+      list_documents: "Consultation des documents partagés…",
+      read_document: "Lecture d’un document partagé…",
+      current_time: "Vérification de l’heure…",
+    };
+    const showTool = (name) => {
+      if (!toolLog) { toolLog = document.createElement("p"); toolLog.className = "tool-activity"; answer.article.append(toolLog); }
+      toolLog.textContent = TOOL_LABELS[name] || ("Outil local : " + String(name).slice(0, 60));
+    };
     const complete = (data) => {
+      toolLog?.remove();
       applyMetadata(data);
       if (typeof data.answer !== "string" || data.answer.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
       answer.render(data.answer);
@@ -450,6 +462,7 @@
       if ((result.headers.get("Content-Type") || "").includes("text/event-stream")) {
         await readEventStream(result.body, (type, data) => {
           if (type === "metadata") applyMetadata(data);
+          if (type === "tool" && data && typeof data.name === "string") showTool(data.name);
           if (type === "delta") {
             if (typeof data.delta !== "string" || streamed.length + data.delta.length > MAX_ANSWER_CHARS) throw new Error("Le serveur a envoyé une réponse invalide.");
             streamed += data.delta;
@@ -467,6 +480,7 @@
       } else complete(await result.json());
       await refreshHistory();
     } catch (error) {
+      toolLog?.remove();
       answer.article.classList.add("error");
       const detail = document.createElement("p");
       detail.className = "field-help";

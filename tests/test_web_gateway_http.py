@@ -96,6 +96,12 @@ class FakeKnowledge:
             return {"hits": []}
         return {"hits": [{"document_id": "project:status.md", "title": "Statut", "provenance_id": "project-sha256:abc", "summary": "Résumé local."}]}
 
+    def documents(self) -> list[dict[str, Any]]:
+        return [{"provenance_id": "upload:doc", "title": "Doc", "chunks": 1, "characters": 20}]
+
+    def chunks_for_provenance(self, provenance_id: str) -> list[dict[str, Any]]:
+        return [] if provenance_id != "upload:doc" else [{"document_id": "upload:doc:000", "title": "Doc", "content": "Contenu local."}]
+
 
 class FakeBootstrap:
     engine = "BOOTSTRAP"
@@ -118,6 +124,15 @@ class FakeBootstrap:
         if "PANNE" in messages[-1]["content"]:
             raise RuntimeError("stream interrupted")
         yield "local"
+
+    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+        self.last_messages = messages
+        last = messages[-1].get("content") or ""
+        if "PANNE" in last:
+            raise RuntimeError("down")
+        if "CHERCHE" in last and tools:
+            return {"content": None, "tool_calls": [{"id": "c1", "function": {"name": "search_knowledge", "arguments": '{"query": "RAG local"}'}}]}
+        return {"content": "outil:" + last, "tool_calls": []}
 
 
 class FakeCore:
@@ -150,7 +165,7 @@ class GatewayTestCase(unittest.TestCase):
         self.auth, self.memory = FakeAuthentication(), FakeMemory()
         self.bootstrap = FakeBootstrap()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
-        self.server.state = gateway.WebState(self.auth, self.memory, self.bootstrap, FakeCore(), FakeKnowledge(), SETUP_TOKEN, qwen_runtime)  # type: ignore[attr-defined]
+        self.server.state = gateway.WebState(self.auth, self.memory, self.bootstrap, FakeCore(), FakeKnowledge(), SETUP_TOKEN, qwen_runtime, tools_enabled=False)  # type: ignore[attr-defined]
         threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
@@ -276,6 +291,25 @@ class GatewayHttpTests(GatewayTestCase):
         events = self.events(body)
         self.assertEqual([name for name, _ in events], ["metadata", "delta", "error"])
         self.assertEqual((events[-1][1]["error"], events[-1][1]["status"]), ("runtime_unavailable", "error"))
+
+    def test_bootstrap_tools_stream(self) -> None:
+        self.login()
+        self.server.state.tools_enabled = True
+        # Plain turn: the model answers directly, no tool call.
+        status, headers, body = self.request("POST", "/v1/chat", self.chat("Salut"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        events = self.events(body)
+        self.assertEqual((status, [name for name, _ in events]), (200, ["metadata", "completed"]))
+        self.assertEqual(events[0][1]["rag_mode"], "tools")
+        self.assertTrue(events[-1][1]["answer"].startswith("outil:"))
+        # Tool turn: the model calls search_knowledge, then answers using the result.
+        _, _, body = self.request("POST", "/v1/chat", self.chat("CHERCHE le statut"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        events = self.events(body)
+        self.assertEqual([name for name, _ in events], ["metadata", "tool", "completed"])
+        self.assertEqual(events[1][1], {"name": "search_knowledge"})
+        self.assertEqual(events[-1][1]["citations"][0]["provenance_id"], "project-sha256:abc")
+        # Runtime failure surfaces as an error event.
+        _, _, body = self.request("POST", "/v1/chat", self.chat("PANNE"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        self.assertEqual([name for name, _ in self.events(body)], ["metadata", "error"])
 
     def test_other_engines_and_failures(self) -> None:
         self.login()
