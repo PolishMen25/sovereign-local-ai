@@ -176,7 +176,17 @@ def packet_selection(accepted: Sequence[dict[str, Any]]) -> tuple[list[dict[str,
     normalized source was accepted for *different* tasks: that is real collapse.
 
     The pool's own redundancy stays visible as ``pool_unique_ratio`` and
-    ``accepted`` — informational, never part of the gate.
+    ``accepted`` — informational, never part of the gate. Note that both are
+    meaningful only when ``accepted`` really is the raw pool: recomputing them
+    from an already-packed packet would return 1.0 and say nothing.
+
+    Be honest about how strong ``unique_ratio`` actually is here: after
+    deduplication by (task, source) it only drops below 1.0 when two *different*
+    tasks got the same normalized answer, which is rare. It catches real
+    collapse and almost nothing else. ``distinct_tasks`` and ``max_task_share``
+    describe what the packet actually covers — 30 solutions spread over 30 tasks
+    teach CORE more than 30 spread over three — and are reported but not gated
+    until their real distribution has been measured on live packets.
     """
 
     kept: dict[tuple[str, str], dict[str, Any]] = {}
@@ -184,12 +194,16 @@ def packet_selection(accepted: Sequence[dict[str, Any]]) -> tuple[list[dict[str,
         kept.setdefault((row["task_id"], row["normalized_sha256"]), row)
     selection = list(kept.values())
     counts = Counter(row["normalized_sha256"] for row in selection)
+    tasks = Counter(row["task_id"] for row in selection)
     unique_ratio = len(counts) / len(selection) if selection else 0.0
     max_repetition = max(counts.values()) / len(selection) if selection else 0.0
+    max_task_share = max(tasks.values()) / len(selection) if selection else 0.0
     pool_unique = len({row["normalized_sha256"] for row in accepted}) / len(accepted) if accepted else 0.0
     return selection, {
         "unique_ratio": round(unique_ratio, 4),
         "max_repetition": round(max_repetition, 4),
+        "distinct_tasks": len(tasks),
+        "max_task_share": round(max_task_share, 4),
         "pool_unique_ratio": round(pool_unique, 4),
         "accepted": len(accepted),
     }

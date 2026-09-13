@@ -74,6 +74,13 @@ def recheck(packet_dir: Path) -> dict[str, Any]:
     selection, metrics = league.packet_selection(rows)
     if len(selection) != len(rows):  # the packet was already deduplicated at creation
         raise PacketUnreadable(f"{len(rows) - len(selection)} duplicate solution(s) inside the packet")
+    # The raw accepted pool is not in the packet — only the deduplicated result
+    # is. Recomputing pool metrics here would always return 1.0 and claim the
+    # arena was not redundant, which we do not know. Drop them rather than
+    # write a comfortable lie into the manifest.
+    for pool_only in ("pool_unique_ratio", "accepted"):
+        metrics.pop(pool_only, None)
+    metrics["pool_metrics"] = "unavailable: recomputed from the packed packet, not from the accepted pool"
     old = manifest.get("metrics") or {}
     return {
         "packet_id": manifest.get("packet_id", packet_dir.name),
@@ -125,7 +132,8 @@ def run(packets_dir: Path, database: Path | None, *, apply: bool) -> dict[str, A
         print(f"  {report['packet_id']:<34} {report['solutions']:>4} sol.  "
               f"unique {report['old_unique_ratio']} → {report['metrics']['unique_ratio']}  "
               f"rep {report['metrics']['max_repetition']}  "
-              f"vivier {report['metrics']['pool_unique_ratio']}  {verdict}  [{written}]")
+              f"tâches {report['metrics']['distinct_tasks']} "
+              f"(max {report['metrics']['max_task_share']})  {verdict}  [{written}]")
         if report["status"] == "flagged":
             outcome["still_flagged"].append(report["packet_id"])
         elif changed:

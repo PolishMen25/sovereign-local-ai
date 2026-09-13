@@ -112,6 +112,7 @@ class LeagueRulesTests(unittest.TestCase):
         self.assertEqual(metrics["unique_ratio"], 1.0)
         self.assertEqual(metrics["max_repetition"], 0.5)
         self.assertEqual((metrics["pool_unique_ratio"], metrics["accepted"]), (round(2 / 3, 4), 3))
+        self.assertEqual((metrics["distinct_tasks"], metrics["max_task_share"]), (2, 0.5))
         self.assertEqual(league.packet_status(metrics), "flagged")  # 2 solutions is still too thin
 
     def test_packet_status_passes_a_diverse_packet_drawn_from_a_redundant_pool(self) -> None:

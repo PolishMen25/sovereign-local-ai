@@ -70,6 +70,17 @@ class RecheckTests(unittest.TestCase):
         manifest = json.loads((self.packets / "p-approved" / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["status"], "approved")
 
+    def test_pool_metrics_are_not_invented_from_a_packed_packet(self):
+        # The raw accepted pool is gone; recomputing it here would always say
+        # 1.0. The tool must refuse to write that number rather than flatter.
+        self._packet("p-clean", self._clean_sources(), status="flagged")
+        recheck.run(self.packets, None, apply=True)
+        manifest = json.loads((self.packets / "p-clean" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertNotIn("pool_unique_ratio", manifest["metrics"])
+        self.assertNotIn("accepted", manifest["metrics"])
+        self.assertIn("unavailable", manifest["metrics"]["pool_metrics"])
+        self.assertEqual(manifest["metrics"]["distinct_tasks"], 25)
+
     def test_comments_do_not_count_as_diversity(self):
         # Same code, different comments: normalize_source must see one solution.
         sources = [(f"t{i}", f"# variant {i}\ndef f():\n    return 1\n") for i in range(30)]
