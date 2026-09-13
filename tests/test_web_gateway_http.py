@@ -311,6 +311,30 @@ class GatewayHttpTests(GatewayTestCase):
         _, _, body = self.request("POST", "/v1/chat", self.chat("PANNE"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
         self.assertEqual([name for name, _ in self.events(body)], ["metadata", "error"])
 
+    def test_catalog_profiles_route(self) -> None:
+        self.login()
+        self.server.state.tools_enabled = True
+        self.server.state.catalog = [
+            {"profile_id": "threat_modeler", "display_name": "threat modeler", "family": "security",
+             "mission": "Modélise les menaces", "engine": "BOOTSTRAP", "system_prompt": "PERSONA-14B", "tools": True},
+            {"profile_id": "test_designer", "display_name": "test designer", "family": "development",
+             "mission": "Conçoit des tests", "engine": "QWEN-CODER", "system_prompt": "PERSONA-CODE", "tools": False},
+        ]
+        # catalog present in the selectable list
+        profiles = json.loads(self.request("GET", "/v1/profiles", session=True)[2])["profiles"]
+        self.assertIn("threat_modeler", {p["profile_id"] for p in profiles})
+        # 14B catalog profile -> tool loop, persona used as the system prompt
+        _, _, body = self.request("POST", "/v1/chat", self.chat("CHERCHE", profile_id="threat_modeler"),
+                                  headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        events = self.events(body)
+        self.assertEqual([n for n, _ in events], ["metadata", "tool", "completed"])
+        self.assertTrue(self.bootstrap.last_messages[0]["content"].startswith("PERSONA-14B"))
+        # code catalog profile -> Qwen engine, persona kept
+        body = json.loads(self.request("POST", "/v1/chat", self.chat("écris un test", profile_id="test_designer"),
+                                       session=True, csrf=True)[2])
+        self.assertEqual(body["engine"], "QWEN-CODER")
+        self.assertEqual(self.qwen.last_messages[0]["content"], "PERSONA-CODE")
+
     def test_other_engines_and_failures(self) -> None:
         self.login()
         body = json.loads(self.request("POST", "/v1/chat", self.chat("écris une fonction", engine="QWEN-CODER"), session=True, csrf=True)[2])
