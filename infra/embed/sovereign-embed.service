@@ -1,0 +1,20 @@
+[Unit]
+Description=Sovereign local embedding runtime (Qwen3-Embedding-0.6B, offline)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sovereign
+# Loopback-only dense embeddings for hybrid RAG. Apache-2.0 model, offline.
+ExecStart=/opt/sovereign/runtime/llama-b10537/llama-server \
+  --model /opt/sovereign/models/qwen3-embedding-0.6b-q8_0.gguf \
+  --embedding --pooling last -ub 8192 --ctx-size 8192 \
+  --threads 8 --n-gpu-layers 0 \
+  --host 127.0.0.1 --port 8082 --offline
+Restart=on-failure
+RestartSec=3
+# Keep it on the same NUMA node as the gateway/14B (container is pinned to node 0).
+
+[Install]
+WantedBy=multi-user.target

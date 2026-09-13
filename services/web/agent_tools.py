@@ -107,8 +107,12 @@ def _parse_arguments(raw: Any) -> dict[str, Any]:
     return arguments
 
 
-def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any) -> tuple[str, list[dict[str, Any]]]:
-    """Run one read-only tool. Returns (text_for_the_model, citations)."""
+def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any, embed_query: Any | None = None) -> tuple[str, list[dict[str, Any]]]:
+    """Run one read-only tool. Returns (text_for_the_model, citations).
+
+    ``embed_query`` (optional) embeds the search query for hybrid retrieval; when
+    absent or failing, search stays lexical.
+    """
 
     if name not in TOOL_NAMES:
         raise ToolError(f"outil inconnu: {name}")
@@ -125,8 +129,14 @@ def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any) -> tuple[str,
         limit = arguments.get("limit", SEARCH_MAX_LIMIT)
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= SEARCH_MAX_LIMIT:
             limit = SEARCH_MAX_LIMIT
+        vector = None
+        if embed_query is not None:
+            try:
+                vector = embed_query(query.strip())
+            except Exception:  # noqa: BLE001 — embedding is best-effort; fall back to lexical
+                vector = None
         try:
-            retrieval = knowledge.search(query.strip(), query_embedding=None, limit=limit)
+            retrieval = knowledge.search(query.strip(), query_embedding=vector, limit=limit)
         except ValueError as failure:
             raise ToolError(f"recherche refusée : {failure}") from None
         hits = retrieval.get("hits", [])

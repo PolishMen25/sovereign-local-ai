@@ -26,6 +26,7 @@ from services.knowledge import document_analysis
 from services.web import agent_tools
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
+from services.web.embed_client import EmbedClient
 from services.web.core_client import CoreClient
 from services.web.qwen_client import QwenClient
 from services.inference.runtime import LocalInferenceRuntime
@@ -202,6 +203,7 @@ class WebState:
     corpus_inbox: Path | None = None
     documents_dir: Path | None = None
     tools_enabled: bool = True
+    embed_runtime: Any = None
 
     def corpus_increments(self) -> dict[str, Any]:
         """List RAW arena corpus increments with their promotion status.
@@ -673,7 +675,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.send_json(422, {"error": "invalid_request"})
             return
         try:
-            result = ingest_document(self.state.knowledge, self.state.documents_dir, filename=filename, data=data)
+            result = ingest_document(self.state.knowledge, self.state.documents_dir, filename=filename, data=data, embed=self._embed_document)
         except IngestError as error:
             self.send_json(422, {"error": "ingest_refused", "detail": str(error)})
             return
@@ -788,13 +790,30 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             self.send_json(422, {"error": "invalid_request"})
         return None
 
+    def _embed_query(self, text: str) -> list[float] | None:
+        """Embed a search query for hybrid retrieval, or None if unavailable (lexical fallback)."""
+        if self.state.embed_runtime is None:
+            return None
+        try:
+            return self.state.embed_runtime.embed(text, is_query=True)
+        except (RuntimeError, ValueError):
+            return None
+
+    def _embed_document(self, text: str) -> list[float] | None:
+        if self.state.embed_runtime is None:
+            return None
+        try:
+            return self.state.embed_runtime.embed(text, is_query=False)
+        except (RuntimeError, ValueError):
+            return None
+
     def _conversation_messages(self, message: str, conversation_id: str, *, system_prompt: str | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
         """System prompt, bounded local references, then the last 20 turns."""
 
         history = self.state.memory.export_conversation(conversation_id)["messages"][-20:]
         messages = [{"role": "system", "content": system_prompt or BOOTSTRAP_SYSTEM_PROMPT}]
         try:
-            retrieval = self.state.knowledge.search(message, query_embedding=None, limit=6)
+            retrieval = self.state.knowledge.search(message, query_embedding=self._embed_query(message), limit=6)
         except ValueError:
             retrieval = {"hits": []}
         citations = [
@@ -855,7 +874,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             answer, citations = agent_tools.run_tool_loop(
                 lambda msgs, tools: self.state.runtime.chat_with_tools(msgs, tools),
                 base,
-                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge),
+                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query),
                 on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
             )
         except RuntimeError:
@@ -938,8 +957,10 @@ def main() -> int:
     documents_dir = Path(os.environ.get("SOVEREIGN_DOCUMENTS_DIR", str(state_root / "documents")))
     documents_dir.mkdir(parents=True, exist_ok=True)
     tools_enabled = os.environ.get("SOVEREIGN_TOOLS_ENABLED", "1") not in {"0", "false", "no", ""}
+    embed_endpoint = os.environ.get("SOVEREIGN_EMBED_ENDPOINT", "http://127.0.0.1:8082")
+    embed_runtime = EmbedClient(embed_endpoint) if embed_endpoint else None
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox,  # type: ignore[attr-defined]
-                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, tools_enabled)
+                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, tools_enabled, embed_runtime)
     server.serve_forever()
     return 0
 

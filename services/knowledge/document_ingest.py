@@ -52,7 +52,7 @@ def _chunks(text: str) -> list[str]:
     return chunks[:MAX_CHUNKS]
 
 
-def ingest(index: Any, storage_dir: Path, *, filename: str, data: bytes) -> dict[str, Any]:
+def ingest(index: Any, storage_dir: Path, *, filename: str, data: bytes, embed: Any | None = None) -> dict[str, Any]:
     if not isinstance(filename, str) or not filename.strip() or "/" in filename or "\\" in filename:
         raise IngestError("nom de fichier invalide")
     if not isinstance(data, (bytes, bytearray)) or not data:
@@ -76,13 +76,22 @@ def ingest(index: Any, storage_dir: Path, *, filename: str, data: bytes) -> dict
 
     provenance_id = f"upload:{document_id}"
     title = filename[:300]
+    embedded = 0
     for position, chunk in enumerate(chunks):
+        vector = None
+        if embed is not None:
+            try:
+                vector = embed(chunk)
+            except Exception:  # noqa: BLE001 — embedding is best-effort; fall back to lexical
+                vector = None
+            if vector is not None:
+                embedded += 1
         index.upsert_validated(
             document_id=f"upload:{document_id}:{position:03d}",
             title=f"{title}" if len(chunks) == 1 else f"{title} ({position + 1}/{len(chunks)})",
             content=chunk,
             provenance_id=provenance_id,
-            embedding=None,
+            embedding=vector,
         )
     (quarantine / "extracted.txt").write_text(text, encoding="utf-8")
     return {
@@ -91,5 +100,6 @@ def ingest(index: Any, storage_dir: Path, *, filename: str, data: bytes) -> dict
         "provenance_id": provenance_id,
         "method": method,
         "chunks": len(chunks),
+        "embedded": embedded,
         "characters": len(text),
     }
