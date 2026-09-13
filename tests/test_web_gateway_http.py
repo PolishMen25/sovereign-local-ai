@@ -132,6 +132,8 @@ class FakeBootstrap:
         last = messages[-1].get("content") or ""
         if "PANNE" in last:
             raise RuntimeError("down")
+        if "ECRIS" in last and tools:
+            return {"content": None, "tool_calls": [{"id": "w1", "function": {"name": "write_file", "arguments": '{"path": "note.md", "content": "CONTENU_TEST", "purpose": "test"}'}}]}
         if "EXECUTE" in last and tools:
             return {"content": None, "tool_calls": [{"id": "a1", "function": {"name": "run_python", "arguments": '{"code": "print(1)", "purpose": "test"}'}}]}
         if "CHERCHE" in last and tools:
@@ -387,6 +389,40 @@ class GatewayHttpTests(GatewayTestCase):
                                   headers={"Accept": "text/event-stream"}, session=True, csrf=True)
         self.assertEqual([n for n, _ in self.events(body)], ["metadata", "completed"])
         self.assertEqual(calls["n"], 0)  # sandbox never ran
+
+    def test_write_file_action_flow(self) -> None:
+        self.login()
+        self.server.state.tools_enabled = True
+        import tempfile
+        from pathlib import Path as _Path
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.server.state.workspace_dir = _Path(directory.name)
+        import services.web.code_sandbox as cs
+        orig = cs.available
+        cs.available = lambda: True  # so action tools are offered
+        self.addCleanup(lambda: setattr(cs, "available", orig))
+        # the model proposes a file write -> confirmation, nothing written yet
+        _, _, body = self.request("POST", "/v1/chat", self.chat("ECRIS un fichier"), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        events = self.events(body)
+        self.assertEqual([n for n, _ in events], ["metadata", "confirmation_required"])
+        conf = events[-1][1]
+        self.assertEqual((conf["tool"], conf["path"]), ("write_file", "note.md"))
+        self.assertIn("CONTENU_TEST", conf["content"])
+        self.assertFalse((_Path(directory.name) / "note.md").exists())
+        # approve -> file written, a "file" event announces it
+        _, _, body = self.request("POST", "/v1/chat/confirm",
+                                  {"conversation_id": "conversation_001", "action_id": conf["action_id"], "decision": "approve"},
+                                  headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        names = [n for n, _ in self.events(body)]
+        self.assertEqual(names, ["metadata", "tool", "file", "completed"])
+        self.assertEqual((_Path(directory.name) / "note.md").read_text(encoding="utf-8"), "CONTENU_TEST")
+        # and it can be downloaded
+        status, headers, payload = self.request("GET", "/v1/workspace/note.md", session=True)
+        self.assertEqual((status, payload.decode()), (200, "CONTENU_TEST"))
+        self.assertIn("attachment", headers["content-disposition"])
+        # traversal is refused
+        self.assertEqual(self.request("GET", "/v1/workspace/../app.py", session=True)[0], 404)
 
     def test_other_engines_and_failures(self) -> None:
         self.login()

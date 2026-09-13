@@ -3,9 +3,10 @@
 The assistant (14B) can decide *when* and *what* to look up: search the local
 validated knowledge base, list uploaded documents, read one of them, or ask the
 time.  Nothing here touches the filesystem, the shell, or the network, and no
-tool has a side effect — an output of the model can never change state or run a
-command.  Side-effectful tools (run code, write a file) are deliberately out of
-scope for this version and must go behind an explicit human confirmation.
+read-only tool has a side effect.  Action tools (run_python, write_file) live in
+ACTION_TOOL_SPECS: the model only PROPOSES them, ``drive`` stops on the first
+such call, and nothing runs until a human approves it — an output of the model
+can never confirm itself.
 
 The loop is pure: ``run_tool_loop`` takes a ``chat`` callable
 (``chat(messages, tools) -> assistant_message``) and an ``execute`` callable, so
@@ -81,6 +82,14 @@ TOOL_SPECS: list[dict[str, Any]] = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_workspace",
+            "description": "Liste les fichiers déjà produits dans le dossier de travail de l'assistant.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
 ]
 
 TOOL_NAMES = frozenset(spec["function"]["name"] for spec in TOOL_SPECS)
@@ -109,6 +118,27 @@ ACTION_TOOL_SPECS: list[dict[str, Any]] = [
         },
     },
 ]
+ACTION_TOOL_SPECS.append({
+    "type": "function",
+    "function": {
+        "name": "write_file",
+        "description": (
+            "Propose d'ÉCRIRE un fichier texte dans le dossier de travail local de l'assistant "
+            "(jamais dans les dossiers personnels de l'utilisateur). Rien n'est écrit sans sa "
+            "confirmation explicite. Utilise-le pour produire un livrable (note, script, CSV, rapport) "
+            "que l'utilisateur pourra ensuite télécharger."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Nom du fichier, éventuellement dans un sous-dossier (ex. 'notes/resume.md')."},
+                "content": {"type": "string", "description": "Le contenu texte complet du fichier."},
+                "purpose": {"type": "string", "description": "Une phrase : à quoi sert ce fichier."},
+            },
+            "required": ["path", "content"],
+        },
+    },
+})
 ACTION_TOOL_NAMES = frozenset(spec["function"]["name"] for spec in ACTION_TOOL_SPECS)
 
 
@@ -133,7 +163,7 @@ def _parse_arguments(raw: Any) -> dict[str, Any]:
     return arguments
 
 
-def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any, embed_query: Any | None = None) -> tuple[str, list[dict[str, Any]]]:
+def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any, embed_query: Any | None = None, workspace: Any | None = None) -> tuple[str, list[dict[str, Any]]]:
     """Run one read-only tool. Returns (text_for_the_model, citations).
 
     ``embed_query`` (optional) embeds the search query for hybrid retrieval; when
@@ -143,6 +173,16 @@ def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any, embed_query: 
     if name not in TOOL_NAMES:
         raise ToolError(f"outil inconnu: {name}")
     arguments = _parse_arguments(raw_arguments)
+
+    if name == "list_workspace":
+        if workspace is None:
+            return "Le dossier de travail n'est pas configuré.", []
+        from services.web import workspace as workspace_module  # local import keeps the module optional
+        entries = workspace_module.list_files(workspace)
+        if not entries:
+            return "Le dossier de travail est vide (aucun fichier produit pour l'instant).", []
+        lines = [f"- {item['relative']} — {item['bytes']} octets (modifié {item['modified']})" for item in entries]
+        return "Fichiers du dossier de travail :\n" + "\n".join(lines), []
 
     if name == "current_time":
         now = datetime.now(timezone.utc).astimezone()
@@ -259,7 +299,8 @@ def drive(
     offer_actions = bool(action_tools)
     for round_index in range(max_rounds):
         last_round = round_index == max_rounds - 1
-        tools = [] if last_round else (TOOL_SPECS + ACTION_TOOL_SPECS if offer_actions else TOOL_SPECS)
+        offered_actions = [spec for spec in ACTION_TOOL_SPECS if spec["function"]["name"] in action_tools]
+        tools = [] if last_round else (TOOL_SPECS + offered_actions)
         assistant = chat(work, tools)
         content = assistant.get("content")
         tool_calls = assistant.get("tool_calls") or []

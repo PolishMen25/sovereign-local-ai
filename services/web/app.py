@@ -18,7 +18,7 @@ import threading
 import time
 import sqlite3
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from services.arena.store import ArenaStore
 from services.memory.store import MemoryStore
@@ -28,6 +28,7 @@ from services.knowledge import document_analysis
 from services.knowledge import corpus_paths
 from services.web import agent_tools
 from services.web import code_sandbox
+from services.web import workspace
 from services.web.catalog_profiles import load_catalog_profiles
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
@@ -93,7 +94,9 @@ TOOLS_CLAUSE = (
 )
 TOOLS_SYSTEM_PROMPT = (
     "Tu es l'assistant local Sovereign, hors ligne, distinct de CORE-700M. " + TOOLS_CLAUSE
-    + " Tu n'as ni accès Internet, ni shell : tu ne peux pas exécuter de code ni modifier de fichiers, seulement lire ce qui est indexé."
+    + " Tu n'as pas d'accès Internet. Tu peux en revanche PROPOSER une action : exécuter du code Python"
+    + " dans un bac à sable isolé (run_python), ou écrire un fichier dans ton dossier de travail (write_file)."
+    + " Ces actions ne s'exécutent jamais d'elles-mêmes : l'utilisateur les confirme une par une. Propose-en une seule à la fois."
 )
 STREAM_INTERRUPTED_ANSWER = "Le moteur local demandé est indisponible ou son flux a été interrompu."
 RUNTIME_REFUSED_ANSWER = "Le moteur local demandé est indisponible ou son checkpoint a été refusé."
@@ -209,6 +212,7 @@ class WebState:
     corpus_validated_root: Path | None = None
     corpus_inbox: Path | None = None
     documents_dir: Path | None = None
+    workspace_dir: Path | None = None
     tools_enabled: bool = True
     embed_runtime: Any = None
     catalog: list[dict[str, Any]] | None = None
@@ -509,11 +513,15 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             "/v1/conversations": lambda: self.send_json(200, {"conversations": self.state.memory.list_conversations()}),
             "/v1/arena": lambda: self.send_json(200, self.state.arena_overview()),
             "/v1/corpus/increments": lambda: self.send_json(200, self.state.corpus_increments()),
+            "/v1/workspace": self._get_workspace_listing,
         }.get(self.path)
         if route is not None:
             route()
             return
         parts = urlsplit(self.path)
+        if parts.path.startswith("/v1/workspace/"):
+            self._get_workspace_file(parts.path[len("/v1/workspace/"):])
+            return
         if parts.path == "/v1/arena/events":
             after = parse_qs(parts.query).get("after", ["0"])[0]
             if not after.isdigit() or len(after) > 12:
@@ -775,6 +783,34 @@ class LocalWebHandler(BaseHTTPRequestHandler):
 
     # --- chat ------------------------------------------------------------
 
+    def _get_workspace_listing(self) -> None:
+        root = self.state.workspace_dir
+        if root is None:
+            self.send_json(200, {"available": False, "files": []})
+            return
+        self.send_json(200, {"available": True, "files": workspace.list_files(root)})
+
+    def _get_workspace_file(self, relative: str) -> None:
+        """Download one file the assistant produced (workspace only, never the host FS)."""
+        root = self.state.workspace_dir
+        if root is None:
+            self.send_json(404, {"error": "not_found"})
+            return
+        try:
+            name = unquote(relative)
+            payload = workspace.read_bytes(root, name)
+        except (workspace.WorkspaceError, OSError):
+            self.send_json(404, {"error": "not_found"})
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Disposition", 'attachment; filename="%s"' % name.split("/")[-1])
+        self.send_header("Content-Length", str(len(payload)))
+        for header, value in SECURITY_HEADERS:
+            self.send_header(header, value)
+        self.end_headers()
+        self.wfile.write(payload)
+
     def _post_chat(self) -> None:
         request_value = self._authorized_chat_request()
         if request_value is None:
@@ -920,12 +956,12 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         )
         self.begin_event_stream()
         self.send_event("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "tools"})
-        action_tools = agent_tools.ACTION_TOOL_NAMES if (self.state.actions_enabled and code_sandbox.available()) else frozenset()
+        action_tools = self._action_tools()
         try:
             result = agent_tools.drive(
                 lambda msgs, tools: self.state.runtime.chat_with_tools(msgs, tools),
                 base,
-                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query),
+                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query, workspace=self.state.workspace_dir),
                 action_tools=action_tools,
                 on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
             )
@@ -953,6 +989,8 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                 "action_id": action_id,
                 "tool": call["name"],
                 "code": str(arguments.get("code", ""))[:8000],
+                "path": str(arguments.get("path", ""))[:200],
+                "content": str(arguments.get("content", ""))[:8000],
                 "purpose": str(arguments.get("purpose", ""))[:400],
             })
             return
@@ -963,6 +1001,46 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             pass
         payload = response(request_id, profile_id, "completed", answer, engine="BOOTSTRAP", conversation_id=conversation_id, citations=result["citations"])
         self.send_event("completed", payload)
+
+    def _action_tools(self) -> frozenset:
+        """Which action tools are actually usable right now (each gated separately)."""
+        if not self.state.actions_enabled:
+            return frozenset()
+        names = set()
+        if code_sandbox.available():
+            names.add("run_python")
+        if self.state.workspace_dir is not None:
+            names.add("write_file")
+        return frozenset(names)
+
+    def _run_action(self, call: dict[str, Any]) -> str:
+        """Execute one human-approved action and return the text fed back to the model."""
+        try:
+            arguments = agent_tools._parse_arguments(call["arguments"])
+        except agent_tools.ToolError as failure:
+            return f"Action impossible : {failure}"
+        name = call["name"]
+        if name == "run_python":
+            try:
+                outcome = code_sandbox.run_python(str(arguments.get("code", "")))
+            except (ValueError, RuntimeError) as failure:
+                return f"Exécution impossible : {failure}"
+            header = ("Exécution réussie" if outcome["ok"]
+                      else "Délai dépassé" if outcome["timed_out"]
+                      else f"Terminé avec le code {outcome['exit_code']}")
+            return f"{header}. Sortie :\n{outcome['output']}"
+        if name == "write_file":
+            root = self.state.workspace_dir
+            if root is None:
+                return "Écriture impossible : aucun dossier de travail configuré."
+            try:
+                written = workspace.write_file(root, str(arguments.get("path", "")), str(arguments.get("content", "")))
+            except (workspace.WorkspaceError, OSError) as failure:
+                return f"Écriture impossible : {failure}"
+            self.send_event("file", {"relative": written["relative"], "bytes": written["bytes"]})
+            return (f"Fichier écrit : {written['relative']} ({written['bytes']} octets), "
+                    "téléchargeable par l'utilisateur depuis le dossier de travail.")
+        return f"Action inconnue : {name}"
 
     def _post_chat_confirm(self) -> None:
         """Approve or reject a pending action, then resume the tool loop (streamed)."""
@@ -998,24 +1076,18 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         self.send_event("metadata", {"conversation_id": conversation_id, "engine": self.state.runtime.engine, "rag_mode": "tools"})
         if decision == "approve":
             self.send_event("tool", {"name": call["name"]})
-            try:
-                arguments = agent_tools._parse_arguments(call["arguments"])
-                outcome = code_sandbox.run_python(str(arguments.get("code", "")))
-                header = "Exécution réussie" if outcome["ok"] else ("Délai dépassé" if outcome["timed_out"] else f"Terminé avec le code {outcome['exit_code']}")
-                tool_result = f"{header}. Sortie :\n{outcome['output']}"
-            except (agent_tools.ToolError, ValueError, RuntimeError) as failure:
-                tool_result = f"Exécution impossible : {failure}"
+            tool_result = self._run_action(call)
         else:
             tool_result = "L'utilisateur a refusé d'exécuter ce code. N'exécute rien ; propose une alternative ou réponds sans exécuter."
         work.append({"role": "tool", "tool_call_id": call["id"], "content": tool_result[:8000]})
         citations = pending["citations"]
         seen = {str(c.get("provenance_id") or c.get("document_id") or "") for c in citations}
-        action_tools = agent_tools.ACTION_TOOL_NAMES if (self.state.actions_enabled and code_sandbox.available()) else frozenset()
+        action_tools = self._action_tools()
         try:
             result = agent_tools.drive(
                 lambda msgs, tools: self.state.runtime.chat_with_tools(msgs, tools),
                 work,
-                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query),
+                execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query, workspace=self.state.workspace_dir),
                 action_tools=action_tools,
                 citations=citations, seen_provenance=seen,
                 on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
@@ -1093,12 +1165,14 @@ def main() -> int:
     corpus_inbox.mkdir(parents=True, exist_ok=True)
     documents_dir = Path(os.environ.get("SOVEREIGN_DOCUMENTS_DIR", str(state_root / "documents")))
     documents_dir.mkdir(parents=True, exist_ok=True)
+    workspace_dir = Path(os.environ.get("SOVEREIGN_WORKSPACE_DIR", str(state_root / "workspace")))
+    workspace_dir.mkdir(parents=True, exist_ok=True)
     tools_enabled = os.environ.get("SOVEREIGN_TOOLS_ENABLED", "1") not in {"0", "false", "no", ""}
     embed_endpoint = os.environ.get("SOVEREIGN_EMBED_ENDPOINT", "http://127.0.0.1:8082")
     embed_runtime = EmbedClient(embed_endpoint) if embed_endpoint else None
     catalog = load_catalog_profiles(Path(os.environ.get("SOVEREIGN_AGENT_REGISTRY", "configs/agents/registry.json")))
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox,  # type: ignore[attr-defined]
-                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, tools_enabled, embed_runtime, catalog)
+                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, workspace_dir, tools_enabled, embed_runtime, catalog)
     server.serve_forever()
     return 0
 

@@ -21,7 +21,8 @@ CODE_FAMILIES = frozenset({"development"})
 GUARDRAILS = (
     "Reste dans ton domaine ; si la demande en sort, dis-le et oriente vers le bon profil. "
     "Tu proposes, tu n'exécutes jamais une action à effet externe ou durable sans confirmation humaine explicite. "
-    "Tu es hors ligne : ni accès Internet, ni shell ; tu ne peux pas exécuter de code ni modifier de fichiers."
+    "Tu es hors ligne (pas d'accès Internet). Tu peux proposer une action — exécuter du code dans un bac à sable "
+    "isolé ou écrire un fichier dans ton dossier de travail — mais rien ne s'exécute sans la confirmation explicite de l'utilisateur."
 )
 
 

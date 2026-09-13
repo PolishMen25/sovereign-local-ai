@@ -423,6 +423,8 @@
     read_document: "Lecture d’un document partagé…",
     current_time: "Vérification de l’heure…",
     run_python: "Exécution du code dans le bac à sable…",
+    write_file: "Écriture du fichier…",
+    list_workspace: "Consultation du dossier de travail…",
   };
 
   function applyMetadata(answer, data) {
@@ -460,6 +462,7 @@
       }
       if (type === "completed") complete(data);
       if (type === "confirmation_required") { toolLog?.remove(); renderConfirmation(answer, data); }
+      if (type === "file" && data && typeof data.relative === "string") renderProducedFile(answer, data);
       if (type === "error") {
         applyMetadata(answer, data);
         const error = new Error(data.answer || "La réponse a été interrompue. Consultez l’historique avant de réessayer.");
@@ -490,16 +493,35 @@
     }
   }
 
+  function renderProducedFile(answer, data) {
+    const relative = String(data.relative);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(\/[A-Za-z0-9][A-Za-z0-9._-]{0,79})?$/.test(relative)) return;
+    const line = document.createElement("p");
+    line.className = "produced-file";
+    const link = document.createElement("a");
+    link.href = "/v1/workspace/" + relative.split("/").map(encodeURIComponent).join("/");
+    link.textContent = relative;
+    link.setAttribute("download", relative.split("/").pop());
+    line.append(document.createTextNode("Fichier produit : "), link);
+    if (Number.isInteger(data.bytes)) line.append(document.createTextNode(" (" + data.bytes + " octets)"));
+    answer.article.append(line);
+    scrollMessages();
+  }
+
   function renderConfirmation(answer, data) {
     answer.article.querySelector(".action-confirm")?.remove();
     const card = document.createElement("div");
     card.className = "action-confirm";
+    const isWrite = data.tool === "write_file";
     const title = document.createElement("p");
     title.className = "action-title";
-    title.textContent = "L’assistant propose d’exécuter du code (bac à sable isolé)" + (data.purpose ? " — " + String(data.purpose).slice(0, 300) : "");
+    title.textContent = (isWrite
+      ? "L’assistant propose d’écrire le fichier « " + String(data.path || "").slice(0, 120) + " » (dossier de travail)"
+      : "L’assistant propose d’exécuter du code (bac à sable isolé)")
+      + (data.purpose ? " — " + String(data.purpose).slice(0, 300) : "");
     const pre = document.createElement("pre");
     const code = document.createElement("code");
-    code.textContent = String(data.code || "");
+    code.textContent = String((isWrite ? data.content : data.code) || "");
     pre.append(code);
     const actions = document.createElement("div");
     actions.className = "dialog-actions";

@@ -86,6 +86,8 @@ h2 { font-size: 1.15rem; line-height: 1.4; }
 .action-confirm { margin-top: .6rem; border: 1px solid var(--accent); border-radius: 8px; padding: .7rem .8rem; background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .action-title { color: var(--text); font-size: .85rem; margin-bottom: .5rem; }
 .action-confirm pre { max-height: 320px; overflow: auto; margin: 0 0 .6rem; }
+.produced-file { margin-top: .5rem; font-size: .82rem; color: var(--muted); }
+.produced-file a { color: var(--accent); font-weight: 500; }
 @media (prefers-reduced-motion: reduce) { .message { animation: none; } .typing span { animation: none; opacity: .6; } }
 .sources { margin-top: .9rem; color: var(--muted); font-size: .76rem; border-top: 1px solid var(--line); padding-top: .75rem; }
 .sources summary { cursor: pointer; color: var(--accent); }
