@@ -1,8 +1,9 @@
 # AGENTS.md — règles de travail du dépôt
 
 Ce fichier s'applique à tout le dépôt et à tout agent de développement
-(Codex, Claude Code ou autre). Il est rédigé par le propriétaire du projet ;
-un agent peut proposer une modification par PR, jamais l'appliquer seul.
+(Codex, Claude Code ou autre). Il est maintenu sous l'autorité du
+propriétaire du projet : un agent peut proposer une modification par PR, jamais
+la fusionner seul.
 
 ## Mission
 
@@ -42,7 +43,8 @@ Git avant de s'y fier.
   CUDA, ROCm ou TPU.
 - Le HPE ML350 Gen9 porte le calcul et l'entraînement principaux (D-002).
 - Le Synology RS3617xs+ stocke ; il n'entraîne pas (D-004, D-005).
-- Le DL380p Gen8 ne reçoit aucune fonction CORE ni aucun entraînement (D-034).
+- Le DL380p Gen8 ne reçoit aucune fonction CORE ni aucun entraînement (D-006,
+  remplacée par D-034).
 - L'agent de programmation Qwen s'exécute sur un nœud physique séparé, sans
   privilège d'administration du cluster (D-034).
 - Aucune durée d'entraînement n'est annoncée avant un benchmark reproductible
@@ -53,7 +55,8 @@ Git avant de s'y fier.
 - IA-CORE ne contacte jamais Internet, directement ou indirectement ; le blocage
   est imposé au réseau (routes, DNS) et prouvé par des tests négatifs (D-007).
 - L'ingestion externe et la consultation des connaissances internes sont des
-  frontières distinctes, sans identité ni droit partagé (P-002).
+  frontières distinctes, sans identité ni droit partagé ; deux services MCP
+  séparés restent le candidat P-002, non décidé avant ADR.
 - Le collecteur externe ne lit jamais les documents, mémoires, modèles ou
   réseaux internes (D-009).
 - Toute entrée externe reste non fiable, même venant d'un fournisseur d'IA
@@ -69,8 +72,8 @@ Git avant de s'y fier.
   consommation. Sans cette politique, toute promotion passe par le propriétaire.
 - Les jeux d'évaluation (E0, E1, E2 et suivants) n'entrent jamais dans un
   entraînement, ni directement ni par une donnée dérivée ou paraphrasée.
-- Une conversation n'alimente les poids qu'à travers un manifeste validé et ses
-  empreintes (D-032).
+- Une conversation n'alimente les poids qu'à travers un manifeste validé, ses
+  empreintes et le gate d'entraînement (D-032).
 
 **Dépôt public**
 
@@ -86,45 +89,58 @@ Git avant de s'y fier.
 
 - Les agents sont des profils logiques à permissions minimales partageant un
   petit nombre de moteurs ; jamais un modèle complet par agent (D-016).
-- L'assistant propose, il ne modifie pas l'infrastructure de lui-même (D-021,
-  D-022). Une sortie de modèle ne s'auto-confirme jamais pour une action durable.
-- Les actions du chat (`run_python`, `write_file`) restent derrière
-  l'interrupteur `SOVEREIGN_ACTIONS_ENABLED`, désactivé par défaut ; leur
-  réactivation exige une décision distincte (D-035).
+- L'assistant est force de proposition : toute action durable, sortie de
+  données ou modification d'infrastructure exige une confirmation humaine, et
+  une sortie de modèle ne s'auto-confirme jamais (D-021). Aucune découverte
+  réseau, exécution de commande ni accès aux secrets par défaut (D-022).
+- Les actions du chat (`run_python`, `write_file`) doivent être placées derrière
+  l'interrupteur `SOVEREIGN_ACTIONS_ENABLED`, désactivé par défaut (D-035). Tant
+  que ce code n'est ni fusionné ni déployé, aucun agent ne s'appuie sur cet
+  interrupteur ni n'étend ces actions ; leur réactivation exige une décision
+  distincte.
 
 ## Phase actuelle
 
-La phase courante est **1 — socle expérimental en service**.
+La phase courante est **1 — socle expérimental en service** (D-038). Elle
+correspond aux jalons J0 à J2 de la [feuille de route](docs/ROADMAP.md),
+partiellement réalisés, avec des prototypes de jalons ultérieurs.
 
-Sont en service, chacun sous sa décision :
+Sont en service, chacun dans les limites exactes de sa décision :
 
 | Composant | Décision |
 | --- | --- |
-| Chat BOOTSTRAP (modèle tiers temporaire, distinct de CORE) | D-024 |
+| Chat BOOTSTRAP Qwen2.5-1.5B, modèle tiers temporaire, sans outil ni agent | D-024 |
 | Passerelle Web authentifiée, mono-utilisateur, HTTPS privé | D-030 |
-| Mémoire conversationnelle locale et ses sauvegardes sur le NAS | D-032 |
-| Collecteur de conversations en écriture seule vers RAW | D-032 |
-| Moteur d'embeddings local, distinct de CORE | D-028 (modèle précis à ratifier, ADR-0007) |
+| Mémoire conversationnelle locale | D-032 ; sauvegardes : D-023 |
+| Collecteur de conversations en écriture seule vers RAW | D-008, D-009, D-032 |
 | Agent de programmation Qwen2.5-Coder | D-034 |
-| Stockage durable Synology monté en SMB 3.1.1 chiffré | D-023 |
-| Validation du pipeline d'entraînement CPU (CORE-30M) | D-034 |
+| Stockage durable Synology | D-023 (protocole NAS encore ouvert) |
 
-Sont en service **sans décision au registre** et doivent être régularisés par
-le propriétaire avant toute extension : le moteur de chat 14B, l'arena et la
-boucle d'auto-entraînement. Un agent ne les étend pas, ne les active pas
-davantage et ne s'appuie pas sur leur présence comme autorisation.
+Sont en service **sans décision au registre**, ou au-delà de leur décision, et
+doivent être régularisés par le propriétaire avant toute extension :
+
+- le moteur 14B qui sert l'emplacement BOOTSTRAP, et la boucle d'outils du chat ;
+- l'activation des profils du catalogue dans le chat ;
+- le moteur d'embeddings, autorisé dans son principe par D-028 mais sans lock
+  ni reçu de promotion ;
+- l'analyse et le téléversement de documents ;
+- l'arena et la boucle d'auto-entraînement.
+
+Un agent ne les étend pas, ne les active pas davantage et ne s'appuie pas sur
+leur présence comme autorisation. La validation du pipeline CPU par CORE-30M
+(D-034) est terminée et archivée ; elle n'est pas un service.
 
 Ce qu'un agent peut faire, selon le cas :
 
 | Changement | Condition |
 | --- | --- |
 | Documentation, schémas, ADR proposés, modèles de menace, outils locaux, tests | PR, tests et CI verts |
-| Correction ou évolution d'un composant en service | PR revue, CI verte, puis déploiement par archive versionnée (voir « Exploitation ») |
-| Nouveau service, port, flux entre zones, appel à un fournisseur externe, activation d'un profil ou d'un outil, promotion automatique | Décision du propriétaire au registre, et ADR si le choix est structurant |
-| Entraînement ou reprise d'entraînement | Contrat approuvé (manifeste, tokenizer, préflight) ; aucun contournement de gate |
+| Correction d'un composant en service, dans les limites exactes de sa décision | PR revue et CI verte ; fusion et déploiement par archive versionnée avec l'accord du propriétaire, ponctuel ou permanent (voir « Exploitation ») ; composants à régulariser exclus |
+| Nouveau moteur, service, port, outil, profil, source de données, flux entre zones, appel à un fournisseur externe ou promotion automatique | Décision du propriétaire au registre, et ADR si le choix est structurant |
+| Entraînement ou reprise d'entraînement | Contrat approuvé par le propriétaire (manifeste, tokenizer, préflight) et gate correspondant accepté ; aucun contournement |
 
-Les gates G1 à G8 de la [feuille de route](docs/ROADMAP.md) restent ouvertes
-tant que leurs preuves ne sont pas acceptées par le propriétaire.
+Les gates G0 à G8 de la feuille de route et A0 à A8 de l'architecture restent
+ouvertes tant que leurs preuves ne sont pas acceptées par le propriétaire.
 
 ## Travail à plusieurs agents
 
@@ -137,7 +153,8 @@ tant que leurs preuves ne sont pas acceptées par le propriétaire.
   a des modifications non commitées.
 - Une tâche par commit, message `<type>(<portée>): <résumé en français>`, corps
   expliquant le pourquoi et, s'il existe, l'identifiant de la tâche ou de
-  l'issue. Auteur : l'adresse `noreply` GitHub du propriétaire.
+  l'issue. Auteur : l'adresse `noreply` GitHub du propriétaire, avec une ligne
+  `Co-Authored-By:` qui identifie l'agent ayant produit le commit.
 - La CI (D-037) doit être verte avant fusion ; un échec préexistant se signale,
   il ne s'ignore pas.
 
@@ -183,8 +200,8 @@ Après l'édition :
   jamais interrompre un entraînement pour une opération de confort.
 - Checkpoints : écriture atomique, destination absente, empreinte SHA-256
   comparée entre source et copie durable, source conservée.
-- Avant de relancer le calcul, vérifier le stockage durable avec
-  `tools/check_synology_readiness.py`.
+- Avant de relancer le calcul, vérifier le stockage durable selon le runbook
+  de préparation du Synology.
 - Ne redémarrer un service qu'en cas de nécessité, en l'annonçant et en
   vérifiant son état après coup.
 - Les détails d'exploitation (adresses, comptes, chemins, inventaires) restent
@@ -196,7 +213,7 @@ Les dépendances suivent le sens de confiance :
 
 ```text
 external providers
-  -> controlled acquisition (Research Gateway if option B is approved, ADR-0006)
+  -> controlled acquisition (Research Gateway if option B is approved, P-001)
   -> external ingress/collector
   -> quarantine
   -> controlled promotion
@@ -230,8 +247,8 @@ Ne jamais exposer via MCP ni via un outil de chat :
 
 ## Modèle et benchmarks
 
-- CORE-30M valide le pipeline CPU dans le budget décidé ; il n'a pas d'objectif
-  conversationnel (D-034). CORE-700M est archivé comme preuve mécanique,
+- CORE-30M a validé le pipeline CPU ; il n'a pas d'objectif conversationnel
+  (D-034). CORE-700M est archivé comme preuve mécanique,
   CORE-80M comme référence historique ; aucun n'est présenté comme assistant.
 - Toute modification de la définition d'un candidat met à jour ensemble sa
   configuration, son comptage exact de paramètres et ses tests.
