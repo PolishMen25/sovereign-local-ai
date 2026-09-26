@@ -1,6 +1,6 @@
 # Registre initial des décisions
 
-Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confirmées des orientations provisoires. Une orientation ne devient ferme qu'après validation explicite du propriétaire et, pour un choix structurant, création d'un ADR.
+Dernière mise à jour : 2026-09-26. Ce registre distingue les décisions confirmées des orientations provisoires. Une orientation ne devient ferme qu'après validation explicite du propriétaire et, pour un choix structurant, création d'un ADR.
 
 ## Décisions confirmées
 
@@ -40,6 +40,9 @@ Dernière mise à jour : 2026-09-01. Ce registre distingue les décisions confir
 | D-032 | Le propriétaire autorise `CC-BY-4.0` avec attribution/provenance et la mise en file automatique des messages de conversation déjà assainis. | `CC-BY-SA` reste refusée. Les messages `user`/`assistant` entrent dans une file locale supprimable avec leur conversation ; un manifeste, ses empreintes et le gate d'entraînement restent requis avant modification des poids. |
 | D-033 | Le propriétaire autorise `Etalab-2.0` après vérification du texte de licence, avec conservation de la provenance et de l'attribution. | Les corpus français sous Licence Ouverte 2.0 peuvent être proposés au manifeste ; `CC-BY-SA`, `CC-BY-NC` et `CC-BY-ND` restent refusées. |
 | D-034 | Deux voies distinctes sont retenues : CORE-30M valide le pipeline CPU jusqu'à son budget de 600 M tokens ; Qwen2.5-Coder-7B-Instruct GGUF Q4_K_M devient l'agent de programmation réel après acquisition vérifiée. | CORE-30M ne reçoit ni objectif conversationnel ni fine-tuning de dialogue. CORE-700M ne reçoit pas de palier long. L'agent Qwen s'exécute sur un nœud physique séparé, sans privilège d'administration du cluster ; son modèle passe par RAW, licence, empreinte et promotion explicite. |
+| D-035 | Le propriétaire décide (2026-09-26) que les actions `run_python` et `write_file` du chat sont placées derrière un interrupteur explicite `SOVEREIGN_ACTIONS_ENABLED`, désactivé par défaut. Leur réactivation exige une décision distincte. | Lorsque l'interrupteur est absent ou désactivé, toute demande d'action est refusée de façon sûre et journalisée, sans exécution. Le code est livré par PR puis déployé seulement après revue ; tant qu'il n'est pas déployé, l'installation en service conserve son comportement actuel. |
+| D-036 | Le propriétaire décide (2026-09-26) que les adresses, noms d'hôte, identifiants de conteneurs et chemins d'hyperviseur internes sortent du dépôt public vers une configuration privée hors Git. L'épinglage exact des points de terminaison internes reste un contrôle de sécurité. | Les services refusent de démarrer sans configuration privée valide (échec fermé) ; la configuration privée doit être installée avant le déploiement du code correspondant. L'historique Git conserve les anciennes valeurs, qui sont des adresses privées non routables ; aucune réécriture d'historique n'est décidée. |
+| D-037 | Le propriétaire décide (2026-09-26) d'ajouter une intégration continue GitHub sur un runner Linux hébergé, qui exécute `python3 -B -m unittest discover -s tests -q` à chaque push et PR. | Aucun secret, aucun accès réseau dans les tests, actions épinglées par empreinte de commit et aucun déploiement automatique. Le statut de la suite est visible sur chaque PR. |
 
 ## Orientations provisoires
 
