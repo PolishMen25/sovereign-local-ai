@@ -21,3 +21,6 @@ Les options obligatoires limitent le montage : SMB 3.1.1 chiffré (`seal`),
 aucune exécution, aucun périphérique, aucun bit setuid et démarrage après le
 réseau. Les dossiers à utiliser sont `raw`, `validated`, `models` et `backups`.
 `RAW` ne devient jamais `VALIDATED` par le simple fait d'être stocké ici.
+
+Avant de redémarrer le calcul, suivre le
+[runbook de préparation du Synology](../../docs/operations/synology-restart-readiness.md).
