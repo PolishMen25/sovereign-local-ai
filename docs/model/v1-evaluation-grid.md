@@ -47,6 +47,51 @@ complète figure dans [la table G × A](#correspondance-g0g8--a0a8).
 5. Le lien entre gates fonctionnelles G0–G8 et gates d'architecture A0–A8 est
    explicite.
 
+## Version lisible par machine
+
+**PROPOSÉ.** La grille existe aussi sous forme de données :
+[`v1-grid.candidate.json`](../../configs/evaluation/v1-grid.candidate.json),
+décrite par le schéma
+[`evaluation-grid.schema.json`](../../schemas/evaluation-grid.schema.json) et
+contrôlée par `tools/validate_evaluation_grid.py`. Le validateur refuse, sans
+exception :
+
+- une métrique sans fixture, procédure, seuil, responsable, gate G ou gate A ;
+- un identifiant de gate inconnu, ou une gate A reliée à aucune de ses gates G
+  dans la [table G × A](#correspondance-g0g8--a0a8) ;
+- un chemin de fixture ou d'outil absent du dépôt : une fixture qui n'existe pas
+  encore est déclarée `missing`, jamais pointée ;
+- une décision citée absente du registre ou remplacée (`SUPERSEDED`) ;
+- un seuil `approved` sans numéro de décision, date d'approbation et empreinte
+  SHA-256 de la grille, ou dont l'empreinte ne correspond plus au contenu.
+
+L'empreinte couvre la forme JSON canonique de la grille, statuts et
+approbations des seuils exclus. Approuver un seuil ne la change donc pas ;
+modifier après coup un seuil, une fixture, une procédure ou une gate la casse,
+et le validateur refuse alors toute approbation existante. La commande
+`python3 -B tools/validate_evaluation_grid.py --print-digest` affiche
+l'empreinte à épingler dans l'entrée du registre. Aucun seuil n'est `approved`
+dans la version candidate.
+
+Correspondance des statuts. Le JSON porte le statut du **seuil mesurable** ;
+la décision qui confirme la règle sous-jacente figure dans `decisions` :
+
+| Statut JSON | Sens | Exemple |
+|---|---|---|
+| `proposed` | PROPOSÉ, éventuellement fondé sur une décision citée | M1.1 (base D-020), M4.2 (règle D-021, D-022) |
+| `pending_measurement` | PROPOSÉ (forme) : la valeur attend une mesure sur le ML350 | M6.1 (règle D-015), M6.2, M6.3 |
+| `confirmed` | CONFIRMÉ : le seuil est lui-même une décision du registre | M7.2 (D-007, D-029) |
+| `approved` | approuvé par le propriétaire, empreinte épinglée | aucun à ce jour |
+
+Une fixture `runtime_artifact` est produite à l'exécution et reste hors dépôt :
+checkpoint, journaux d'entraînement, rapports d'évaluation.
+
+Le validateur E1 (`tools/validate_language_evaluation_suite.py`) n'est plus
+limité à CORE-30M et à 50 prompts : il accepte CORE-30M ou CORE-700M et toute
+taille équilibrée par langue et catégorie, de 1 à 99 prompts par case. Les
+options `--model` et `--prompt-count` refusent une suite dont la cible ou la
+taille diffère de celle attendue.
+
 ## Synthèse des huit axes
 
 | # | Axe de l'issue #9 | Métriques | Fixtures présentes | Fixtures manquantes | G | A |
