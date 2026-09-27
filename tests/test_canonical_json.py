@@ -15,6 +15,7 @@ from pathlib import Path
 import struct
 import sys
 import unittest
+from unittest import mock
 
 from tests._temp_support import sovereign_temporary_directory
 
@@ -373,8 +374,25 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual("", stdout)
         self.assertIn("DUPLICATE_KEY", stderr)
         self.assertNotIn("synthetic-marker-7f3a", stderr)
-        self.assertEqual(1, missing_code)
+        self.assertEqual(2, missing_code)
         self.assertNotIn("absent.json", missing_stderr)
+
+    def test_unreadable_or_oversized_input_exits_two(self) -> None:
+        with sovereign_temporary_directory() as directory:
+            path = Path(directory) / "big.json"
+            path.write_text('{"a": 1}', encoding="utf-8")
+            with mock.patch.object(MODULE, "MAX_DOCUMENT_BYTES", 4):
+                oversized = self.run_cli("--scope", "ingress", str(path))
+            invalid_utf8 = Path(directory) / "latin1.json"
+            invalid_utf8.write_bytes(b'{"a": "caf\xe9"}')
+            refused = self.run_cli("--scope", "canonical", str(invalid_utf8))
+            directory_itself = self.run_cli("--scope", "ingress", directory)
+        self.assertEqual((2, ""), oversized[:2])
+        self.assertIn("SIZE_EXCEEDED", oversized[2])
+        self.assertEqual(2, directory_itself[0])
+        # A document the strict profile refuses stays a refusal (1), not an input error.
+        self.assertEqual(1, refused[0])
+        self.assertIn("INVALID_UTF8", refused[2])
 
 
 if __name__ == "__main__":

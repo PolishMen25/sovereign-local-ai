@@ -4,13 +4,15 @@ Each fixture file under tests/fixtures/research-package/ and
 tests/fixtures/lifecycle-events/ is listed in the directory's expected.json
 with the exact refusals it must produce.  Template fixtures carry
 placeholders instead of secret-shaped fragments; the fragments are assembled
-here at run time, so no such literal is committed to the public repository.
+at run time by tools/contract_fixture_hashes.py (the reseal helper), so no
+such literal is committed to the public repository.
 """
 
 from __future__ import annotations
 
-import hashlib
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import sys
@@ -21,15 +23,19 @@ import unittest
 
 PROJECT_ROOT = Path(__file__).parents[1]
 QUARANTINE = PROJECT_ROOT / "services" / "quarantine"
+TOOL_PATH = PROJECT_ROOT / "tools" / "contract_fixture_hashes.py"
 PACKAGE_FIXTURES = PROJECT_ROOT / "tests" / "fixtures" / "research-package"
 JOURNAL_FIXTURES = PROJECT_ROOT / "tests" / "fixtures" / "lifecycle-events"
 NOT_FIXTURES = {"expected.json", "README.md"}
 
 
-def _load(name: str, filename: str) -> ModuleType:
+def _load(name: str, filename: str | Path) -> ModuleType:
+    """A quarantine module by file name, or any module by absolute path."""
+
     module = sys.modules.get(name)
     if module is None:
-        spec = importlib.util.spec_from_file_location(name, QUARANTINE / filename)
+        location = filename if isinstance(filename, Path) else QUARANTINE / filename
+        spec = importlib.util.spec_from_file_location(name, location)
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
@@ -42,13 +48,11 @@ L = _load("lifecycle", "lifecycle.py")
 C = sys.modules["sovereign_quarantine_canonical_json"]
 S = sys.modules["sovereign_quarantine_closed_schema"]
 SCAN = _load("sovereign_quarantine_secret_scan", "secret_scan.py")
+TOOL = _load("contract_fixture_hashes", TOOL_PATH)
 
-# Assembled at run time: the committed files only hold the placeholders.
-RUNTIME_FRAGMENTS = {
-    "{{signed_param}}": "X-Amz-" + "Signature",
-    "{{credential_param}}": "access_" + "token",
-    "{{bearer_value}}": hashlib.sha256(b"synthetic-bearer-value").hexdigest()[:24],
-}
+# Assembled at run time by the reseal helper: the committed files only hold
+# the placeholders.
+RUNTIME_FRAGMENTS = TOOL.RUNTIME_FRAGMENTS
 
 # Structural codes that no byte string can produce against research-package
 # 0.1.0; each exclusion is re-proved in test_every_rule_has_an_invalid_fixture.
@@ -69,11 +73,7 @@ def fixture_files(directory: Path) -> set[str]:
 
 
 def package_bytes(filename: str) -> bytes:
-    text = (PACKAGE_FIXTURES / filename).read_text(encoding="utf-8")
-    if filename.endswith(".template.json"):
-        for placeholder, fragment in RUNTIME_FRAGMENTS.items():
-            text = text.replace(placeholder, fragment)
-    return text.encode("utf-8")
+    return TOOL.expand(filename, (PACKAGE_FIXTURES / filename).read_bytes())
 
 
 def read_journal(filename: str) -> tuple[list[Any], tuple[str, ...], int]:
@@ -165,6 +165,62 @@ class ResearchPackageFixtureTests(unittest.TestCase):
             # Without the runtime fragment, the committed file is clean.
             committed = (PACKAGE_FIXTURES / case["file"]).read_text(encoding="utf-8")
             self.assertEqual((), SCAN.scan_text(committed).categories)
+
+
+class ResealHelperTests(unittest.TestCase):
+    """tools/contract_fixture_hashes.py gives the digests a fixture must carry."""
+
+    def run_tool(self, *paths: Path) -> tuple[int, list[dict[str, Any]], str]:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = TOOL.main([str(path) for path in paths])
+        return code, [json.loads(line) for line in stdout.getvalue().splitlines()], stderr.getvalue()
+
+    def test_every_sealed_package_matches_its_recomputed_digest(self) -> None:
+        cases = expected_cases(PACKAGE_FIXTURES)["cases"]
+        codes = {case["file"]: {finding["code"] for finding in case["findings"]} for case in cases if "max_bytes" not in case}
+        code, rows, _ = self.run_tool()
+        self.assertEqual(1, code)  # the invalid-json-* fixtures are refused on purpose
+        self.assertEqual(fixture_files(PACKAGE_FIXTURES), {row["file"] for row in rows})
+        for row in rows:
+            with self.subTest(file=row["file"]):
+                if "refused" in row:
+                    self.assertIn(row["refused"], codes[row["file"]])
+                elif R.INTEGRITY_MISMATCH in codes[row["file"]]:
+                    self.assertFalse(row["match"])
+                else:
+                    self.assertTrue(row["match"])
+                    self.assertEqual(row["declared"], row["computed"])
+        templates = [row for row in rows if row["file"].endswith(".template.json")]
+        self.assertTrue(templates)
+        # The digest of a template is the digest of its expanded form.
+        for row in templates:
+            expanded = C.loads_strict(package_bytes(row["file"]))
+            self.assertEqual(C.package_sha256(expanded), row["computed"])
+
+    def test_journal_mode_prints_the_chain_digests(self) -> None:
+        path = JOURNAL_FIXTURES / "valid-package-lifecycle.jsonl"
+        code, rows, _ = self.run_tool(path)
+        self.assertEqual(0, code)
+        events, reasons, _index = read_journal(path.name)
+        self.assertEqual((), reasons)
+        self.assertEqual([L.event_sha256(event) for event in events], [row["event_sha256"] for row in rows])
+        seen: set[str] = set()
+        for row in rows:
+            if row["previous_event_sha256"] is not None:
+                self.assertIn(row["previous_event_sha256"], seen)
+            seen.add(row["event_sha256"])
+
+    def test_the_helper_never_writes_and_reports_unreadable_input(self) -> None:
+        before = {path.name: path.read_bytes() for path in PACKAGE_FIXTURES.iterdir()}
+        self.run_tool()
+        self.assertEqual(before, {path.name: path.read_bytes() for path in PACKAGE_FIXTURES.iterdir()})
+        code, rows, stderr = self.run_tool(PACKAGE_FIXTURES / "absent-fixture.json")
+        self.assertEqual((2, []), (code, rows))
+        self.assertNotIn("absent-fixture", stderr)
+        source = TOOL_PATH.read_text(encoding="utf-8")
+        for forbidden in ("write_text", "write_bytes", "import socket", "urllib", "http.client", "subprocess"):
+            self.assertNotIn(forbidden, source)
 
 
 class LifecycleFixtureTests(unittest.TestCase):

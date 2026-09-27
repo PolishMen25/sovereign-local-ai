@@ -464,16 +464,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("path", type=Path, help="fichier texte UTF-8, une URL par ligne")
     arguments = parser.parse_args(argv)
     limit = 1024 * (MAX_URL_CHARS + 2)
+    # Exit codes: 0 every URL allowed, 1 at least one URL refused, 2 unreadable input.
+    refusal: str | None = None
+    data = b""
     try:
         with arguments.path.open("rb") as handle:
             data = handle.read(limit + 1)
-        if len(data) > limit:
-            print("url check refused: the input file exceeds 1024 lines of maximum length", file=sys.stderr)
-            return 1
-        lines = data.decode("utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        print("url check refused: the input file cannot be read as UTF-8", file=sys.stderr)
-        return 1
+    except OSError:
+        refusal = "the input file cannot be read"
+    if refusal is None and len(data) > limit:
+        refusal = "the input file exceeds 1024 lines of maximum length"
+    text = ""
+    if refusal is None:
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            refusal = "the input file is not UTF-8"
+    if refusal is not None:
+        print(f"url check refused: {refusal}", file=sys.stderr)
+        return 2
+    # Split on LF only (and drop one trailing CR): str.splitlines() would also
+    # split on U+2028, U+0085, VT, FF... and turn one refused line into several
+    # allowed ones.  Those characters stay inside the line and are refused.
+    lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+    if lines[-1] == "":
+        lines.pop()
     refused = 0
     for number, line in enumerate(lines, start=1):
         reasons = evaluate_url(line)

@@ -581,6 +581,49 @@ class SemanticRuleTests(unittest.TestCase):
             self.assertTrue(code.startswith(("PKG_", "URL_", "JSON_")), code)
 
 
+def json_paths(node: Any, prefix: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
+    """Every member path of a parsed JSON value, root excluded."""
+
+    found = [prefix] if prefix else []
+    if type(node) is dict:
+        for key, value in node.items():
+            found += json_paths(value, prefix + (key,))
+    elif type(node) is list:
+        for index, value in enumerate(node):
+            found += json_paths(value, prefix + (index,))
+    return found
+
+
+class MalformedInputTests(unittest.TestCase):
+    """Hostile shapes give reason codes, never an exception (A26 contract)."""
+
+    def test_unhashable_ids_are_type_mismatches(self) -> None:
+        for bad in ([], {}):
+            with self.subTest(value=bad):
+                found = findings_after(lambda p, b=bad: p["sources"][0].__setitem__("source_id", b))
+                self.assertIn(("/sources/0/source_id", "PKG_TYPE_MISMATCH"), found)
+                found = findings_after(lambda p, b=bad: p["citations"][0].__setitem__("source_id", b))
+                self.assertIn(("/citations/0/source_id", "PKG_TYPE_MISMATCH"), found)
+        self.assertIn("PKG_TYPE_MISMATCH", R.evaluate({"sources": [{"source_id": []}]}).reason_codes)
+        body = json.dumps({"sources": [{"source_id": {}}]}).encode("utf-8")
+        self.assertIn("PKG_TYPE_MISMATCH", R.evaluate_bytes(body).reason_codes)
+
+    def test_no_member_replaced_by_a_container_raises(self) -> None:
+        base = full_package()
+        paths = json_paths(base)
+        self.assertGreater(len(paths), 100)
+        for path in paths:
+            for bad in ([], {}, [[]], {"x": []}):
+                package = copy.deepcopy(base)
+                target = package
+                for step in path[:-1]:
+                    target = target[step]
+                target[path[-1]] = bad
+                with self.subTest(path=path, value=bad):
+                    result = R.evaluate(package)
+                    self.assertTrue(set(result.reason_codes) <= R.REASON_CODES)
+
+
 class BytesTests(unittest.TestCase):
     def encode(self, package: dict[str, Any]) -> bytes:
         return json.dumps(package, ensure_ascii=False).encode("utf-8")

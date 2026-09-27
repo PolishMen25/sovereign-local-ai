@@ -450,7 +450,9 @@ def _check_unique(items: list[Any], collection: str, field: str, add: Any) -> No
 
 
 def _check_citations(document: dict[str, Any], sources: list[Any], add: Any) -> None:
-    known = {_member(source, "source_id") for source in sources}
+    # Only string ids are collected: a list or object id is unhashable and is
+    # already reported by the structural layer (PKG_TYPE_MISMATCH).
+    known = {value for value in (_member(source, "source_id") for source in sources) if type(value) is str}
     text = _member(document, "response", "text")
     for index, citation in enumerate(_SCHEMA.bounded_list(document.get("citations"), MAX_CITATIONS)):
         if type(citation) is not dict:

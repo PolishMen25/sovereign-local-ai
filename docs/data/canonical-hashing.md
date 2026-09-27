@@ -45,7 +45,7 @@ Les vecteurs de l'annexe B de la RFC 8785 et son exemple complet sont rejoués p
 | `DEPTH_EXCEEDED`, `SIZE_EXCEEDED` | Imbrication au-delà de 64 niveaux ; document au-delà de 16 Mio par défaut. |
 | `UNSUPPORTED_TYPE`, `NON_STRING_KEY` | Valeur Python sans équivalent JSON exact (tuple, ensemble, octets, sous-classe de nombre) ou clé non textuelle. |
 
-Les bornes de 64 niveaux et de 16 Mio sont des hypothèses de travail (HYPOTHÈSE), pas des mesures. Le schéma `research-package` autorise une réponse de 2 000 000 caractères, ce qui peut dépasser 1 Mio en UTF-8.
+Les bornes de 64 niveaux et de 16 Mio sont des hypothèses de travail (HYPOTHÈSE), pas des mesures. Raisonnement : le schéma `research-package` autorise une réponse de 2 000 000 caractères, soit jusqu'à 8 Mo en UTF-8 littéral (4 octets par caractère) et 12 Mo si chaque caractère du plan multilingue de base est échappé en `\uXXXX`. Une telle réponse dépasse largement la limite de 1 Mio du Collector de conversations (`services/mcp-collector/README.md`), qui ne s'applique pas à ce contrat ; d'où la borne de 16 Mio. Cas limite non couvert : 2 000 000 caractères hors du plan de base, tous échappés en paires de substitution (`\uXXXX\uXXXX`), occuperaient 24 Mo et seraient refusés (`SIZE_EXCEEDED`).
 
 ## `json.dumps(sort_keys=True)` n'est pas RFC 8785
 
@@ -59,7 +59,7 @@ Une sérialisation par `json.dumps(document, sort_keys=True, …)` **n'est pas**
 | Non-ASCII | échappé en `\uXXXX` si `ensure_ascii=True` (défaut) | littéral UTF-8 |
 | Clés dupliquées à la lecture | `json.loads` garde silencieusement la dernière | refusées |
 
-Constat, sans décision : le collecteur de conversations en service (`services/quarantine/conversation_import.py`, fonction `canonical_bytes`) calcule son `sha256` sur un `json.dumps(sort_keys=True)` resérialisé. Cette empreinte n'est ni RFC 8785 ni l'empreinte des octets reçus. Il s'agit d'un contrat distinct, propre aux conversations. Son alignement éventuel sur ce document est une décision du propriétaire, à coordonner avec le relais Codex qui valide ce reçu. Rien n'est modifié ici.
+Constat, sans décision, tiré du code de `main` et non d'une observation en service (état de déploiement non revérifié) : le collecteur de conversations (`services/quarantine/conversation_import.py`, fonction `canonical_bytes`) calcule son `sha256` sur un `json.dumps(sort_keys=True)` resérialisé. Cette empreinte n'est ni RFC 8785 ni l'empreinte des octets reçus. Il s'agit d'un contrat distinct, propre aux conversations. Son alignement éventuel sur ce document est une décision du propriétaire, à coordonner avec le relais Codex qui valide ce reçu. Rien n'est modifié ici.
 
 ## Reçu technique du Collector
 
@@ -83,7 +83,7 @@ python -B services/quarantine/canonical_json.py --scope package paquet.json
 python -B services/quarantine/canonical_json.py --scope ingress corps.bin
 ```
 
-La sortie est un objet JSON canonique `{"algorithm", "hash_scope", "sha256"}`. Un refus renvoie le code 1 avec le seul code de motif sur la sortie d'erreur.
+La sortie est un objet JSON canonique `{"algorithm", "hash_scope", "sha256"}`. Code de sortie : 0 si l'empreinte est calculée ; 1 si le document est refusé par le profil strict, avec le seul code de motif sur la sortie d'erreur ; 2 si le fichier est illisible ou dépasse 16 Mio.
 
 ## Hors périmètre
 

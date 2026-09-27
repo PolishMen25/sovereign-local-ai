@@ -174,7 +174,9 @@ class _Sink:
 
     def add(self, code: str, pointer: str) -> None:
         self.findings.add(Finding(pointer, self.prefix + code))
-        if len(self.findings) >= self.limit:
+        # Stop only once the cap is exceeded: exactly ``limit`` distinct
+        # findings are all reported, without TOO_MANY_FINDINGS.
+        if len(self.findings) > self.limit:
             raise _Overflow
 
 
@@ -375,7 +377,7 @@ class ClosedSchema:
         return self._definitions[name]
 
     def matches(self, schema: Any, value: Any) -> bool:
-        sink = _Sink("", 1)
+        sink = _Sink("", 0)  # a limit of 0 stops at the first finding
         try:
             self._apply(schema, value, "", sink)
         except _Overflow:
@@ -482,7 +484,12 @@ def codes(findings: tuple[Finding, ...]) -> tuple[str, ...]:
 
 
 def finalize(findings: set[Finding], prefix: str, limit: int = MAX_FINDINGS) -> tuple[Finding, ...]:
-    """Sort, deduplicate and cap findings; the cap itself is reported."""
+    """Sort, deduplicate and cap findings; the cap itself is reported.
+
+    Up to ``limit`` distinct findings are returned as they are.  Beyond that,
+    or when an evaluation already stopped on the cap, ``limit - 1`` findings
+    are kept and the last one is ``TOO_MANY_FINDINGS``.
+    """
 
     overflow = Finding("", prefix + TOO_MANY_FINDINGS)
     ordered = sorted(item for item in findings if item != overflow)

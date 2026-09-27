@@ -111,7 +111,7 @@ Codes d'un ensemble d'enregistrements (pointeur préfixé par l'indice de l'enre
 | `LINEAGE_ARTIFACT_UNKNOWN` | Remontée demandée pour un dérivé absent d'une lignée cohérente. |
 | `LINEAGE_LIMIT_EXCEEDED` | Plus de 1 000 000 d'enregistrements ou de 4 000 000 de références de parents (bornes HYPOTHÈSE). |
 
-Un enregistrement refusé pour lui-même est exclu du graphe : ses enfants signalent alors `LINEAGE_PARENT_UNKNOWN`. Au plus 100 refus sont rendus ; au-delà, le dernier est `LINEAGE_TOO_MANY_FINDINGS`. Seul un ensemble sans aucun refus donne un graphe que l'on peut remonter.
+Un enregistrement refusé pour lui-même est exclu du graphe : ses enfants signalent alors `LINEAGE_PARENT_UNKNOWN`. Au plus 100 refus sont rendus : jusqu'à 100 refus distincts, tous figurent ; au-delà, 99 sont gardés et le dernier est `LINEAGE_TOO_MANY_FINDINGS`. Seul un ensemble sans aucun refus donne un graphe que l'on peut remonter.
 
 ## Hors périmètre
 

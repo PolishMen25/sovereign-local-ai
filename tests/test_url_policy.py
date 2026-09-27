@@ -267,6 +267,44 @@ class UrlPolicyCommandLineTests(unittest.TestCase):
         rows = [json.loads(line) for line in stdout.getvalue().splitlines()]
         self.assertEqual([[], [M.PARAM_CREDENTIAL]], [row["reasons"] for row in rows])
 
+    def run_cli(self, path: Path | str) -> tuple[int, list[dict], str]:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = M.main([str(path)])
+        return code, [json.loads(line) for line in stdout.getvalue().split("\n") if line], stderr.getvalue()
+
+    def test_cli_splits_on_line_feed_only(self) -> None:
+        # str.splitlines() would cut each of these lines in two allowed URLs.
+        separators = (" ", " ", "\x85", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\r")
+        with sovereign_temporary_directory() as directory:
+            path = Path(directory) / "urls.txt"
+            for separator in separators:
+                path.write_bytes(f"https://example.com/{separator}https://example.org/\n".encode("utf-8"))
+                with self.subTest(separator=hex(ord(separator))):
+                    code, rows, _ = self.run_cli(path)
+                    self.assertEqual(1, code)
+                    self.assertEqual([1], [row["line"] for row in rows])
+                    self.assertEqual([M.MALFORMED], rows[0]["reasons"])
+            crlf = Path(directory) / "crlf.txt"
+            crlf.write_bytes(b"https://example.com/\r\nhttps://example.org/\r\n")
+            code, rows, _ = self.run_cli(crlf)
+        self.assertEqual(0, code)
+        self.assertEqual([[], []], [row["reasons"] for row in rows])
+
+    def test_cli_unreadable_input_exits_two(self) -> None:
+        with sovereign_temporary_directory() as directory:
+            latin1 = Path(directory) / "latin1.txt"
+            latin1.write_bytes(b"https://example.com/caf\xe9\n")
+            big = Path(directory) / "big.txt"
+            big.write_text("https://example.com/\n" * 600, encoding="utf-8")  # > 1024 * (8 + 2) bytes
+            results = [self.run_cli(latin1), self.run_cli(Path(directory) / "absent.txt"), self.run_cli(directory)]
+            with mock.patch.object(M, "MAX_URL_CHARS", 8):
+                results.append(self.run_cli(big))
+        for code, rows, stderr in results:
+            self.assertEqual(2, code)
+            self.assertEqual([], rows)
+            self.assertNotIn("absent.txt", stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

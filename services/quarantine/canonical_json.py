@@ -346,8 +346,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("path", type=Path)
     arguments = parser.parse_args(argv)
+    # Exit codes: 0 digest printed, 1 document refused, 2 unreadable or oversized input.
+    unreadable: str | None = None
+    data = b""
     try:
         data = _read_bounded(arguments.path, MAX_DOCUMENT_BYTES)
+    except OSError:
+        unreadable = "the input file cannot be read"
+    except CanonicalJSONError as error:
+        unreadable = error.code
+    if unreadable is not None:
+        print(f"hash refused: {unreadable}", file=sys.stderr)
+        return 2
+    try:
         if arguments.scope == "ingress":
             scope, digest = SCOPE_INGRESS, ingress_sha256(data)
         elif arguments.scope == "provider-response":
@@ -356,9 +367,6 @@ def main(argv: list[str] | None = None) -> int:
             scope, digest = SCOPE_PACKAGE, package_sha256(loads_strict(data))
         else:
             scope, digest = "canonical-document", canonical_sha256(loads_strict(data))
-    except OSError:
-        print("hash refused: the input file cannot be read", file=sys.stderr)
-        return 1
     except CanonicalJSONError as error:
         print(f"hash refused: {error.code}", file=sys.stderr)
         return 1

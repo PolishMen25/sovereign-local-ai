@@ -64,8 +64,10 @@ def jwt_shape() -> str:
 VALUE = synthetic(40)
 PEM_HEADER = "-----" + "BEGIN " + "PRIVATE KEY" + "-----"
 
-# The five shapes the live collector currently accepts (issue #6 probe).
-FIVE_LIVE_GAPS = (
+# Five shapes that SECRET_PATTERN in services/quarantine/conversation_import.py
+# (main) does not match.  Read from the code, not from a live probe: the
+# deployment state is not re-verified here.
+FIVE_MAIN_PATTERN_GAPS = (
     ("gh" + "p_" + synthetic(36, "ghp"), S.KNOWN_PREFIX),
     ("Authorization: " + "Bea" + "rer " + VALUE, S.BEARER_TOKEN),
     ("https://bucket.example.com/object?X-Amz-" + "Signature=" + hashlib.sha256(b"sig").hexdigest(), S.SIGNED_URL),
@@ -118,8 +120,8 @@ CLEAN_SAMPLES = (
 
 
 class SecretScanDetectionTests(unittest.TestCase):
-    def test_detects_the_five_shapes_the_live_collector_accepts(self) -> None:
-        for text, category in FIVE_LIVE_GAPS:
+    def test_detects_the_five_shapes_main_secret_pattern_accepts(self) -> None:
+        for text, category in FIVE_MAIN_PATTERN_GAPS:
             with self.subTest(category=category):
                 result = S.scan_text(text)
                 self.assertEqual(S.POLICY_ID, result.policy_id)
@@ -128,7 +130,7 @@ class SecretScanDetectionTests(unittest.TestCase):
 
     def test_detects_every_documented_category(self) -> None:
         seen = set()
-        for text, category in FIVE_LIVE_GAPS + MORE_SHAPES:
+        for text, category in FIVE_MAIN_PATTERN_GAPS + MORE_SHAPES:
             with self.subTest(category=category, index=len(seen)):
                 categories = S.scan_text(text).categories
                 self.assertIn(category, categories)
@@ -151,7 +153,7 @@ class SecretScanDetectionTests(unittest.TestCase):
             "schema_version": "0.1.0",
             "messages": [
                 {"role": "user", "content": "Bonjour"},
-                {"role": "assistant", "content": FIVE_LIVE_GAPS[0][0]},
+                {"role": "assistant", "content": FIVE_MAIN_PATTERN_GAPS[0][0]},
             ],
             "usage": {"input_tokens": 12, "output_tokens": 34, "ratio": 0.5, "cached": None, "final": True},
         }
@@ -173,7 +175,7 @@ class SecretScanDetectionTests(unittest.TestCase):
             synthetic(16, "mixed-only"),
             "a!" + synthetic(10, "symbol"),
         )
-        for text in tuple(text for text, _ in FIVE_LIVE_GAPS + MORE_SHAPES) + borderline:
+        for text in tuple(text for text, _ in FIVE_MAIN_PATTERN_GAPS + MORE_SHAPES) + borderline:
             with self.subTest(index=hashlib.sha256(text.encode()).hexdigest()[:8]):
                 if "://" in text and "@" not in text.partition("://")[2].partition("/")[0]:
                     # The relay strips every query string; only signed or
@@ -185,7 +187,7 @@ class SecretScanDetectionTests(unittest.TestCase):
 
 class SecretScanHygieneTests(unittest.TestCase):
     def test_results_never_contain_the_matched_text(self) -> None:
-        for text, _category in FIVE_LIVE_GAPS + MORE_SHAPES:
+        for text, _category in FIVE_MAIN_PATTERN_GAPS + MORE_SHAPES:
             result = S.scan_text(text)
             rendered = repr(result) + str(result) + json.dumps(result.categories)
             secret_part = text.split()[-1] if " " in text.strip() else text
@@ -196,7 +198,7 @@ class SecretScanHygieneTests(unittest.TestCase):
                 self.assertRegex(category, r"^SECRET_[A-Z_]+$")
 
     def test_refusals_never_contain_the_scanned_text(self) -> None:
-        secret = FIVE_LIVE_GAPS[0][0]
+        secret = FIVE_MAIN_PATTERN_GAPS[0][0]
         cases = (
             (lambda: S.scan_text(b"bytes are not text"), "NOT_TEXT"),
             (lambda: S.scan_text(secret + "x" * S.MAX_SCAN_CHARS), "SIZE_EXCEEDED"),
@@ -227,7 +229,7 @@ class SecretScanHygieneTests(unittest.TestCase):
         names = ("getaddrinfo", "gethostbyname", "gethostbyname_ex", "create_connection", "socket")
         with contextlib.ExitStack() as stack:
             mocks = [stack.enter_context(mock.patch.object(socket, name, side_effect=AssertionError(name))) for name in names]
-            for text, _ in FIVE_LIVE_GAPS + MORE_SHAPES:
+            for text, _ in FIVE_MAIN_PATTERN_GAPS + MORE_SHAPES:
                 S.scan_text(text)
         for patched in mocks:
             patched.assert_not_called()
@@ -249,7 +251,7 @@ class SecretScanCommandLineTests(unittest.TestCase):
         return code, stdout.getvalue(), stderr.getvalue()
 
     def test_cli_reports_categories_only(self) -> None:
-        secret = FIVE_LIVE_GAPS[1][0]
+        secret = FIVE_MAIN_PATTERN_GAPS[1][0]
         with sovereign_temporary_directory() as directory:
             text_path = Path(directory) / "export.txt"
             text_path.write_text("Bonjour\n" + secret + "\n", encoding="utf-8")
@@ -273,6 +275,33 @@ class SecretScanCommandLineTests(unittest.TestCase):
         self.assertEqual(S.POLICY_ID, json.loads(results["json"][1])["policy_id"])
         for _code, stdout, stderr in results.values():
             self.assertNotIn(VALUE, stdout + stderr)
+
+    def test_cli_json_mode_refuses_what_would_hide_a_value(self) -> None:
+        secret = FIVE_MAIN_PATTERN_GAPS[0][0]
+        with sovereign_temporary_directory() as directory:
+            duplicate = Path(directory) / "duplicate.json"
+            # json.loads would keep only the last "a" and never scan the secret.
+            duplicate.write_text('{"a": "' + secret + '", "a": "x"}', encoding="utf-8")
+            deep = Path(directory) / "deep.json"
+            deep.write_text("[" * 200_000 + "]" * 200_000, encoding="utf-8")
+            nested = Path(directory) / "nested.json"
+            nested.write_text("[" * (S.MAX_DEPTH + 2) + "]" * (S.MAX_DEPTH + 2), encoding="utf-8")
+            text_mode = self.run_cli(str(duplicate))
+            results = {
+                "duplicate": self.run_cli("--json", str(duplicate)),
+                "deep": self.run_cli("--json", str(deep)),
+                "nested": self.run_cli("--json", str(nested)),
+            }
+        self.assertEqual(1, text_mode[0])
+        self.assertIn(S.KNOWN_PREFIX, json.loads(text_mode[1])["categories"])
+        expected = {"duplicate": "DUPLICATE_KEY", "deep": "DEPTH_EXCEEDED", "nested": "DEPTH_EXCEEDED"}
+        for name, (code, stdout, stderr) in results.items():
+            with self.subTest(case=name):
+                self.assertEqual(2, code)
+                self.assertEqual("", stdout)
+                self.assertIn(expected[name], stderr)
+                self.assertNotIn(secret, stderr)
+                self.assertNotIn("Traceback", stderr)
 
 
 if __name__ == "__main__":

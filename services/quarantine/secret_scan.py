@@ -1,9 +1,11 @@
 """Versioned server-side secret scanner ``collector-secret-scan-v1``.
 
 PROVISOIRE: candidate detector for issue #6.  It is a pure library and is not
-wired into any service: the live conversation collector keeps its own check
-until the owner decides the per-category outcome policy (hard reject at
-ingress or flag at PENDING) and the conversation contract, after PR #17.
+wired into any service: the conversation collector code on main
+(services/quarantine/conversation_import.py, SECRET_PATTERN) keeps its own
+check until the owner decides the per-category outcome policy (hard reject at
+ingress or flag at PENDING) and the conversation contract, after PR #17.  The
+deployment state of that collector is not re-verified here.
 
 The scanner reports category codes only.  Results, exceptions and the
 command-line output never contain the matched text, an excerpt, an offset or a
@@ -26,8 +28,8 @@ Categories (a text may match several):
 ``SECRET_CREDENTIAL_ASSIGNMENT``
     ``password``, ``passwd``, ``mdp``, ``mot de passe``, ``api key``,
     ``access token`` or ``private key`` followed by ``:`` or ``=``, whatever the
-    value.  This keeps what the live collector and the client relay already
-    refuse or redact.
+    value.  This keeps what main's SECRET_PATTERN and the client relay
+    already refuse or redact.
 ``SECRET_TOKEN_ASSIGNMENT``
     A ``token``, ``key``, ``secret``, ``passphrase``, ``pwd`` or
     ``credential`` label, possibly as a suffix (``client_secret``,
@@ -155,22 +157,24 @@ class ScanResult:
         return not self.categories
 
 
-def _load_url_policy() -> ModuleType:
-    """Load the sibling ``url_policy.py`` by path, without touching sys.path."""
+def _load_sibling(name: str, filename: str) -> ModuleType:
+    """Load a sibling module by path, without touching sys.path."""
 
-    name = "sovereign_quarantine_url_policy"
     module = sys.modules.get(name)
     if module is None:
-        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("url_policy.py"))
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(filename))
         if spec is None or spec.loader is None:
-            raise ImportError("url_policy.py is missing next to secret_scan.py")
+            raise ImportError(f"{filename} is missing next to secret_scan.py")
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)
     return module
 
 
-_URL_POLICY = _load_url_policy()
+_URL_POLICY = _load_sibling("sovereign_quarantine_url_policy", "url_policy.py")
+# The CLI parses --json input with the strict profile: plain json.loads keeps
+# only the last duplicate key, so an earlier value would never be scanned.
+_CANONICAL = _load_sibling("sovereign_quarantine_canonical_json", "canonical_json.py")
 
 
 def _looks_like_secret_value(value: str) -> bool:
@@ -292,7 +296,12 @@ def main(argv: list[str] | None = None) -> int:
         "Seules les catégories détectées sont affichées, jamais le texte trouvé."
     )
     parser.add_argument("path", type=Path)
-    parser.add_argument("--json", action="store_true", help="analyser clés et chaînes d'un document JSON")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="analyser clés et chaînes d'un document JSON lu avec le profil strict "
+        "(clé dupliquée, NaN ou imbrication excessive : refus, code 2)",
+    )
     arguments = parser.parse_args(argv)
     refusal: str | None = None
     data = b""
@@ -311,10 +320,12 @@ def main(argv: list[str] | None = None) -> int:
             refusal = "the input file is not UTF-8"
     document: Any = None
     if refusal is None and arguments.json:
+        # Strict profile: a duplicate key, NaN or excessive nesting is refused
+        # (exit 2) instead of hiding a value from the scan or raising.
         try:
-            document = json.loads(text)
-        except ValueError:
-            refusal = "the input file is not valid JSON"
+            document = _CANONICAL.loads_strict(data, max_bytes=MAX_FILE_BYTES)
+        except _CANONICAL.CanonicalJSONError as error:
+            refusal = error.code
     if refusal is not None:
         print(f"secret scan refused: {refusal}", file=sys.stderr)
         return 2

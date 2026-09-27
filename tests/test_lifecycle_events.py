@@ -484,6 +484,44 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(("EVENT_TYPE_MISMATCH",), reasons)
         self.assertEqual(0, index)
 
+    def test_unhashable_event_type_is_an_enum_mismatch(self) -> None:
+        for bad in ([], {}):
+            with self.subTest(value=bad):
+                self.assertIn(("/event_type", "EVENT_ENUM_MISMATCH"), codes_of({"event_type": bad}))
+                events = full_journal().events
+                events[0]["event_type"] = bad
+                reasons, index = refusal(events)
+                self.assertIn("EVENT_ENUM_MISMATCH", reasons)
+                self.assertEqual(0, index)
+
+    def test_no_member_replaced_by_a_container_raises(self) -> None:
+        events = full_journal().events
+        allowed = {L.CODE_PREFIX + code for code in S.GENERIC_CODES} | L.EVENT_RULE_CODES | L.REPLAY_CODES
+        for position in (0, 1, len(events) - 1):
+            paths: list[tuple[Any, ...]] = []
+            stack: list[tuple[Any, tuple[Any, ...]]] = [(events[position], ())]
+            while stack:
+                node, path = stack.pop()
+                if path:
+                    paths.append(path)
+                if type(node) is dict:
+                    stack += [(value, path + (key,)) for key, value in node.items()]
+                elif type(node) is list:
+                    stack += [(value, path + (index,)) for index, value in enumerate(node)]
+            for path in paths:
+                for bad in ([], {}, [[]], {"x": []}):
+                    journal = copy.deepcopy(events)
+                    target = journal[position]
+                    for step in path[:-1]:
+                        target = target[step]
+                    target[path[-1]] = bad
+                    with self.subTest(position=position, path=path, value=bad):
+                        self.assertTrue({finding.code for finding in L.evaluate_event(journal[position])} <= allowed)
+                        try:
+                            L.replay(journal)
+                        except L.LifecycleError as error:
+                            self.assertTrue(set(error.reasons) <= allowed | {L.JSON_PREFIX + code for code in C._MESSAGES})
+
 
 class RawAndSafetyTests(unittest.TestCase):
     def test_raw_bytes_and_digest_are_untouched_by_replay(self) -> None:

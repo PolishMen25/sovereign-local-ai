@@ -395,7 +395,9 @@ def evaluate_event(event: Any) -> tuple[Any, ...]:
         return (Finding("", CODE_PREFIX + _SCHEMA.TYPE_MISMATCH),)
     found: set[Any] = set(_VALIDATOR.evaluate(event))
     event_type = event.get("event_type")
-    if event_type in REGISTRATIONS:
+    # A list or object is unhashable: the type test comes first, and the
+    # structural layer already reports EVENT_ENUM_MISMATCH for it.
+    if type(event_type) is str and event_type in REGISTRATIONS:
         to_states, actors, kinds = REGISTRATIONS[event_type]
         from_state, to_state = event.get("from_state"), event.get("to_state")
         if event_type == STATE_TRANSITION:

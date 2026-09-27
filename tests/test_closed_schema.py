@@ -100,6 +100,23 @@ class ClosedSchemaTests(unittest.TestCase):
         few = S.finalize({S.Finding("/a", "T_X")}, "T_", 5)
         self.assertEqual((S.Finding("/a", "T_X"),), few)
 
+    def test_the_cap_is_reported_only_when_exceeded(self) -> None:
+        mirror = {"type": "array", "items": {"type": "string"}}
+        overflow = S.Finding("", "T_TOO_MANY_FINDINGS")
+        for limit in (5, S.MAX_FINDINGS):
+            schema = S.ClosedSchema(mirror, code_prefix="T_", max_findings=limit)
+            for count, capped in ((limit - 1, False), (limit, False), (limit + 1, True)):
+                with self.subTest(limit=limit, count=count):
+                    result = schema.evaluate([1] * count)
+                    self.assertEqual(min(count, limit), len(result))
+                    self.assertEqual(capped, overflow in result)
+                    if not capped:
+                        self.assertEqual({S.Finding(f"/{index}", "T_TYPE_MISMATCH") for index in range(count)}, set(result))
+                    findings = {S.Finding(f"/{index:03d}", "T_X") for index in range(count)}
+                    self.assertEqual(capped, overflow in S.finalize(findings, "T_", limit))
+        self.assertFalse(S.ClosedSchema(mirror, code_prefix="T_").matches({"type": "string"}, 1))
+        self.assertTrue(S.ClosedSchema(mirror, code_prefix="T_").matches({"type": "string"}, "a"))
+
     def test_bounded_list_refuses_oversized_or_non_lists(self) -> None:
         self.assertEqual([1, 2], S.bounded_list([1, 2], 2))
         self.assertEqual([], S.bounded_list([1, 2, 3], 2))

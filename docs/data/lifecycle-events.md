@@ -76,7 +76,7 @@ Conséquences sur les acteurs :
 Le sujet est identifié par le triplet `(artifact_kind, artifact_id, subject_sha256)`. `subject_sha256` est l'empreinte des octets conservés, identique dans tous les événements du sujet :
 
 - `research_package` : `artifact_id` = `package_id` ; empreinte de portée `ingress-payload-bytes` (`docs/data/canonical-hashing.md`), car le RAW conserve les octets reçus ;
-- `conversation` : `artifact_id` = `conversation_id` ; empreinte `sha256` du reçu actuel du collecteur de conversations (contrat distinct, voir `canonical-hashing.md`) ;
+- `conversation` : `artifact_id` = `conversation_id` ; empreinte `sha256` du reçu que produit aujourd'hui le code du collecteur de conversations sur `main` (contrat distinct, voir `canonical-hashing.md`). **OUVERT** : la portée de cette empreinte dépend de la décision du propriétaire sur le contrat de conversation (empreinte actuelle documentée comme contrat propre, ou passage aux octets d'ingress et à RFC 8785) et de la fusion de la PR #17. Le schéma et la relecture ne traitent `subject_sha256` que comme une empreinte SHA-256 opaque et ne tranchent donc pas ce choix ;
 - `conversation_revision` : même `artifact_id` que l'original, empreinte de la révision ;
 - refus à l'ingress : `artifact_id` = `submission_id` attribué par le Collector, car un corps refusé peut ne contenir aucun identifiant fiable ; empreinte des octets reçus puis écartés ;
 - `derived_artifact` : `artifact_id` et `result.content_sha256` de l'enregistrement de lignée.

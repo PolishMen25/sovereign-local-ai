@@ -115,4 +115,4 @@ Le Collector write-only ne déréférence aucune URL. Il peut appliquer ce contr
 python -B services/quarantine/url_policy.py urls.txt
 ```
 
-Le fichier contient une URL par ligne. La sortie donne, pour chaque ligne, son numéro et ses codes de motif, sans recopier l'URL. Le code de sortie vaut 1 si au moins une URL est refusée.
+Le fichier contient une URL par ligne, en UTF-8. Seul le saut de ligne `LF` sépare les lignes (un `CR` final est retiré) : U+2028, U+0085 ou un saut de page restent dans la ligne, qui est alors refusée. La sortie donne, pour chaque ligne, son numéro et ses codes de motif, sans recopier l'URL. Code de sortie : 0 si toutes les URL sont admises, 1 si au moins une URL est refusée, 2 si le fichier est illisible, n'est pas en UTF-8 ou dépasse la taille admise.

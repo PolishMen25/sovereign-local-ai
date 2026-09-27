@@ -9,7 +9,7 @@ Ce document précise la phrase de `docs/data/provenance-and-lifecycle.md` : « l
 - **Refuser, jamais corriger.** Le validateur ne modifie pas le paquet. Le RAW reste identique aux octets reçus.
 - **Codes seulement.** Chaque refus est un couple (code, pointeur JSON RFC 6901). Le pointeur n'est construit qu'avec des noms du schéma et des indices de tableau : un membre inconnu est signalé sur son objet parent, sans recopier son nom. Aucune valeur, URL ou partie de texte n'apparaît dans un résultat, une exception ou la sortie de la ligne de commande.
 - **Deux couches.** Une couche structurelle reproduit le schéma ; une couche sémantique applique les règles que le schéma ne peut pas exprimer.
-- **Bornes.** Un tableau qui dépasse son `maxItems` est signalé et n'est pas parcouru. Au plus 100 refus sont rendus ; au-delà, le dernier est `PKG_TOO_MANY_FINDINGS`.
+- **Bornes.** Un tableau qui dépasse son `maxItems` est signalé et n'est pas parcouru. Au plus 100 refus sont rendus : jusqu'à 100 refus distincts, tous figurent ; au-delà, 99 sont gardés et le dernier est `PKG_TOO_MANY_FINDINGS`.
 - **Aucun réseau.** Le module n'ouvre aucune socket et ne résout aucun nom ; un test le vérifie.
 
 ## Couche structurelle : miroir du schéma
@@ -50,7 +50,7 @@ Le choix entre ce validateur stdlib et une dépendance `jsonschema` de test rest
 | `PKG_ARRAY_TOO_SHORT`, `PKG_ARRAY_TOO_LONG` | Taille de tableau hors bornes ; un tableau trop long n'est pas parcouru. |
 | `PKG_ARRAY_DUPLICATE_ITEM` | Doublon dans `redacted_categories`. |
 | `PKG_ONE_OF_MISMATCH` | Valeur de paramètre de génération qui n'est ni un scalaire ni une liste de scalaires. |
-| `PKG_TOO_MANY_FINDINGS` | Plafond de 100 refus atteint. |
+| `PKG_TOO_MANY_FINDINGS` | Plafond de 100 refus dépassé (plus de 100 refus distincts). |
 
 ## Couche sémantique
 
@@ -84,7 +84,7 @@ Chaque `sources[].url` et `attachments[].source_url` passe par `url_policy.evalu
 
 ## Hors périmètre
 
-- **Analyse de secrets.** `secret_scan` (`collector-secret-scan-v1`) n'est pas appliqué ici : le choix entre refus à l'ingress et signalement en `PENDING`, par catégorie, est une décision du propriétaire. Le Collector devra combiner les deux résultats.
+- **Analyse de secrets.** `secret_scan` (`collector-secret-scan-v1`) n'est pas appliqué ici : le choix entre refus à l'ingress et signalement en `PENDING`, par catégorie, est une décision du propriétaire. Le composant désigné par l'ADR du Research Gateway (OUVERT) devra combiner les deux résultats selon la politique refus/signalement du propriétaire (OUVERT).
 - **Câblage.** Aucune route `submit_research_package` n'existe ; elle dépend de l'ADR du Research Gateway.
 - **Horloge.** Aucune comparaison avec l'heure de réception : `received_at` appartient au reçu et au journal.
 

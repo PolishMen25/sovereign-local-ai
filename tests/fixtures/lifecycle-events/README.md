@@ -9,8 +9,9 @@ Statut : **PROVISOIRE**, comme la relecture `lifecycle-event-replay-v1` qu'ils i
 
 `tests/test_contract_fixtures.py` vérifie chaque cas et que chaque règle d'événement ou de relecture a au moins un journal invalide ; `tests/test_fixture_hygiene.py` vérifie l'absence de secret et de valeur non réservée.
 
-Les événements d'un sujet sont chaînés par empreinte RFC 8785 : modifier un événement oblige à recalculer `previous_event_sha256` des événements suivants du même sujet (`lifecycle.event_sha256`). Relecture locale :
+Les événements d'un sujet sont chaînés par empreinte RFC 8785 : modifier un événement oblige à recalculer `previous_event_sha256` des événements suivants du même sujet (`lifecycle.event_sha256`). Le générateur d'origine n'a pas été conservé ; les fichiers versionnés font foi. L'outil de rescellement, hors ligne et en lecture seule, affiche pour chaque ligne son `event_sha256` et le `previous_event_sha256` déclaré, puis la relecture confirme la chaîne :
 
 ```text
-python -B services/quarantine/lifecycle.py fichier.jsonl
+python -B tools/contract_fixture_hashes.py tests/fixtures/lifecycle-events/fichier.jsonl
+python -B services/quarantine/lifecycle.py tests/fixtures/lifecycle-events/fichier.jsonl
 ```
