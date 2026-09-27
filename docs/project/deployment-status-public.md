@@ -1,12 +1,14 @@
 # État public du déploiement
 
-Dernière vérification en direct : 2026-09-09. Dernier relevé versionné :
-2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `eea75b5` :
+Dernière vérification complète en direct : 2026-09-09. Vérification ciblée :
+2026-09-27 (passerelle et Collector uniquement). Dernier relevé versionné :
+2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `c88ccb0` :
 registre jusqu'à D-045, phase 1 (D-038) ; depuis `db9414d`, le code a reçu
 l'interrupteur D-035, le contrôleur de disponibilité du NAS, les points
 d'accès privés hors Git (D-036), la CI (D-037), le comparateur NUMA durci, des
 contrats et outils candidats hors ligne et la séparation par défaut entre E2
-et l'arène, sans relevé de déploiement.
+et l'arène. Les composants hors de la vérification ciblée ne disposent pas
+d'un nouveau relevé de déploiement.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md), qui donne pour
@@ -89,7 +91,10 @@ sans décision au registre ou au-delà de leur décision.
   confirmation humaine à usage unique. Profils et boucle d'outils sont à
   régulariser. D-035 place les deux actions derrière l'interrupteur
   `SOVEREIGN_ACTIONS_ENABLED`, désactivé par défaut ; le code de `main`
-  l'implémente depuis `c0b169e`, sans déploiement consigné.
+  l'implémente depuis `c0b169e`. Contrôle ciblé en service le 2026-09-27 :
+  le fichier applicatif correspond au blob Git de `main`, l'interrupteur
+  effectif est désactivé et la configuration privée épinglée est présente.
+  Cela ne constitue pas un test d'activation des actions.
 - **Arène d'agents et incréments de corpus : code et observations de commit.**
   Le code de l'arène produit des paquets de solutions vérifiées par le bac à
   sable, en attente d'approbation ; un paquet approuvé peut devenir un
@@ -112,8 +117,12 @@ sans décision au registre ou au-delà de leur décision.
   fail-closed existent ; les outils du chat passent par la passerelle, pas par
   l'orchestrateur.
 - **Collector : ingress write-only vérifié en direct au relevé du 2026-08-31
-  (`cd1740e`).** Son endpoint HTTPS de santé répondait ; une entrée acceptée
-  reste `RAW` et n'est jamais promue automatiquement.
+  (`cd1740e`), puis contrôle ciblé le 2026-09-27.** La release versionnée
+  du correctif de la PR #17 répond localement et par HTTPS ; ses modules ont
+  été relus à destination et comparés aux blobs Git, les instantanés RAW
+  existants sont conservés et les empreintes des versions vérifiées. La PR #17
+  reste ouverte. Une entrée acceptée reste `RAW` et n'est jamais promue
+  automatiquement.
 - **Stockage : partage Synology monté et persistant.** L'arborescence durable
   est accessible au conteneur CORE depuis un montage hôte SMB 3.1.1 chiffré,
   activé au démarrage et contrôlé par un compte de service limité. Une écriture
