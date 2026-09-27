@@ -78,9 +78,18 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
   Internet. Le premier run réel a ensuite refusé un argument appartenant au
   wrapper enfant ; le défaut est corrigé, déployé et couvert par les tests.
   Deux preuves A/B de trois répétitions, même commit et même workload ont été
-  produites puis vérifiées par un comparateur strict. La médiane de A est 3,8 %
-  au-dessus de B sur ce mini-test ; cette observation descriptive ne choisit
-  pas encore un placement pour CORE-700M.
+  produites puis vérifiées par un comparateur strict. Le 2026-09-06, la médiane
+  de A est 3,8 % au-dessus de B sur ce mini-test. La paire du 2026-09-07
+  (révision `6cebad1`, voir `docs/model/core-mini-numa-protocol.md`) donne au
+  contraire un ratio A/B de 0,9497, soit B environ 5,3 % au-dessus de A, et la
+  médiane de B se situe dans la plage observée de A. Le sens s'inverse entre
+  les deux paires et les plages se recouvrent : l'observation est non
+  concluante et ne choisit aucun placement. Le comparateur utilisé pour ces
+  paires ne vérifiait pas que A et B reposaient sur deux contrats de placement
+  distincts ; depuis `654b730`, il refuse deux preuves de même engagement, et
+  `tools/verify_core_mini_placement_distinctness.py` établit cette distinction
+  hors ligne à partir des contrats privés. Aucun des deux n'a été rejoué sur
+  ces preuves.
 
 Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
 le benchmark NUMA complet avec répétitions et charges plus grandes, ni la

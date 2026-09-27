@@ -2,10 +2,50 @@
 
 ## Statut et invariant
 
-**INACTIVE.** Cette spécification ne lance ni génération, ni sandbox, ni
-entraînement. Une boucle ne peut devenir activable qu'après le pilote CORE-MINI
-décrit ci-dessous, une approbation explicite du propriétaire et un taux
-d'acceptation mesuré d'au moins **60 % sur 100 tâches distinctes**.
+**Statut factuel au 2026-09-27**, établi sans accès au serveur de calcul, hors
+ligne depuis le 2026-09-14 environ, contre `main` à `eea75b5` (depuis
+`db9414d`, l'arène a reçu l'épinglage privé de Qwen-Coder, `6a79309`, et sa
+suite par défaut, `eea75b5` ; registre jusqu'à D-045) :
+
+- **Spécification** : ce document ne lance lui-même ni génération, ni sandbox,
+  ni entraînement.
+- **Code de l'arène versionné** : génération arbitrée par le bac à sable,
+  paquets et pont vers les incréments de corpus sont sur `main` depuis
+  `0dcbe8c` (2026-09-11) et ses suites : `b5f0227`, `015b815`, `9b31b41`,
+  `8ef2f8a`, `cd68960`, `d9c0e42`, `b486851` pour l'arène ; `229ffe0`,
+  `689fa70`, `75d234a`, `0655d42`, `5f59591`, `dbca0c6` pour le pont.
+- **Exécutions rapportées seulement par des messages de commit** : `8ef2f8a`
+  rapporte un démon qui redémarrait en boucle, `dbca0c6` 41 paquets dont 2
+  convertis en incréments, `b486851` des mesures sur 28 paquets réels. Aucun
+  relevé versionné ne les confirme et l'état présent n'est pas vérifiable.
+- **Critères d'activation non consignés** : le pilote CORE-MINI, l'approbation
+  explicite du propriétaire et le taux d'acceptation d'au moins 60 % sur 100
+  tâches distinctes (§6) ne figurent dans `docs/project/decisions.md` ni comme
+  atteints ni comme levés. `AGENTS.md` (phase 1, D-038) range l'arène et la
+  boucle d'auto-entraînement parmi les composants en service sans décision au
+  registre, à régulariser avant toute extension. **OUVERT**, décision du
+  propriétaire. Rien dans ce document ne vaut approbation d'activation.
+- **Données produites** : D-040 rend admissible pour l'entraînement de CORE le
+  code synthétique de l'arène, dans les limites données au §4 ; cette
+  admissibilité ne vaut pas activation de la boucle. D-045 active
+  l'approbation automatique réelle des paquets selon D-039 et D-040 ; elle
+  n'est pas implémentée sur `main`, et son articulation avec les critères
+  d'activation ci-dessus et avec la régularisation demandée par `AGENTS.md`
+  est **OUVERT**, décision du propriétaire.
+- **Suite jouée** : D-044 consigne que l'arène a joué sur le benchmark scellé
+  E2 (`configs/evaluation/core-python-e2.candidate.json`) le 2026-09-11,
+  étiquette E2 « contaminée » et la remplace, pour l'évaluation, par une suite
+  E2-v2 scellée hors dépôt ; D-043 révoque l'autorisation d'entraînement des
+  incréments `0001` et `0002`. Depuis `eea75b5`, la suite par défaut de
+  `services/arena/runner.py` est `configs/arena/practice-suite.v1.json` et E2
+  ne se joue que par choix explicite ; 14 noms de fonction restent communs
+  aux deux suites. La suite jouée depuis le 2026-09-11 n'est pas consignée.
+
+Les sections suivantes restent la spécification cible ; les écarts du code sont
+signalés là où ils s'appliquent. Selon cette spécification, une boucle ne peut
+devenir activable qu'après le pilote CORE-MINI décrit ci-dessous, une
+approbation explicite du propriétaire et un taux d'acceptation mesuré d'au
+moins **60 % sur 100 tâches distinctes**.
 
 Le seul signal de qualité est mécanique : exécution isolée d'un candidat et
 succès de la suite de tests fournie avec la tâche. Le modèle ne note jamais sa
@@ -50,6 +90,45 @@ tri. Il reste RAW jusqu'à un commit propriétaire de
 `core-v1-source-policy.approved.json` compatible avec le même vérificateur que
 le corpus externe. Aucun résultat de test, journal ou sortie de modèle ne
 constitue une promotion automatique vers l'entraînement.
+*[Condition d'approbation remplacée par D-039 et D-040 ; voir ci-dessous.]*
+
+**Registre au 2026-09-27.** D-039 ratifie `6d959d7`, qui retire
+`core-v1-source-policy.approved.json` du préflight : une version de corpus est
+autorisée dès qu'une politique automatique versionnée et auditée produit son
+manifeste `VALIDATED`, sans approbation du propriétaire par version ; chaque
+décision automatique est journalisée avec un acteur de politique et reste
+révocable avant consommation. D-040 rend admissibles les données
+synthétiques de l'arène, limitées au code dont chaque solution passe ses tests
+en bac à sable, généré par Qwen2.5-Coder, étiqueté synthétique et sans
+recouvrement avec les jeux d'évaluation, dans la limite de 20 % des tokens
+d'une version de corpus ; les sorties de BOOTSTRAP restent exclues. D-040
+résout le conflit entre `promote_arena_increment` et
+`validate_training_corpus_manifest` et demande l'alignement des validateurs.
+D-043 révoque l'autorisation d'entraînement des incréments `0001` et `0002`
+et exige que les outils qui construisent un corpus refusent tout incrément
+révoqué. D-045 active l'approbation automatique réelle des paquets par cette
+politique (acteur `policy:auto-v1`), avec chaîne d'audit, interrupteur
+d'arrêt et révocation.
+
+**Écart du code au 2026-09-27.** Dans le code de `main`, un paquet approuvé
+depuis `/arena` est converti en incrément RAW synthétique par un outil lancé à
+la main (`tools/build_core_increment_from_arena.py`,
+`tools/build_increments_for_approved_packets.py`) ; une approbation déposée
+depuis `/corpus` est ensuite appliquée toutes les deux minutes par un service
+périodique qui promeut l'incrément en `VALIDATED` avec
+`training_authorization` `approved` (`tools/promote_arena_increment.py`).
+Depuis `eea75b5`, `tools/build_core_increment_from_arena.py` refuse une suite
+E2 et les solutions de tâches E2, et inscrit l'empreinte de la suite dans le
+manifeste d'incrément. Restent à livrer par PR : la politique automatique de
+D-039 et l'approbation automatique réelle de D-045, absentes du code de
+`main` ; le refus des incréments révoqués par D-043 ; l'alignement de
+`tools/validate_training_corpus_manifest.py`, qui refuse encore un matériau
+`synthetic` dont l'autorisation vaut `approved` ; et l'exclusion des
+solutions qui ne viennent pas de Qwen2.5-Coder : les paquets enregistrent le
+moteur de chaque solution (`engine`), les profils `author-bootstrap` de
+`services/arena/league.py` sont servis par BOOTSTRAP, et les outils
+d'incrément ne lisent pas ce champ. D'ici là, aucun chemin contractuel ne
+mène ces incréments à un manifeste d'entraînement.
 
 ## 5. Garde-fous anti-effondrement
 
