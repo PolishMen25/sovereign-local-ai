@@ -21,6 +21,7 @@ from tests.test_compare_core_mini_numa_evidence import (
     encode,
     evidence,
 )
+from tools import compare_core_mini_numa_evidence as comparison
 from tools import core_mini_numa_benchmark as benchmark
 from tools import verify_core_mini_placement_distinctness as verifier
 
@@ -292,7 +293,8 @@ class DistinctnessTests(unittest.TestCase):
                         return os.stat_result(fields)
                     return result
 
-                with patch.object(verifier.os, "lstat", fake_lstat):
+                # The check lives in the comparator, shared with the verifier.
+                with patch.object(comparison.os, "lstat", fake_lstat):
                     self.assertRefused(paths, "not a link")
 
     def test_refuses_a_directory_or_missing_input(self) -> None:

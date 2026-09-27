@@ -14,9 +14,7 @@ node id, a count, a salt or a path.
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
-import stat
 import sys
 from typing import Any
 
@@ -38,18 +36,8 @@ LABEL_A, LABEL_B = benchmark.PLACEMENT_IDS
 
 
 def _require_regular_non_link(path: Path) -> None:
-    # The reads below also use O_NOFOLLOW where the platform offers it; this
-    # explicit check keeps the refusal on platforms without that flag.
-    try:
-        metadata = os.lstat(path)
-    except (OSError, ValueError):
-        raise benchmark.BenchmarkRefused(
-            "distinctness input is unavailable"
-        ) from None
-    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-        raise benchmark.BenchmarkRefused(
-            "distinctness input must be a regular file, not a link"
-        )
+    # Same lstat rule as the comparator, which applies it to both proofs too.
+    comparison._require_regular_non_link(path, "distinctness input")
 
 
 def _require_outside_source_tree(path: Path) -> None:

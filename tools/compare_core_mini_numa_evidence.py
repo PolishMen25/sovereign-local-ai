@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import os
 from pathlib import Path
 import re
+import stat
 import statistics
 import sys
 from typing import Any
@@ -48,6 +50,17 @@ REPETITION_KEYS = {
     "verification_sha256", "checkpoint_sha256", "steps_total", "steps_measured",
     "tokens_measured", "timing_seconds", "tokens_per_second",
 }
+REPETITION_DIGEST_KEYS = (
+    "metrics_sha256", "summary_sha256", "verification_sha256", "checkpoint_sha256",
+)
+# Same timing contract as the runner's metrics summary: five positive values
+# and two non-negative dispersion values, all finite floats.
+TIMING_POSITIVE_KEYS = (
+    "total", "mean_step", "median_step", "minimum_step", "maximum_step",
+)
+TIMING_DISPERSION_KEYS = (
+    "population_standard_deviation", "median_absolute_deviation",
+)
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 PROOF_ID_PATTERN = re.compile(
     r"proof-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
@@ -80,6 +93,67 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and SHA256_PATTERN.fullmatch(value) is not None
 
 
+def _require_regular_non_link(path: Path, subject: str) -> None:
+    # The bounded read also uses O_NOFOLLOW where the platform offers it; this
+    # explicit check keeps the refusal on platforms without that flag. The
+    # placement verifier reuses it for its own inputs.
+    try:
+        metadata = os.lstat(path)
+    except (OSError, ValueError):
+        raise benchmark.BenchmarkRefused(f"{subject} is unavailable") from None
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise benchmark.BenchmarkRefused(
+            f"{subject} must be a regular file, not a link"
+        )
+
+
+def _is_finite_float(value: Any) -> bool:
+    return type(value) is float and math.isfinite(value)
+
+
+def _validate_repetition(run: Any, workload: dict[str, Any]) -> float:
+    # Repetition fields are not echoed in the comparison, but the comparator
+    # refuses any proof outside the 0.2.0 contract, with the runner's bounds.
+    if (
+        not isinstance(run, dict)
+        or set(run) != REPETITION_KEYS
+        or run["status"] != "completed"
+        or any(not _is_sha256(run[key]) for key in REPETITION_DIGEST_KEYS)
+    ):
+        raise benchmark.BenchmarkRefused("NUMA repetition is incompatible")
+    steps = workload["steps"]
+    measured_steps = steps - workload["warmup_steps"]
+    tokens_per_step = workload["batch_size"] * workload["sequence_length"]
+    expected_counts = {
+        "steps_total": steps,
+        "steps_measured": measured_steps,
+        "tokens_measured": tokens_per_step * measured_steps,
+    }
+    if any(
+        type(run[key]) is not int or run[key] != value
+        for key, value in expected_counts.items()
+    ):
+        raise benchmark.BenchmarkRefused("NUMA repetition counts are incompatible")
+    timing = run["timing_seconds"]
+    if (
+        not isinstance(timing, dict)
+        or set(timing) != set(TIMING_POSITIVE_KEYS) | set(TIMING_DISPERSION_KEYS)
+        or any(
+            not _is_finite_float(timing[key]) or timing[key] <= 0.0
+            for key in TIMING_POSITIVE_KEYS
+        )
+        or any(
+            not _is_finite_float(timing[key]) or timing[key] < 0.0
+            for key in TIMING_DISPERSION_KEYS
+        )
+    ):
+        raise benchmark.BenchmarkRefused("NUMA repetition timing is incompatible")
+    throughput = run["tokens_per_second"]
+    if not _is_finite_float(throughput) or throughput <= 0.0:
+        raise benchmark.BenchmarkRefused("NUMA throughput is incompatible")
+    return throughput
+
+
 def _validate_workload(workload: dict[str, Any]) -> None:
     def refuse(key: str) -> None:
         raise benchmark.BenchmarkRefused(f"NUMA workload field is incompatible: {key}")
@@ -110,6 +184,7 @@ def _validate_workload(workload: dict[str, Any]) -> None:
 
 
 def _read_evidence(path: Path) -> tuple[dict[str, Any], str]:
+    _require_regular_non_link(path, "NUMA evidence")
     payload = benchmark._read_regular_bytes(
         path, maximum_bytes=benchmark.MAXIMUM_CHILD_OUTPUT_BYTES
     )
@@ -168,33 +243,35 @@ def _read_evidence(path: Path) -> tuple[dict[str, Any], str]:
         <= benchmark.MAXIMUM_REPETITIONS
         or not isinstance(repetitions, list)
         or len(repetitions) != expected_count
-        or [run.get("repetition_id") if isinstance(run, dict) else None for run in repetitions]
+        # type() rather than ==, so that True never stands for repetition 1.
+        or [
+            run.get("repetition_id")
+            if isinstance(run, dict) and type(run.get("repetition_id")) is int
+            else None
+            for run in repetitions
+        ]
         != list(range(1, expected_count + 1))
     ):
         raise benchmark.BenchmarkRefused("NUMA repetitions are incompatible")
-    samples: list[float] = []
-    for run in repetitions:
-        if (
-            not isinstance(run, dict)
-            or set(run) != REPETITION_KEYS
-            or run["status"] != "completed"
-        ):
-            raise benchmark.BenchmarkRefused("NUMA repetition is incompatible")
-        throughput = run["tokens_per_second"]
-        if type(throughput) is not float or not math.isfinite(throughput) or throughput <= 0.0:
-            raise benchmark.BenchmarkRefused("NUMA throughput is incompatible")
-        samples.append(throughput)
+    samples = [
+        _validate_repetition(run, document["workload"]) for run in repetitions
+    ]
     distribution = document["aggregate"]["tokens_per_second"]
-    expected_distribution = {
-        "mean": statistics.fmean(samples),
-        "median": statistics.median(samples),
-        "minimum": min(samples),
-        "maximum": max(samples),
-        "population_standard_deviation": statistics.pstdev(samples),
-        "median_absolute_deviation": statistics.median(
-            abs(value - statistics.median(samples)) for value in samples
-        ),
-    }
+    try:
+        expected_distribution = {
+            "mean": statistics.fmean(samples),
+            "median": statistics.median(samples),
+            "minimum": min(samples),
+            "maximum": max(samples),
+            "population_standard_deviation": statistics.pstdev(samples),
+            "median_absolute_deviation": statistics.median(
+                abs(value - statistics.median(samples)) for value in samples
+            ),
+        }
+    except (OverflowError, ValueError, statistics.StatisticsError):
+        # Finite samples near the float maximum overflow fmean's exact sum;
+        # library callers expect BenchmarkRefused, never a raw exception.
+        raise benchmark.BenchmarkRefused("NUMA aggregate is incompatible") from None
     if any(
         type(distribution[key]) is not float
         or not math.isfinite(distribution[key])

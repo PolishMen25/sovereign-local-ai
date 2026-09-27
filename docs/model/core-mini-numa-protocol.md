@@ -187,7 +187,9 @@ Avant tout ratio, le comparateur refuse :
 
 - un fichier non régulier, un lien symbolique, une taille hors borne, un JSON
   invalide, une clé dupliquée, une constante non finie, un entier géant ou une
-  imbrication excessive ;
+  imbrication excessive. Le refus des liens repose sur un contrôle `lstat`
+  explicite, partagé avec le vérificateur de distinction, qui vaut aussi là où
+  `O_NOFOLLOW` n'existe pas, par exemple sous Windows ;
 - des octets qui ne sont pas exactement la forme `canonical-json-v1` suivie
   d'un unique LF : indentation, clés non triées, CRLF, LF absent ou doublé,
   échappements superflus ;
@@ -196,7 +198,13 @@ Avant tout ratio, le comparateur refuse :
   empreinte mal formés, ainsi qu'un champ de workload hors du contrat `0.2.0`,
   puisque le workload est recopié dans la sortie ;
 - un nombre de répétitions hors de 3 à 10, zéro compris, ou une statistique
-  que le recalcul exact ne retrouve pas ;
+  que le recalcul exact ne retrouve pas ou ne peut pas représenter (débits
+  finis proches du maximum flottant) ;
+- une répétition hors du contrat `0.2.0` : `repetition_id` non entier (un
+  booléen compris), empreinte mal formée, nombre d'étapes ou de jetons mesurés
+  différent de celui que fixe le workload, durées d'étape absentes, non finies,
+  négatives ou autres que des flottants. Ces champs ne sont pas recopiés dans
+  la sortie ; ils restent liés à elle par le SHA-256 du fichier de preuve ;
 - deux fichiers de même SHA-256, deux `proof_id` identiques, ou des libellés
   autres que `placement-a` puis `placement-b` ;
 - deux sessions différentes, un champ de workload différent (le refus interne
@@ -224,7 +232,7 @@ non vérifiée ».
 | `shared_contract` | `workload_contract_sha256` et l'objet `workload` commun complet : commit et empreintes des sources, locks PyTorch et NumPy, observation du runtime, contrat d'environnement, configuration et dimensions. L'empreinte se recalcule sur cet objet. |
 | `placements` | Pour `placement-a` et `placement-b` : `proof_id`, SHA-256 du fichier de preuve, engagement salé, nombre de répétitions et distribution des débits (moyenne, médiane, minimum, maximum, écart-type de population, MAD). |
 | `descriptive_ratios` | Ratios B/A de la moyenne, de la médiane, du minimum et du maximum. |
-| `separation` | `observed_ranges_overlap`, `outcome` et `higher_median_label`. |
+| `separation` | `observed_ranges_overlap`, `outcome` et `higher_median_label`, limités par le schéma à leurs combinaisons cohérentes. |
 | `interpretation` | `descriptive-only-not-a-core-placement-decision` |
 | `gate_status` | `g4-open`, constant. |
 
@@ -235,7 +243,17 @@ recouvrent, y compris par une borne commune, `outcome` vaut
 conclusion statistique : même des intervalles disjoints restent une
 description. `higher_median_label` (`placement-a`, `placement-b` ou `tied`)
 nomme la médiane la plus haute, jamais un gagnant, et aucun libellé n'est
-traduit en socket.
+traduit en socket. Le schéma n'admet que les combinaisons cohérentes : un
+recouvrement donne toujours l'issue `inconclusive-overlapping-observed-ranges`,
+des intervalles disjoints l'issue `disjoint-observed-ranges`, et `tied` n'est
+jamais disjoint, puisque deux médianes égales appartiennent aux deux
+intervalles.
+
+`shared_contract.workload` recopie `threads`, comme le font déjà les preuves
+`0.2.0`. Si ce niveau égale la taille exacte de l'affinité, une comparaison v2
+répète donc un effectif de CPU. Le point 7 des « Points soumis au
+propriétaire » (D-025, **OUVERT**) couvre aussi les artefacts de comparaison
+v2 ; le comparateur reste inchangé en attendant cette décision.
 
 Le schéma est fermé à tous les niveaux. Ses définitions `workload`,
 `distribution`, `sha256`, `proofId` et `sessionId` sont identiques à celles du
@@ -459,7 +477,7 @@ Préconditions communes (PROVISOIRE) :
 | 1 | Au moins deux tailles miniatures avec MHA, RoPE, RMSNorm, SwiGLU et poids liés | **OUVERT** (la première échelle est CONFIRMÉE) | « Échelles et workload » |
 | 2 | Dataset autorisé, tokenizer, séquence, lots et optimiseur représentatifs | **OUVERT** (le workload synthétique est CONFIRMÉ) | « Échelles et workload » |
 | 3 | Un socket/deux sockets, placements NUMA et nombres de threads | **PROVISOIRE** (contrats, comparateur et reçu CONFIRMÉS) | « Matrice de balayage et ordre d'exécution », « Reçu de distinction des placements » |
-| 4 | Tokens/s, temps/étape, mémoire de pointe, CPU, défauts NUMA et I/O | **PROVISOIRE** (tokens/s et temps/étape CONFIRMÉS) | « Métriques système », « Temps séparés » |
+| 4 | Tokens/s, temps/étape, mémoire de pointe, CPU, défauts NUMA et I/O | **PROVISOIRE** (tokens/s et temps/étape CONFIRMÉS ; défauts NUMA **OUVERT** : ratio de localité proposé à la place, point 10) | « Métriques système », « Temps séparés » |
 | 5 | Checkpoint, interruption, reprise, évaluation et inférence | **PROVISOIRE** (checkpoint et reprise d'une étape CONFIRMÉS) | « Interruption et reprise », « Évaluation et inférence » |
 | 6 | Chauffe, répétitions, médiane, dispersion et format brut | **CONFIRMÉ** | « Protocole d'un run de preuve », « Format brut et statistiques » |
 | 7 | Méthode d'extrapolation et incertitudes | **PROVISOIRE** (modèle visé OUVERT) | « Extrapolation » |
@@ -468,7 +486,7 @@ Préconditions communes (PROVISOIRE) :
 | Critère d'acceptation de l'issue #8 | Statut | Section |
 | --- | --- | --- |
 | Protocole relisible et exécutable sans GPU ni accès Internet | **CONFIRMÉ** pour le runner (refus de CUDA/ROCm, sockets INET refusés) ; **PROVISOIRE** pour les extensions, qui n'ajoutent ni dépendance ni accès réseau | « Précondition d'isolation réseau » |
-| Configuration matérielle et logicielle complète avec chaque résultat | **PROVISOIRE** (liaison logicielle par empreintes CONFIRMÉE) | « Configuration et publication » |
+| Configuration matérielle et logicielle complète avec chaque résultat | **PROVISOIRE**, en attente du point 11 sur sa lecture sous D-025 (liaison logicielle par empreintes CONFIRMÉE) | « Configuration et publication » |
 | Aucune estimation de jours ou de mois avant les mesures | **PROVISOIRE** | « Extrapolation » |
 | Approbation du protocole par le propriétaire avant le benchmark long | **OUVERT** | « Points soumis au propriétaire » |
 
@@ -549,7 +567,7 @@ une nouvelle version du schéma de preuve, qui reste à écrire.
 | Temps CPU utilisateur et système | `ru_utime` et `ru_stime` de la même `rusage` | secondes par phase, et rapport temps CPU / temps mural à titre descriptif |
 | Entrées/sorties | `read_bytes` et `write_bytes` de `/proc/self/io`, lus par l'enfant juste avant sa sortie ; à défaut, `ru_inblock` et `ru_oublock` | octets, par phase |
 | Localité NUMA | `/proc/self/numa_maps`, lu par l'enfant d'entraînement après la dernière étape mesurée : pages des champs `N<nœud>=<pages>`, pondérées par `kernelpagesize_kB`, situées sur les nœuds de référence, divisées par le total | un seul ratio dans [0 ; 1] |
-| Défauts NUMA | aucun compteur par processus n'est retenu (voir les réserves ci-dessous) | rien |
+| Défauts NUMA | **OUVERT** : aucun compteur par processus n'est retenu à ce stade (voir les réserves ci-dessous) ; le ratio de localité est proposé à la place, sous réserve du point 10 soumis au propriétaire | rien tant que le point 10 reste ouvert |
 
 `getrusage(RUSAGE_CHILDREN)` ne convient pas à la mémoire de pointe : il renvoie
 le maximum sur tous les enfants terminés, pas celui d'une phase. Les nœuds de
@@ -560,8 +578,10 @@ performance. La lecture de `numa_maps` parcourt les tables de pages : elle a
 lieu une fois par répétition, hors des étapes mesurées, pour ne pas en fausser
 la durée.
 
-Réserves propres à l'invité LXC non privilégié (**HYPOTHÈSE** à vérifier sur
-l'hôte au repos) :
+Réserves propres à l'invité conteneurisé non privilégié de la zone CORE, déjà
+décrit publiquement comme conteneur dans
+[l'état des capacités](../project/current-capabilities.md) (**HYPOTHÈSE** à
+vérifier sur l'hôte au repos) :
 
 - `/proc/vmstat` et les compteurs `numastat` par nœud y décrivent l'hôte
   entier et incluent les autres charges. Ils ne mesurent pas le run et ne
@@ -735,9 +755,17 @@ du modèle. Elle publie aussi les paramètres du workload. Les documents
 correspondants restent dans le répertoire privé du run.
 
 **PROVISOIRE.** Le matériel exact n'est pas publié (D-025). L'enregistrement
-privé rattache chaque session de benchmark à l'inventaire interne mesuré, au
-type d'invité (VM ou LXC) et aux contrats de placement. Le dépôt public ne
-conserve que le caractère bi-socket NUMA et CPU-only.
+privé rattache chaque session de benchmark à l'inventaire interne mesuré et aux
+contrats de placement. Le type d'invité n'y est pas réservé : la zone CORE est
+déjà décrite publiquement comme un conteneur non privilégié (D-029 et
+[l'état des capacités](../project/current-capabilities.md)). Pour le matériel,
+le dépôt public ne conserve que le caractère bi-socket NUMA et CPU-only.
+
+Le critère de l'issue #8 « configuration matérielle et logicielle complète avec
+chaque résultat » est donc lu ici comme satisfait par cet enregistrement privé,
+lié à chaque résultat par l'identifiant de session. Cette lecture n'est pas
+tranchée : elle est soumise au propriétaire (point 11), qui peut exiger à la
+place un résumé public expurgé accompagnant chaque résultat.
 
 Toute sortie publique ajoutée par ce protocole suit « Minimisation de la sortie
 publique » : scalaires, ratios, booléens et empreintes seulement. Elle ne
@@ -763,10 +791,21 @@ document, identifiée par son commit, et sur les points **OUVERTS** :
 6. l'exigence éventuelle d'une reprise bit à bit ;
 7. la publication éventuelle des classes « un socket » et « deux sockets » pour
    les libellés opaques, et celle d'un niveau de threads égal à la taille de
-   l'affinité ;
+   l'affinité, que les preuves `0.2.0` et les comparaisons v2 recopient ;
 8. l'extension du reçu de distinction à d'autres axes que les CPU et les nœuds
    de la politique ;
-9. la façon de vérifier que l'hôte est au repos.
+9. la façon de vérifier que l'hôte est au repos ;
+10. les défauts NUMA, que l'issue #8 cite parmi les métriques : accepter le
+    ratio de localité à leur place, ou chercher un compteur par processus. Les
+    candidats sont les champs `numa_faults` de `/proc/<pid>/sched`, qui
+    dépendent de la configuration du noyau et n'existent que si l'équilibrage
+    NUMA automatique est actif, ou l'événement `node-load-misses` de `perf`.
+    Leur disponibilité depuis l'invité non privilégié est une **HYPOTHÈSE** à
+    vérifier ;
+11. la façon de satisfaire, sous D-025, le critère « configuration matérielle
+    et logicielle complète avec chaque résultat » : enregistrement privé lié
+    par session, comme proposé dans « Configuration et publication », ou résumé
+    public expurgé accompagnant chaque résultat.
 
 Tant que le propriétaire n'a pas consigné cette approbation dans le registre
 des décisions, ce protocole reste PROVISOIRE, et aucun benchmark long ne peut

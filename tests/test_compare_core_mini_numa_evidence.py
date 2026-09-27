@@ -3,10 +3,13 @@ import hashlib
 import io
 import json
 import math
+import os
 from pathlib import Path
 import re
+import stat
 import statistics
 import unittest
+from unittest.mock import patch
 
 from tests._temp_support import sovereign_temporary_directory
 from tools import compare_core_mini_numa_evidence as comparison
@@ -233,6 +236,83 @@ class ComparisonTests(unittest.TestCase):
             evidence_b([1e300, 1e300, 1e300]),
             "ratio",
         )
+
+    def test_samples_near_the_float_maximum_are_refused_not_raised(self) -> None:
+        # Finite samples near the float maximum overflow fmean's exact sum.
+        # The placement verifier calls the comparator as a library and must
+        # receive a refusal, never an OverflowError.
+        document = evidence_a()
+        for run in document["repetitions"]:
+            run["tokens_per_second"] = 1.7e308
+        document["aggregate"]["tokens_per_second"] = {
+            "mean": 1.7e308, "median": 1.7e308, "minimum": 1.7e308,
+            "maximum": 1.7e308, "population_standard_deviation": 0.0,
+            "median_absolute_deviation": 0.0,
+        }
+        self.assertRefused(document, evidence_b(), "NUMA aggregate is incompatible")
+
+    def test_refuses_repetition_fields_outside_the_evidence_contract(self) -> None:
+        def timing(**changes) -> dict:
+            return repetition(1, 1800.0)["timing_seconds"] | changes
+
+        cases = {
+            "boolean repetition id": ({"repetition_id": True}, "repetitions are incompatible"),
+            "path as metrics digest": ({"metrics_sha256": "/private/path"}, "repetition is incompatible"),
+            "uppercase checkpoint digest": ({"checkpoint_sha256": "A" * 64}, "repetition is incompatible"),
+            "steps_total off the workload": ({"steps_total": 9}, "counts"),
+            "float steps_measured": ({"steps_measured": 6.0}, "counts"),
+            "boolean steps_measured": ({"steps_measured": True}, "counts"),
+            "tokens_measured off the workload": ({"tokens_measured": 385}, "counts"),
+            "free-form timing": ({"timing_seconds": {"note": "/private/path"}}, "timing"),
+            "negative timing": ({"timing_seconds": timing(total=-1.0)}, "timing"),
+            "integer timing": ({"timing_seconds": timing(total=2)}, "timing"),
+            "negative dispersion": (
+                {"timing_seconds": timing(median_absolute_deviation=-0.01)}, "timing",
+            ),
+        }
+        for name, (changes, fragment) in cases.items():
+            with self.subTest(case=name):
+                document = evidence_b()
+                document["repetitions"][0].update(changes)
+                self.assertRefused(evidence_a(), document, fragment)
+
+    def test_refuses_a_directory_or_a_symbolic_link_as_proof(self) -> None:
+        with sovereign_temporary_directory() as directory:
+            root = Path(directory)
+            path_a, path_b = self._pair(root, evidence_a(), evidence_b())
+            with self.assertRaises(benchmark.BenchmarkRefused) as caught:
+                comparison.compare(root, path_b)
+            self.assertIn("not a link", str(caught.exception))
+            link = root / "link.json"
+            try:
+                os.symlink(path_a, link)
+            except (OSError, NotImplementedError):
+                self.skipTest("symbolic links are unavailable on this platform")
+            with self.assertRaises(benchmark.BenchmarkRefused) as caught:
+                comparison.compare(link, path_b)
+        self.assertIn("not a link", str(caught.exception))
+
+    def test_refuses_a_link_where_links_cannot_be_created(self) -> None:
+        # Windows has no O_NOFOLLOW and test hosts often lack the symlink
+        # privilege: simulate what lstat reports for a link on each side.
+        real_lstat = os.lstat
+        for side in (0, 1):
+            with self.subTest(side=side), sovereign_temporary_directory() as directory:
+                paths = self._pair(Path(directory), evidence_a(), evidence_b())
+                target = paths[side]
+
+                def fake_lstat(path, *args, **kwargs):
+                    result = real_lstat(path, *args, **kwargs)
+                    if Path(path) == target:
+                        fields = list(result)
+                        fields[stat.ST_MODE] = stat.S_IFLNK | 0o777
+                        return os.stat_result(fields)
+                    return result
+
+                with patch.object(comparison.os, "lstat", fake_lstat):
+                    with self.assertRaises(benchmark.BenchmarkRefused) as caught:
+                        comparison.compare(*paths)
+                self.assertIn("not a link", str(caught.exception))
 
     def test_refuses_a_forged_workload_digest(self) -> None:
         forged = evidence_b()
@@ -545,9 +625,12 @@ def check_against_schema(instance, schema: dict, root: dict | None = None, where
 class ComparisonSchemaTests(unittest.TestCase):
     def test_produced_artifacts_validate_against_the_schema_file(self) -> None:
         schema = load_comparison_schema()
+        # Every admissible separation combination is produced once.
         for name, samples_b in (
-            ("overlapping", SAMPLES_B),
-            ("disjoint", [1500.0, 1550.0, 1600.0]),
+            ("overlapping, higher a", SAMPLES_B),
+            ("overlapping, higher b", [1950.0, 2050.0, 2150.0]),
+            ("disjoint, higher a", [1500.0, 1550.0, 1600.0]),
+            ("disjoint, higher b", [2500.0, 2600.0, 2700.0]),
             ("tied", [1950.0, 2000.0, 2050.0]),
         ):
             with self.subTest(fixture=name):
@@ -603,6 +686,19 @@ class ComparisonSchemaTests(unittest.TestCase):
             "gate closed": lambda d: d.update(gate_status="g4-closed"),
             "missing ratio": lambda d: d["descriptive_ratios"].pop("median_b_over_a"),
             "winner label": lambda d: d["separation"].update(higher_median_label="winner"),
+            "overlap claimed disjoint": lambda d: d["separation"].update(
+                observed_ranges_overlap=True, outcome="disjoint-observed-ranges"
+            ),
+            "disjoint claimed inconclusive": lambda d: d["separation"].update(
+                observed_ranges_overlap=False,
+                outcome="inconclusive-overlapping-observed-ranges",
+            ),
+            "tied yet disjoint": lambda d: d["separation"].update(
+                observed_ranges_overlap=False,
+                outcome="disjoint-observed-ranges",
+                higher_median_label="tied",
+            ),
+            "integer overlap flag": lambda d: d["separation"].update(observed_ranges_overlap=1),
             "path in proof id": lambda d: d["placements"]["placement-a"].update(proof_id="proof-/tmp/x"),
             "digest with newline": lambda d: d["shared_contract"].update(
                 workload_contract_sha256="a" * 64 + "\n"

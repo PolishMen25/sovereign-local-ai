@@ -59,6 +59,7 @@
       }
     },
     "separation": {
+      "description": "Combinaisons admissibles seulement : un recouvrement donne toujours l'issue inconclusive, des intervalles disjoints l'issue disjoint. Deux médianes égales appartiennent aux deux intervalles, qui se recouvrent donc : tied n'est jamais disjoint.",
       "type": "object",
       "additionalProperties": false,
       "required": ["observed_ranges_overlap", "outcome", "higher_median_label"],
@@ -73,7 +74,34 @@
         "higher_median_label": {
           "enum": ["placement-a", "placement-b", "tied"]
         }
-      }
+      },
+      "enum": [
+        {
+          "observed_ranges_overlap": true,
+          "outcome": "inconclusive-overlapping-observed-ranges",
+          "higher_median_label": "placement-a"
+        },
+        {
+          "observed_ranges_overlap": true,
+          "outcome": "inconclusive-overlapping-observed-ranges",
+          "higher_median_label": "placement-b"
+        },
+        {
+          "observed_ranges_overlap": true,
+          "outcome": "inconclusive-overlapping-observed-ranges",
+          "higher_median_label": "tied"
+        },
+        {
+          "observed_ranges_overlap": false,
+          "outcome": "disjoint-observed-ranges",
+          "higher_median_label": "placement-a"
+        },
+        {
+          "observed_ranges_overlap": false,
+          "outcome": "disjoint-observed-ranges",
+          "higher_median_label": "placement-b"
+        }
+      ]
     },
     "interpretation": { "const": "descriptive-only-not-a-core-placement-decision" },
     "gate_status": { "const": "g4-open" }
