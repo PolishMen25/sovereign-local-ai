@@ -1,0 +1,41 @@
+{
+  "schema_version": "0.1.0",
+  "package_id": "0b7c6f2e-4d1a-4f3b-9c2d-7e8f9a0b1c2d",
+  "lifecycle_state": "RAW",
+  "producer": {
+    "provider": "synthetic-provider",
+    "model": "synthetic-model"
+  },
+  "timestamps": {
+    "request_started_at": "2026-09-01T10:00:00Z",
+    "response_completed_at": "2026-09-01T10:00:04Z",
+    "collected_at": "2026-09-01T10:00:05Z",
+    "created_at": "2026-09-01T10:00:06Z"
+  },
+  "request": {
+    "question": "Quelle est la frontière de confiance du Collector ?"
+  },
+  "response": {
+    "text": "Le Collector est en écriture seule."
+  },
+  "sources": [],
+  "citations": [],
+  "attachments": [],
+  "usage": {},
+  "cost": {},
+  "generation_parameters": [],
+  "errors": [],
+  "security": {
+    "producer_secret_scan_status": "passed",
+    "redaction_policy_version": "producer-redaction-v1",
+    "scanned_at": "2026-09-01T10:00:05Z",
+    "redactions_count": 0
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "RFC8785",
+    "hash_scope": "canonical-package-excluding-integrity",
+    "package_sha256": "b909f97b5f20265faa334acaa1f9377f06168ec30590656da952f4a8f7313051"
+  },
+  "comment": "champ inconnu"
+}

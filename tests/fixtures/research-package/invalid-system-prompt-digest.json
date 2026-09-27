@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "package_id": "3f1c2a9e-6b1d-4c1e-9a52-0d4b8e7f1a20",
+  "lifecycle_state": "RAW",
+  "producer": {
+    "provider": "synthetic-provider",
+    "model": "synthetic-model-large",
+    "provider_request_id": "req-0001",
+    "gateway_version": "0.1.0"
+  },
+  "timestamps": {
+    "request_started_at": "2026-09-01T10:00:00Z",
+    "response_completed_at": "2026-09-01T10:00:05.250Z",
+    "collected_at": "2026-09-01T12:00:06+02:00",
+    "created_at": "2026-09-01T10:00:07.000000001Z"
+  },
+  "request": {
+    "question": "Quelles sources publiques décrivent un sas de quarantaine ?",
+    "controlled_system_prompt": {
+      "text": "Réponds en français et cite tes sources. ",
+      "controlled_by": "local_operator",
+      "template_id": "template-fr-1",
+      "sha256": "a786c74bc1efd1f0b14eb34631be2268d6fcdca45d30ad36b267aa151e66c5f8"
+    },
+    "conversation_id": "conv-0001"
+  },
+  "response": {
+    "text": "Réponse synthétique : deux sources publiques d'exemple sont citées. 😀 Fin.",
+    "language": "fr-FR",
+    "finish_reason": "stop",
+    "provider_status": "completed"
+  },
+  "sources": [
+    {
+      "source_id": "src-1",
+      "kind": "web",
+      "url": "https://example.com/articles/quarantaine",
+      "title": "Article d'exemple",
+      "publisher": "Éditeur d'exemple",
+      "authors": [
+        "Autrice Synthétique"
+      ],
+      "published_at": "2026-08-01T00:00:00Z",
+      "retrieved_at": "2026-09-01T10:00:02Z",
+      "content_sha256": "ffa6a744d78d28386438b4a8e8ee32f56718633735057b1b5ddfb5d224d45d98",
+      "media_type": "text/html"
+    },
+    {
+      "source_id": "src-2",
+      "kind": "document",
+      "url": "https://www.example.org/rapport.pdf",
+      "retrieved_at": "2026-09-01T10:00:03Z",
+      "media_type": "application/pdf"
+    }
+  ],
+  "citations": [
+    {
+      "citation_id": "cit-1",
+      "source_id": "src-1",
+      "response_start": 0,
+      "response_end": 10,
+      "locator": "section 2",
+      "quoted_text_sha256": "1fa570a6e95b98451fc0849e29c457e3621df99b3d3f85368bc7b4bd1962dff2"
+    },
+    {
+      "citation_id": "cit-2",
+      "source_id": "src-2",
+      "response_start": 10,
+      "response_end": 74
+    },
+    {
+      "citation_id": "cit-3",
+      "source_id": "src-1"
+    }
+  ],
+  "attachments": [
+    {
+      "attachment_id": "att-1",
+      "filename": "rapport.pdf",
+      "media_type": "application/pdf",
+      "byte_size": 2048,
+      "content_sha256": "6b9af93708359b3140cbedbdecb4622d937c5e13be6248a13fc166cbdf5d74a5",
+      "source_url": "https://www.example.org/rapport.pdf",
+      "created_at": "2026-09-01T10:00:03Z"
+    }
+  ],
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 80,
+    "total_tokens": 200,
+    "cached_input_tokens": 20,
+    "reasoning_tokens": 30
+  },
+  "cost": {
+    "amount": 0.0125,
+    "currency": "EUR",
+    "estimated": true
+  },
+  "generation_parameters": [
+    {
+      "name": "temperature",
+      "value": 0.2
+    },
+    {
+      "name": "max_output_tokens",
+      "value": 1024
+    },
+    {
+      "name": "stop",
+      "value": [
+        "###",
+        null,
+        1,
+        true
+      ]
+    },
+    {
+      "name": "seed",
+      "value": null
+    },
+    {
+      "name": "stream",
+      "value": false
+    },
+    {
+      "name": "reasoning.effort",
+      "value": "medium"
+    }
+  ],
+  "errors": [
+    {
+      "code": "PROVIDER_RETRY",
+      "phase": "provider",
+      "message": "Nouvelle tentative après délai.",
+      "retryable": true,
+      "occurred_at": "2026-09-01T10:00:01Z",
+      "provider_http_status": 429,
+      "provider_error_type": "rate_limit"
+    }
+  ],
+  "security": {
+    "producer_secret_scan_status": "passed",
+    "redaction_policy_version": "producer-redaction-v1",
+    "scanned_at": "2026-09-01T10:00:06Z",
+    "redactions_count": 1,
+    "redacted_categories": [
+      "personal_data"
+    ]
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "RFC8785",
+    "hash_scope": "canonical-package-excluding-integrity",
+    "package_sha256": "bd4639b6d3ee99f628e1d9f3d15a94637e48c43c2c00863546c121c9cbe4d48d",
+    "provider_raw_response_sha256": "346655856d77deb365c0933f9a79c9dd0f1bee5b6955ce5c0beb4af176d68b49"
+  }
+}

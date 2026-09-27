@@ -1,0 +1,622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/lifecycle-event/0.1.0/schema.json",
+  "title": "Événement de cycle de vie append-only",
+  "description": "PROVISOIRE : contrat candidat, non câblé (docs/data/lifecycle-events.md). Un événement enregistre un dépôt ou un changement d'état d'un artefact sans jamais en recopier le contenu ; l'état courant s'obtient en rejouant le journal. Les événements d'un même sujet forment une chaîne d'empreintes RFC 8785 numérotée sans trou.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "subject",
+    "sequence",
+    "previous_event_sha256",
+    "from_state",
+    "to_state",
+    "actor",
+    "decision",
+    "occurred_at",
+    "recorded_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "enum": [
+        "INGRESS_ACCEPTED",
+        "INGRESS_REJECTED",
+        "DERIVED_RECORDED",
+        "STATE_TRANSITION"
+      ],
+      "description": "INGRESS_ACCEPTED : dépôt RAW par le Collector. INGRESS_REJECTED : refus à l'ingress, rien n'est stocké. DERIVED_RECORDED : enregistrement d'un artefact dérivé par un service interne. STATE_TRANSITION : changement d'état ultérieur."
+    },
+    "subject": {
+      "$ref": "#/$defs/subjectRef"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000,
+      "description": "Rang de l'événement dans la chaîne du sujet ; 0 pour l'événement d'enregistrement, puis +1 sans trou."
+    },
+    "previous_event_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Empreinte RFC 8785 de l'événement précédent du même sujet, hors auth_tag ; null uniquement pour l'enregistrement."
+    },
+    "from_state": {
+      "enum": [
+        null,
+        "RAW",
+        "PENDING",
+        "VALIDATED",
+        "SUPERSEDED",
+        "REJECTED"
+      ]
+    },
+    "to_state": {
+      "enum": [
+        "RAW",
+        "PENDING",
+        "VALIDATED",
+        "REJECTED",
+        "SUPERSEDED",
+        "ARCHIVED",
+        "REJECTED_AT_INGRESS"
+      ]
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "superseded_by": {
+      "$ref": "#/$defs/subjectRef",
+      "description": "Présent si et seulement si to_state vaut SUPERSEDED : le sujet qui devient la version active."
+    },
+    "revision_of": {
+      "$ref": "#/$defs/subjectRef",
+      "description": "Présent si et seulement si l'événement dépose une révision RAW de conversation : l'instantané original qu'elle ne remplace pas."
+    },
+    "occurred_at": {
+      "$ref": "#/$defs/dateTime"
+    },
+    "recorded_at": {
+      "$ref": "#/$defs/dateTime"
+    },
+    "auth_tag": {
+      "$ref": "#/$defs/authTag"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "INGRESS_ACCEPTED",
+              "INGRESS_REJECTED",
+              "DERIVED_RECORDED"
+            ]
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "sequence": {
+            "const": 0
+          },
+          "previous_event_sha256": {
+            "const": null
+          },
+          "from_state": {
+            "const": null
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "sequence": {
+            "minimum": 1
+          },
+          "previous_event_sha256": {
+            "type": "string"
+          },
+          "from_state": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "INGRESS_ACCEPTED"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "const": "RAW"
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "const": "collector"
+              }
+            }
+          },
+          "subject": {
+            "properties": {
+              "artifact_kind": {
+                "enum": [
+                  "research_package",
+                  "conversation",
+                  "conversation_revision"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "INGRESS_REJECTED"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "const": "REJECTED_AT_INGRESS"
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "const": "collector"
+              }
+            }
+          },
+          "subject": {
+            "properties": {
+              "artifact_kind": {
+                "enum": [
+                  "research_package",
+                  "conversation"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "DERIVED_RECORDED"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "const": "RAW"
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "internal_service",
+                  "operator"
+                ]
+              }
+            }
+          },
+          "subject": {
+            "properties": {
+              "artifact_kind": {
+                "const": "derived_artifact"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "STATE_TRANSITION"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "enum": [
+              "PENDING",
+              "VALIDATED",
+              "REJECTED",
+              "SUPERSEDED",
+              "ARCHIVED"
+            ]
+          },
+          "actor": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "internal_service",
+                  "operator"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "from_state": {
+            "const": "RAW"
+          }
+        },
+        "required": [
+          "from_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "const": "PENDING"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "from_state": {
+            "const": "PENDING"
+          }
+        },
+        "required": [
+          "from_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "enum": [
+              "VALIDATED",
+              "REJECTED"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "from_state": {
+            "const": "VALIDATED"
+          }
+        },
+        "required": [
+          "from_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "enum": [
+              "SUPERSEDED",
+              "ARCHIVED"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "from_state": {
+            "enum": [
+              "SUPERSEDED",
+              "REJECTED"
+            ]
+          }
+        },
+        "required": [
+          "from_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "to_state": {
+            "const": "ARCHIVED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "to_state": {
+            "const": "SUPERSEDED"
+          }
+        },
+        "required": [
+          "to_state"
+        ]
+      },
+      "then": {
+        "required": [
+          "superseded_by"
+        ]
+      },
+      "else": {
+        "properties": {
+          "superseded_by": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "to_state": {
+            "enum": [
+              "REJECTED",
+              "REJECTED_AT_INGRESS"
+            ]
+          }
+        },
+        "required": [
+          "to_state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "reason_codes": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "INGRESS_ACCEPTED"
+          },
+          "subject": {
+            "properties": {
+              "artifact_kind": {
+                "const": "conversation_revision"
+              }
+            },
+            "required": [
+              "artifact_kind"
+            ]
+          }
+        },
+        "required": [
+          "event_type",
+          "subject"
+        ]
+      },
+      "then": {
+        "required": [
+          "revision_of"
+        ],
+        "properties": {
+          "revision_of": {
+            "properties": {
+              "artifact_kind": {
+                "const": "conversation"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "revision_of": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "to_state": {
+            "const": "VALIDATED"
+          }
+        },
+        "required": [
+          "to_state"
+        ]
+      },
+      "else": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "confirmation_ref": false
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "subjectRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "artifact_id",
+        "subject_sha256"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "enum": [
+            "research_package",
+            "conversation",
+            "conversation_revision",
+            "derived_artifact"
+          ]
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/identifier",
+          "description": "package_id, conversation_id, submission_id d'un refus à l'ingress, ou artifact_id d'un dérivé. Jamais un chemin ni un nom d'hôte."
+        },
+        "subject_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Empreinte des octets RAW conservés (ou reçus puis refusés) ; pour un dérivé, result.content_sha256."
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "collector",
+            "internal_service",
+            "operator"
+          ],
+          "description": "Aucun producteur externe n'écrit dans le journal ; le Collector n'émet que les événements d'ingress."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+          "description": "Identifiant technique non nominatif du service ou du rôle opérateur."
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_version",
+        "reason_codes"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{2,127}$"
+        },
+        "policy_version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "reason_codes": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          },
+          "description": "Codes de motif non sensibles uniquement, jamais un extrait."
+        },
+        "confirmation_ref": {
+          "$ref": "#/$defs/confirmationRef"
+        }
+      }
+    },
+    "confirmationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Proposition confirmée du registre de l'orchestrateur ; autorisée seulement vers VALIDATED. Son caractère obligatoire relève de la matrice de promotion du propriétaire.",
+      "required": [
+        "capability",
+        "proposal_id"
+      ],
+      "properties": {
+        "capability": {
+          "const": "knowledge.promote_approved"
+        },
+        "proposal_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        }
+      }
+    },
+    "authTag": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Emplacement réservé (OUVERT) : schéma d'authentification, gestion des clés et vérification relèvent d'une décision du propriétaire. La relecture ne le vérifie pas et l'exclut de l'empreinte de chaîne.",
+      "required": [
+        "scheme",
+        "key_id",
+        "value"
+      ],
+      "properties": {
+        "scheme": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$"
+        },
+        "key_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{16,2048}$"
+        }
+      }
+    }
+  }
+}
