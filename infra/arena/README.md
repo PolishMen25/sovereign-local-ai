@@ -44,7 +44,7 @@ SOVEREIGN_ARENA_MAX_MATCHES_PER_HOUR=12
 
 Sans jeton Qwen, l'arène tourne avec les seuls profils BOOTSTRAP. Avec un jeton,
 l'adresse du moteur Qwen vient uniquement du fichier privé
-`/opt/sovereign/credentials/private-endpoints.json` (D-036, contrat
+`/etc/sovereign-endpoints/private-endpoints.json` (D-036, contrat
 `schemas/private-endpoints.schema.json`, nom `qwen_coder`), désigné par
 `SOVEREIGN_PRIVATE_ENDPOINTS_FILE` dans l'unité. Sans fichier valide, l'arène
 refuse de démarrer et affiche `engine_configuration_refused`. L'ancienne
