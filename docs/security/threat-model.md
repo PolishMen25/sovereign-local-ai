@@ -18,6 +18,8 @@ Le risque est évalué qualitativement. Une cotation chiffrée utile exigera l'i
 - le Synology RS3617xs+ fournit du stockage, avec rôles exacts et politiques encore à valider ;
 - le DL380p Gen8 ne participe pas à la V1.
 
+> Point de cohérence signalé (OUVERT) : la ligne précédente reprend D-006, que le registre `docs/project/decisions.md` marque désormais comme remplacée par D-034. Elle est laissée inchangée : sa reformulation, comme celle de la règle équivalente d'`AGENTS.md`, revient au propriétaire, et ce modèle de menaces devra alors être réapprouvé.
+
 Orientation provisoire : un Research Gateway est l'option B recommandée pour l'étude, mais pas encore la décision finale. Les hypothèses confirmées sont des invariants de conception ; si l'une change, le modèle de menaces doit être réapprouvé.
 
 ## 3. Actifs à protéger
@@ -86,7 +88,7 @@ La réalisation physique de ces zones et les règles entre elles ne sont pas enc
 | T06 | **Canal de commande DMZ → cœur** caché dans le mécanisme de transfert. | paquet passif uniquement ; sens de connexion documenté ; types et taille limités ; intégrité revérifiée ; pas de montage partagé bidirectionnel | méthode de sas non choisie ; décision d'architecture obligatoire |
 | T07 | **Exfiltration cœur → Internet** via recherche automatique, erreur, DNS, message encodé ou synchronisation NAS. | absence de chemin automatique ; minimisation et approbation avant toute recherche ; NAS non passerelle ; tests de fuite ; journaux locaux | risque humain lors d'un export manuel ; procédure de déclassification requise |
 | T08 | **Vol des clés d'API du Gateway** par RCE, logs ou dépôt Git. | secrets dédiés, à portée minimale, hors code ; aucun secret dans les logs ; rotation/révocation ; limitation fournisseur ; alerte d'usage anormal | fournisseur et coffre de secrets à sélectionner |
-| T09 | **SSRF et contournement des destinations autorisées** depuis le Gateway/Collector. | validation d'URL ; résolution et redirections contrôlées ; refus des adresses privées/métadonnées ; filtrage de sortie ; limites de téléchargement | détails DNS/proxy à traiter dans la conception DMZ |
+| T09 | **SSRF et contournement des destinations autorisées** depuis le Gateway/Collector. | validation d'URL ; résolution et redirections contrôlées ; refus des adresses privées/métadonnées ; filtrage de sortie ; limites de téléchargement ; règles statiques candidates dans `docs/security/url-ssrf-policy.md` (PROVISOIRE) | détails DNS/proxy à traiter dans la conception DMZ ; résolution, redirections et rebinding restent au composant qui accède au réseau |
 | T10 | **Abus d'un outil MCP** pour lire des fichiers, lancer des commandes ou altérer le système. | outils étroits ; schémas stricts ; chemins et opérations autorisés ; sandbox ; identité ; quotas ; journal ; confirmation selon impact | un outil légitime reste exploitable par entrées malicieuses ; gate A4 |
 | T11 | **Usurpation d'un utilisateur ou administrateur**. | comptes nominatifs ; MFA pour privilèges ; sessions limitées ; séparation des rôles ; révocation ; bastion si retenu | système IAM et voies d'urgence non définis ; gate A2 |
 | T12 | **Compromission de Proxmox ou évasion d'un invité** donnant accès au cœur. | interface de gestion isolée ; correctifs validés hors ligne ; moindre privilège ; sauvegarde de configuration ; services inutiles désactivés ; revue des invités | versions/firmwares inconnus ; inventaire A0 requis |
