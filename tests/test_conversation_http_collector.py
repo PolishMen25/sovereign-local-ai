@@ -147,9 +147,9 @@ class CollectorSurfaceTests(unittest.TestCase):
         self.assert_nothing_written()
 
     def test_put_delete_patch_are_not_implemented(self) -> None:
-        # Seule la ligne de statut est épinglée : sur ce chemin, send_error
-        # journalise aussi un message qui recopie la méthode du client (écart
-        # connu, voir test_unsupported_method_log_carries_status_only).
+        # Seul le statut est épinglé ici : sur ce chemin, send_error recopie la
+        # méthode du client dans le journal et le corps (écart connu, voir
+        # test_known_defect_unsupported_method_is_echoed_in_log_and_body).
         body = json.dumps(conversation()).encode("utf-8")
         for method in ("PUT", "DELETE", "PATCH"):
             with self.subTest(method=method):
@@ -166,21 +166,30 @@ class CollectorSurfaceTests(unittest.TestCase):
         self.assertIn("collector event status=501\n", log)
         self.assert_nothing_written()
 
-    @unittest.expectedFailure
-    def test_unsupported_method_log_carries_status_only(self) -> None:
-        """Écart connu du code de production, consigné ici plutôt que masqué.
+    def test_known_defect_unsupported_method_is_echoed_in_log_and_body(self) -> None:
+        """Écart connu du code de production, épinglé tel quel plutôt que masqué.
 
         BaseHTTPRequestHandler.send_error appelle log_error(format, code, message)
         et log_message journalise arguments[1] : le message « Unsupported method »
-        recopie donc dans le journal une méthode choisie par le client. Ce test
-        deviendra un succès inattendu quand le collecteur ne journalisera plus que
-        des statuts numériques ; cette correction relève du code de production,
-        après la PR #17, et non de ce lot de tests.
+        recopie donc dans le journal la méthode choisie par le client. La réponse
+        501 la recopie aussi, dans sa phrase de statut et dans le corps HTML par
+        défaut de send_error ; une réponse 400 (« Bad request version »,
+        « Bad request syntax ») recopie de même la requête fautive.
+
+        La correction relève du code de production, après la PR #17 : surcharger
+        send_error et log_error pour ne produire qu'un statut numérique et un
+        corps JSON fixe, sur les chemins 400 comme 501. Ce test échouera alors
+        et devra être inversé (assertNotIn). Contrairement à expectedFailure, il
+        échoue aussi si le banc de test ou le gestionnaire plante.
         """
         method = "FOOBAR" + uuid4().hex.upper()
-        _status, _payload, log = self.exchange(method, "/v1/conversations")
-        self.assertNotIn(method, log)
-        self.assertEqual(log, "collector event status=501\n")
+        status, payload, log = self.exchange(method, "/v1/conversations")
+        self.assertEqual(status, 501)
+        self.assertIn("collector event status=501\n", log)
+        # KNOWN DEFECT (journal et corps 501 recopient la méthode) : inverser après la PR #17.
+        self.assertIn(method, log)
+        self.assertIn(method.encode("ascii"), payload)
+        self.assert_nothing_written()
 
 
 class ConversationHttpCollectorTests(unittest.TestCase):
