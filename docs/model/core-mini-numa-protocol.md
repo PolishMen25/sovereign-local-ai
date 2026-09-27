@@ -1,10 +1,12 @@
 # Protocole de preuve répétée CORE-MINI sur placement NUMA
 
-**Statut : PROVISOIRE — phase 0. Le runner et ses contrats sont implémentés ;
-deux preuves A/B de trois répétitions ont été produites et comparées. Elles
-restent une observation miniature descriptive, sans décision de placement pour
-CORE-700M. La section « Protocole G4 étendu » spécifie les mesures qui
-manquent ; elle n'est ni implémentée, ni validée sur matériel, ni approuvée.**
+**Statut : PROVISOIRE — rédigé en phase 0 ; le passage en phase 1 (D-038) ne
+change ni ce statut ni la gate G4, qui reste ouverte. Le runner et ses contrats
+sont implémentés ; deux preuves A/B de trois répétitions ont été produites et
+comparées. Elles restent une observation miniature descriptive, sans décision
+de placement pour CORE-700M. La section « Protocole G4 étendu » spécifie les
+mesures qui manquent ; elle n'est ni implémentée, ni validée sur matériel, ni
+approuvée.**
 
 Ce protocole définit une preuve bornée pour **un seul placement externe** de
 CORE-MINI-1M. Il permet de répéter un workload synthétique comparable sans
