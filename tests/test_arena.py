@@ -1,4 +1,5 @@
 import contextlib
+from contextlib import closing
 import io
 import json
 import os
@@ -194,7 +195,7 @@ class ArenaRunnerTests(ArenaTestCase):
         engines = {"QWEN-CODER": FakeEngine("QWEN-CODER"), "BOOTSTRAP": FakeEngine("BOOTSTRAP")}
         arena = self.arena(engines)
         for profile in self.store.profiles(role="author"):
-            with self.store._connect() as connection:
+            with closing(self.store._connect()) as connection, connection:
                 connection.execute("UPDATE profiles SET matches=5 WHERE profile_id=?", (profile["profile_id"],))
         self.assertEqual(arena.step(), "played")
         self.assertEqual(arena.step(), "played")

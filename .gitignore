@@ -57,6 +57,7 @@ configs/codex/*.local.json
 /tests/tmp*/
 /tests/runtime-*/
 /.authorized-bundle-*/
+/.tokenizer-promotion-*/
 
 # Temporary transfer bundles created during host provisioning
 *.tar
