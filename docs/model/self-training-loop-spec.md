@@ -2,10 +2,36 @@
 
 ## Statut et invariant
 
-**INACTIVE.** Cette spécification ne lance ni génération, ni sandbox, ni
-entraînement. Une boucle ne peut devenir activable qu'après le pilote CORE-MINI
-décrit ci-dessous, une approbation explicite du propriétaire et un taux
-d'acceptation mesuré d'au moins **60 % sur 100 tâches distinctes**.
+**Statut factuel au 2026-09-26**, établi sans accès au serveur de calcul, hors
+ligne depuis le 2026-09-14 environ :
+
+- **Spécification** : ce document ne lance lui-même ni génération, ni sandbox,
+  ni entraînement.
+- **Code de l'arène versionné** : génération arbitrée par le bac à sable,
+  paquets et pont vers les incréments de corpus sont sur `main` depuis
+  `0dcbe8c` (2026-09-11) et ses suites : `b5f0227`, `015b815`, `9b31b41`,
+  `8ef2f8a`, `cd68960`, `d9c0e42`, `b486851` pour l'arène ; `229ffe0`,
+  `689fa70`, `75d234a`, `0655d42`, `5f59591`, `dbca0c6` pour le pont.
+- **Exécutions rapportées seulement par des messages de commit** : `8ef2f8a`
+  rapporte un démon qui redémarrait en boucle, `dbca0c6` 41 paquets dont 2
+  convertis en incréments, `b486851` des mesures sur 28 paquets réels. Aucun
+  relevé versionné ne les confirme et l'état présent n'est pas vérifiable.
+- **Critères d'activation non consignés** : le pilote CORE-MINI, l'approbation
+  explicite du propriétaire et le taux d'acceptation d'au moins 60 % sur 100
+  tâches distinctes (§6) ne figurent dans `docs/project/decisions.md` ni comme
+  atteints ni comme levés. **OUVERT**, décision du propriétaire. Rien dans ce
+  document ne vaut approbation d'activation.
+- **Suite jouée non consignée** : la suite par défaut de
+  `services/arena/runner.py` est le benchmark scellé E2
+  (`configs/evaluation/core-python-e2.candidate.json`) et 14 noms de fonction
+  sont communs à E2 et à `configs/arena/practice-suite.v1.json`. La suite
+  réellement jouée par l'arène est **OUVERT**.
+
+Les sections suivantes restent la spécification cible ; les écarts du code sont
+signalés là où ils s'appliquent. Selon cette spécification, une boucle ne peut
+devenir activable qu'après le pilote CORE-MINI décrit ci-dessous, une
+approbation explicite du propriétaire et un taux d'acceptation mesuré d'au
+moins **60 % sur 100 tâches distinctes**.
 
 Le seul signal de qualité est mécanique : exécution isolée d'un candidat et
 succès de la suite de tests fournie avec la tâche. Le modèle ne note jamais sa
@@ -50,6 +76,23 @@ tri. Il reste RAW jusqu'à un commit propriétaire de
 `core-v1-source-policy.approved.json` compatible avec le même vérificateur que
 le corpus externe. Aucun résultat de test, journal ou sortie de modèle ne
 constitue une promotion automatique vers l'entraînement.
+
+**Écart du code au 2026-09-26, sans décision au registre.** Dans le code de
+`main`, un paquet approuvé depuis `/arena` est converti en incrément RAW
+synthétique par un outil lancé à la main
+(`tools/build_core_increment_from_arena.py`,
+`tools/build_increments_for_approved_packets.py`) ; une approbation déposée
+depuis `/corpus`, fichier JSON non signé, est ensuite appliquée toutes les deux
+minutes par un service périodique qui promeut l'incrément en `VALIDATED` avec
+`training_authorization` `approved` (`tools/promote_arena_increment.py`). Aucun
+commit de `approved.json` n'intervient. Depuis `6d959d7`, le préflight
+tokenizer ne lit d'ailleurs plus ce fichier et un manifeste `VALIDATED` lui
+suffit :
+**ratification par le propriétaire en attente**. Enfin,
+`tools/validate_training_corpus_manifest.py` refuse un matériau `synthetic`
+dont l'autorisation d'entraînement vaut `approved` : aucun chemin contractuel
+ne mène encore ces incréments à un manifeste d'entraînement. La règle
+ci-dessus n'est ni confirmée ni remplacée ici.
 
 ## 5. Garde-fous anti-effondrement
 
