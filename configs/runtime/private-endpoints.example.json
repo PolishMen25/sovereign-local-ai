@@ -1,0 +1,7 @@
+{
+  "schema_version": "private-endpoints.v1",
+  "endpoints": {
+    "core_inference": { "host": "192.0.2.43", "port": 9000 },
+    "qwen_coder": { "host": "192.0.2.44", "port": 8790 }
+  }
+}
