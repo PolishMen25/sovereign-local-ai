@@ -329,7 +329,8 @@ def main() -> int:
         engines = build_engines(os.environ)
     except (private_endpoints.PrivateEndpointsError, ValueError) as failure:  # content-free messages
         store.set_state(status="stopped", reason="engine_configuration_refused", detail=str(failure)[:300], heartbeat=utc_now())
-        raise SystemExit(f"arena refused to start: {failure}") from None
+        # Static fault: exit 78 so that RestartPreventExitStatus ends the loop.
+        private_endpoints.refuse_to_start(str(failure), prefix="arena refused to start")
     try:
         referee = sandbox_referee(Path(tempfile.gettempdir()) / "sovereign-arena")
     except Exception as failure:  # the status must reach the page, whatever refused

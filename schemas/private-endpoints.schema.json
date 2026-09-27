@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.local-ai.invalid/private-endpoints/v1/schema.json",
   "title": "Points de terminaison privés hors Git",
-  "description": "Contrat opérateur installé hors Git (D-036). Ses valeurs réelles ne doivent jamais être publiées. Le chargeur services/common/private_endpoints.py applique en plus : adresse IPv4 canonique dans une plage privée RFC 1918 ou de boucle locale, ni adresse de réseau ni de diffusion, paires adresse/port distinctes, fichier régulier d'au plus 16 384 octets, non modifiable par le groupe ni par les autres.",
+  "description": "Contrat opérateur installé hors Git (D-036). Ses valeurs réelles ne doivent jamais être publiées. Le chargeur services/common/private_endpoints.py applique en plus : adresse IPv4 canonique dans une plage privée RFC 1918 ou de boucle locale, ni adresse de réseau ni de diffusion, paires adresse/port distinctes, fichier régulier d'au plus 16 384 octets ; sous POSIX, fichier et répertoire parent appartenant à root et non modifiables par le groupe ni par les autres.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "endpoints"],

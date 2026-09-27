@@ -13,7 +13,12 @@ publishing the private topology.
 
 The module depends on the standard library only and runs as a script, so an
 operator can validate the private file with the new revision before deploying
-it (``--check``).
+it (``--check``), inside each unit's own environment so that the legacy
+override variables are checked too (``--legacy-env``).
+
+A service that refuses its configuration exits with ``EXIT_CONFIGURATION_REFUSED``
+(78, ``EX_CONFIG``) so that its unit can declare ``RestartPreventExitStatus=78``
+instead of restarting forever on a static fault.
 """
 
 from __future__ import annotations
@@ -26,12 +31,21 @@ import os
 from pathlib import Path
 import stat
 import sys
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, NoReturn, Sequence
 
 PRIVATE_ENDPOINTS_ENV = "SOVEREIGN_PRIVATE_ENDPOINTS_FILE"
 SCHEMA_VERSION = "private-endpoints.v1"
 MAXIMUM_FILE_BYTES = 16_384
 ENDPOINT_NAMES = frozenset({"core_inference", "qwen_coder"})
+# POSIX: the file and its directory must belong to root, so a compromised
+# service account can neither rewrite its own pin nor swap the file.  Tests that
+# run unprivileged substitute their own uid; nothing else changes this value.
+TRUSTED_OWNER_UID = 0
+# sysexits.h EX_CONFIG: a static configuration fault that a restart cannot fix.
+EXIT_CONFIGURATION_REFUSED = 78
+# Legacy variables still tolerated when they equal the pinned value exactly.
+LEGACY_URL_VARIABLES = {"SOVEREIGN_CORE_ENDPOINT": "core_inference", "SOVEREIGN_QWEN_ENDPOINT": "qwen_coder"}
+LEGACY_PORT_VARIABLES = {"SOVEREIGN_CORE_PORT": "core_inference"}
 # RFC 1918 private blocks and the IPv4 loopback block.  Documentation (RFC 5737),
 # shared (RFC 6598), link-local, wildcard and public addresses are refused.
 ALLOWED_NETWORKS = tuple(
@@ -95,19 +109,38 @@ def configured_path(environ: Mapping[str, str] | None = None) -> Path:
     return Path(value)
 
 
+def _require_trusted_owner(status: os.stat_result, subject: str) -> None:
+    if status.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise PrivateEndpointsError(f"private endpoint {subject} must not be group- or world-writable")
+    if status.st_uid != TRUSTED_OWNER_UID:
+        raise PrivateEndpointsError(f"private endpoint {subject} must be owned by root")
+
+
+def _open_private_file(path: Path, flags: int) -> int:
+    """Open the file; on POSIX, only through a checked, root-owned directory."""
+
+    if os.name != "posix":
+        return os.open(path, flags)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0))
+    try:
+        _require_trusted_owner(os.fstat(directory), "directory")
+        # Opened relative to the checked descriptor: the directory cannot be
+        # swapped between the check and the open.
+        return os.open(path.name, flags, dir_fd=directory)
+    finally:
+        os.close(directory)
+
+
 def _read_private_file(path: Path) -> bytes:
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     descriptor: int | None = None
     try:
-        descriptor = os.open(path, flags)
+        descriptor = _open_private_file(path, flags)
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
             raise PrivateEndpointsError("private endpoint file must be a regular file")
         if os.name == "posix":
-            if before.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
-                raise PrivateEndpointsError("private endpoint file must not be group- or world-writable")
-            if before.st_uid not in {0, os.geteuid()}:
-                raise PrivateEndpointsError("private endpoint file must be owned by root or by the service account")
+            _require_trusted_owner(before, "file")
         if not 1 <= before.st_size <= MAXIMUM_FILE_BYTES:
             raise PrivateEndpointsError("private endpoint file size is outside the allowed range")
         chunks: list[bytes] = []
@@ -184,13 +217,46 @@ def require_endpoint(name: str, environ: Mapping[str, str] | None = None) -> Pri
     return endpoints[name]
 
 
+def refuse_to_start(reason: str, *, prefix: str = "refusing to start") -> NoReturn:
+    """Journal a content-free reason, then exit with EX_CONFIG (no restart loop)."""
+
+    print(f"{prefix}: {reason}", file=sys.stderr, flush=True)
+    raise SystemExit(EXIT_CONFIGURATION_REFUSED)
+
+
 def endpoint_or_exit(name: str, environ: Mapping[str, str] | None = None) -> PrivateEndpoint:
     """Service entry points: refuse to start, with a content-free reason."""
 
     try:
         return require_endpoint(name, environ)
     except PrivateEndpointsError as failure:
-        raise SystemExit(f"refusing to start: {failure}") from None
+        reason = str(failure)
+    refuse_to_start(reason)
+
+
+def check_legacy_overrides(endpoints: Mapping[str, PrivateEndpoint],
+                           environ: Mapping[str, str] | None = None) -> list[str]:
+    """Apply the services' start-up rule to every legacy variable present.
+
+    A legacy URL variable must equal ``http://<host>:<port>`` exactly (no
+    trailing slash, no path) and ``SOVEREIGN_CORE_PORT`` the configured port in
+    decimal form, as the services require.  A legacy variable whose endpoint is
+    absent from the private file is refused as well.  Returns the names of the
+    variables checked; a refusal names the variable, never its value.
+    """
+
+    environ = os.environ if environ is None else environ
+    checked: list[str] = []
+    for variables, attribute in ((LEGACY_URL_VARIABLES, "url"), (LEGACY_PORT_VARIABLES, "port")):
+        for variable, name in sorted(variables.items()):
+            if variable not in environ:
+                continue
+            if name not in endpoints:
+                raise PrivateEndpointsError(f"{variable} is set but private endpoint {name} is not configured")
+            if environ[variable] != str(getattr(endpoints[name], attribute)):
+                raise PrivateEndpointsError(f"{variable} does not match the pinned endpoint")
+            checked.append(variable)
+    return checked
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -200,16 +266,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", required=True, help="valider le fichier et sortir")
     parser.add_argument("--require", action="append", default=[], choices=sorted(ENDPOINT_NAMES),
                         help="point de terminaison qui doit être présent (répétable)")
+    parser.add_argument("--legacy-env", action="store_true",
+                        help="vérifier aussi, comme au démarrage des services, les anciennes variables présentes "
+                             "dans l'environnement (" + ", ".join(sorted({**LEGACY_URL_VARIABLES, **LEGACY_PORT_VARIABLES})) + ")")
     arguments = parser.parse_args(argv)
     try:
         endpoints = load_private_endpoints()
         missing = sorted(set(arguments.require) - set(endpoints))
         if missing:
             raise PrivateEndpointsError("required private endpoint is not configured: " + ", ".join(missing))
+        legacy = check_legacy_overrides(endpoints) if arguments.legacy_env else None
     except PrivateEndpointsError as failure:
         print(f"refused: {failure}", file=sys.stderr)
         return 2
     print("valid: " + ", ".join(sorted(endpoints)))
+    if legacy is not None:
+        print("legacy variables matching: " + (", ".join(legacy) if legacy else "none"))
     return 0
 
 

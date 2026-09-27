@@ -1,8 +1,11 @@
+import contextlib
+import io
 import tempfile
 import unittest
 
+from services.common.private_endpoints import EXIT_CONFIGURATION_REFUSED
 from services.inference.core_server import bind_address
-from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, write_private_endpoints
+from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, trust_test_account, write_private_endpoints
 
 
 class BindAddressTests(unittest.TestCase):
@@ -10,6 +13,7 @@ class BindAddressTests(unittest.TestCase):
         self._directory = tempfile.TemporaryDirectory()
         self.addCleanup(self._directory.cleanup)
         self.directory = self._directory.name
+        trust_test_account(self)
 
     def test_binds_to_the_configured_private_address(self) -> None:
         environ = write_private_endpoints(self.directory, CORE_ENDPOINT)
@@ -26,11 +30,13 @@ class BindAddressTests(unittest.TestCase):
         )
         for index, case in enumerate(cases):
             environ = case()  # each case rewrites the private file before use
-            with self.subTest(case=index), self.assertRaises(SystemExit) as caught:
+            stderr = io.StringIO()
+            with self.subTest(case=index), self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(stderr):
                 bind_address(environ)
-            self.assertIn("refusing to start", str(caught.exception.code))
-            self.assertNotIn(CORE_ENDPOINT.host, str(caught.exception.code))
-            self.assertNotIn(self.directory, str(caught.exception.code))
+            self.assertEqual(caught.exception.code, EXIT_CONFIGURATION_REFUSED)
+            self.assertIn("refusing to start", stderr.getvalue())
+            self.assertNotIn(CORE_ENDPOINT.host, stderr.getvalue())
+            self.assertNotIn(self.directory, stderr.getvalue())
 
 
 if __name__ == "__main__":

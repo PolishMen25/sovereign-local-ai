@@ -40,6 +40,13 @@ coverage.xml
 htmlcov/
 *.log
 
+# Private infrastructure configuration kept outside Git (D-036)
+private-endpoints.json
+*.private-endpoints.json
+!configs/runtime/private-endpoints.example.json
+fast-chat.conf
+*.fast-chat.conf
+
 # Owner-specific Codex hook configuration
 configs/codex/hooks.windows.json
 configs/codex/*.local.json

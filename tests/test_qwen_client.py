@@ -1,7 +1,9 @@
 import io
 import json
+import os
 import unittest
 from unittest.mock import patch
+from urllib import request
 
 from services.common.private_endpoints import PrivateEndpoint
 from services.web.qwen_client import QwenClient
@@ -29,6 +31,15 @@ class QwenClientTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             QwenClient(QWEN_ENDPOINT.url, "short", pinned=QWEN_ENDPOINT)
 
+    def test_ignores_proxies_from_the_environment(self):
+        proxy = "http://192.0.2.80:3128"  # RFC 5737: never contacted
+        with patch.dict(os.environ, {"HTTP_PROXY": proxy, "http_proxy": proxy, "ALL_PROXY": proxy}):
+            client = QwenClient(QWEN_ENDPOINT.url, "x" * 32, pinned=QWEN_ENDPOINT)
+            default = request.build_opener()
+        # Sanity: a default opener would route through the environment proxy.
+        self.assertTrue(any(isinstance(item, request.ProxyHandler) for item in default.handlers))
+        self.assertFalse(any(isinstance(item, request.ProxyHandler) for item in client.opener.handlers))
+
     def test_preserves_history_and_references_in_order(self):
         messages = [
             {"role": "system", "content": "Local coding assistant"},
@@ -38,23 +49,23 @@ class QwenClientTests(unittest.TestCase):
             {"role": "user", "content": "Keep its name"},
         ]
         payload = {"choices": [{"message": {"content": "alpha"}}]}
-        with patch("services.web.qwen_client.request.urlopen", return_value=io.BytesIO(json.dumps(payload).encode())) as call:
+        with patch.object(self.client.opener, "open", return_value=io.BytesIO(json.dumps(payload).encode())) as call:
             self.assertEqual("alpha", self.client.generate(messages))
         self.assertEqual(messages, json.loads(call.call_args.args[0].data)["messages"])
 
     def test_rejects_empty_and_malformed_answers(self):
         for payload in [None, {}, {"choices": []}, {"choices": [{"message": {"content": "  "}}]}]:
-            with self.subTest(payload=payload), patch("services.web.qwen_client.request.urlopen", return_value=io.BytesIO(json.dumps(payload).encode())):
+            with self.subTest(payload=payload), patch.object(self.client.opener, "open", return_value=io.BytesIO(json.dumps(payload).encode())):
                 with self.assertRaises(RuntimeError):
                     self.client.generate("hello")
 
     def test_rejects_malformed_health(self):
-        with patch("services.web.qwen_client.request.urlopen", return_value=io.BytesIO(b'[]')):
+        with patch.object(self.client.opener, "open", return_value=io.BytesIO(b'[]')):
             with self.assertRaises(RuntimeError):
                 self.client.status()
 
     def test_rejects_invalid_history_before_network(self):
-        with patch("services.web.qwen_client.request.urlopen") as call:
+        with patch.object(self.client.opener, "open") as call:
             for messages in [[], [{"role": "tool", "content": "x"}], [{"role": "user", "content": None}]]:
                 with self.assertRaises(RuntimeError):
                     self.client.generate(messages)

@@ -14,6 +14,9 @@ Environment=SOVEREIGN_PRIVATE_ENDPOINTS_FILE=/etc/sovereign-endpoints/private-en
 ExecStart=/usr/bin/python3 -B -m services.web.app
 Restart=on-failure
 RestartSec=5
+# Configuration refusée (fichier privé absent ou invalide) : code 78 (EX_CONFIG), faute statique
+# qu'un redémarrage ne corrige pas ; l'unité reste en échec au lieu de boucler.
+RestartPreventExitStatus=78
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes

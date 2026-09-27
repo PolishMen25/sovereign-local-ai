@@ -25,8 +25,10 @@ Règles appliquées, toutes en échec fermé :
 - `port` est un entier de 1 à 65535 ; deux noms ne partagent jamais la même
   paire adresse/port ;
 - fichier régulier (pas de lien symbolique), de 1 à 16 384 octets, JSON strict
-  sans clé dupliquée ; sous POSIX, il n'est modifiable ni par le groupe ni par
-  les autres et appartient à `root` ou au compte du service.
+  sans clé dupliquée ; sous POSIX, le fichier et son répertoire parent
+  appartiennent à `root` et ne sont modifiables ni par le groupe ni par les
+  autres, si bien qu'un compte de service compromis ne peut pas réécrire son
+  propre épinglage. Le fichier est ouvert relativement au répertoire vérifié.
 
 Les messages d'erreur nomment la règle violée, jamais le chemin du fichier ni
 une valeur lue. Les clients (`CoreClient`, `QwenClient`, moteur Qwen de
@@ -36,13 +38,22 @@ restent facultatives, mais si elles sont présentes elles doivent être
 identiques, sinon le service refuse de démarrer. Le serveur CORE écoute sur
 l'adresse configurée ; `SOVEREIGN_CORE_PORT`, si présent, doit égaler le port
 configuré. Aucun repli vers `0.0.0.0` ni vers une ancienne valeur codée en dur.
+Un refus arrête le service avec le code 78 (`EX_CONFIG`), que les unités
+déclarent dans `RestartPreventExitStatus` pour ne pas redémarrer en boucle.
 
-Validation avant déploiement, sans afficher le contenu :
+Validation avant déploiement, sans afficher le contenu, depuis le répertoire de
+la nouvelle révision (appartenant à `root`) et en mode isolé (`-I`), jamais
+depuis une copie dans `/tmp` :
 
 ```sh
 SOVEREIGN_PRIVATE_ENDPOINTS_FILE=/chemin/absolu/private-endpoints.json \
-  python3 -B services/common/private_endpoints.py --check --require core_inference
+  python3 -I -B '<révision>/services/common/private_endpoints.py' --check --require core_inference
 ```
+
+`--legacy-env` applique en plus la règle de démarrage des services aux
+anciennes variables présentes dans l'environnement (`SOVEREIGN_CORE_ENDPOINT`,
+`SOVEREIGN_QWEN_ENDPOINT`, `SOVEREIGN_CORE_PORT`) ; le guide l'exécute dans
+l'environnement réel de chaque unité.
 
 La procédure complète est décrite dans
 `docs/operations/private-endpoints-migration.md`.

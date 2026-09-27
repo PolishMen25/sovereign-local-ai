@@ -17,6 +17,9 @@ class CoreClient:
                 or endpoint != pinned.url or len(token) < 32):
             raise ValueError("CORE client requires the pinned private CORE endpoint and a token")
         self.endpoint, self.token = pinned.url, token
+        # Never follow a proxy from the environment: the pin must reach the
+        # private endpoint directly (D-036), as the arena's ChatEngine does.
+        self.opener = request.build_opener(request.ProxyHandler({}))
 
     def _call(self, path: str, payload: dict | None = None, *, timeout: int = 90) -> dict:
         if not isinstance(timeout, int) or not 1 <= timeout <= 90:
@@ -24,7 +27,7 @@ class CoreClient:
         body = None if payload is None else json.dumps(payload, separators=(",", ":")).encode()
         target = request.Request(self.endpoint + path, data=body, headers={"Authorization": "Bearer " + self.token, "Content-Type": "application/json"})
         try:
-            with request.urlopen(target, timeout=timeout) as response:
+            with self.opener.open(target, timeout=timeout) as response:
                 value = json.loads(response.read().decode("utf-8"))
         except (OSError, error.URLError, json.JSONDecodeError) as failure:
             raise RuntimeError("CORE experimental runtime is unavailable") from failure

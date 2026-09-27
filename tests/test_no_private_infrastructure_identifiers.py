@@ -1,12 +1,15 @@
 """D-036: the public repository carries no private infrastructure identifier.
 
 The test fails when a tracked text file contains an RFC 1918 or RFC 6598
-(shared address space) IPv4 literal, an IPv6 unique-local literal, a per-guest
-hypervisor path or a container id tied to Proxmox tooling.  Documentation
-ranges (RFC 5737, RFC 3849) are not private and stay allowed, as does the
-canonical notation of a private block itself (its network address followed by
-its own prefix length).  Real values live in the private configuration outside
-Git (``services/common/private_endpoints.py``).
+(shared address space) IPv4 literal, zero-padded forms included, an IPv6
+unique-local literal, a per-guest hypervisor path or a container id tied to
+Proxmox tooling or written as a container reference (``CT <id>``, ``ct-<id>``,
+``vmid <id>``, ``conteneur <id>``).  Documentation ranges (RFC 5737, RFC 3849)
+are not private and stay allowed, as does the canonical notation of a private
+block itself (its network address followed by its own prefix length).  Real
+values live in the private configuration outside Git
+(``services/common/private_endpoints.py``).  Host names are not detected: they
+are reviewed by hand.
 
 Every network and address is built at runtime so this file never matches
 itself.  Findings name the file, the line and the rule, never the value, so a
@@ -15,6 +18,7 @@ failure does not copy a private address into a CI log.
 
 from __future__ import annotations
 
+from collections import Counter
 import ipaddress
 from pathlib import Path
 import re
@@ -46,7 +50,9 @@ HYPERVISOR_RULES = (
     ("per-guest hypervisor path", re.compile(r"/etc/pve/(?:[\w.-]+/)*(?:lxc|qemu-server|firewall)/\d+\.(?:conf|fw)\b")),
     ("per-guest cgroup path", re.compile(r"\blxc/\d{3,9}\b")),
     ("container id passed to pct/qm", re.compile(r"\b(?:pct|qm)\s+[a-z-]+\s+\d{3,9}\b")),
-    ("container id written as CT <id>", re.compile(r"\bCT\s?\d{3,9}\b")),
+    ("container id written as CT <id>", re.compile(r"\bct[ _-]?\d{3,9}\b", re.IGNORECASE)),
+    ("container id written as a container reference",
+     re.compile(r"\b(?:vmid|conteneur|container)[ :=#]*\d{3,9}\b", re.IGNORECASE)),
 )
 
 # Explicit exceptions, each with its reason.  They are exercise data about IPv4
@@ -69,6 +75,14 @@ ALLOWLIST = {
         "Générateur de la suite d'arène figée ; mêmes exercices IPv4 de manuel que la suite publiée."
     ),
 }
+# What each exception may contain, pinned exactly: a new private literal in an
+# allowlisted file (or one removed) fails until a reviewer updates this count.
+ALLOWED_FINDINGS = {
+    "configs/arena/practice-suite.v1.json": {"private IPv4 literal": 32},
+    "configs/evaluation/core-python-e2.candidate.json": {"private IPv4 literal": 1},
+    "tools/arena_tasks_v2.py": {"private IPv4 literal": 17},
+    "tools/generate_arena_practice_suite.py": {"private IPv4 literal": 15},
+}
 
 
 def tracked_files() -> list[str]:
@@ -86,10 +100,12 @@ def findings(text: str) -> list[tuple[int, str]]:
     found: list[tuple[int, str]] = []
     for number, line in enumerate(text.splitlines(), start=1):
         for match in IPV4_CANDIDATE.finditer(line):
-            try:
-                address = ipaddress.IPv4Address(match.group(1))
-            except ValueError:
+            # Octets are parsed by hand: ipaddress refuses zero-padded forms
+            # such as 010.x.y.z, which would otherwise slip through unflagged.
+            octets = [int(part) for part in match.group(1).split(".")]
+            if any(octet > 255 for octet in octets):
                 continue
+            address = ipaddress.IPv4Address(bytes(octets))
             if not any(address in block for block in PRIVATE_IPV4_BLOCKS):
                 continue
             if match.group(2) and match.group(1) + match.group(2) in CANONICAL_BLOCK_NOTATIONS:
@@ -129,6 +145,18 @@ class DetectorTests(unittest.TestCase):
                 self.assertEqual(findings(f"endpoint = http://{address}:9000"), [(1, "private IPv4 literal")])
                 self.assertEqual(findings(f"bind {address}/24"), [(1, "private IPv4 literal")])
 
+    def test_flags_zero_padded_private_literals(self) -> None:
+        padded = (
+            ".".join(("192", "168", "000", "143")),
+            ".".join(("010", "1", "2", "3")),
+            ".".join(("172", "016", "5", "9")),
+            ".".join(("010", "000", "000", "000")) + "/8",  # not the canonical notation
+        )
+        for address in padded:
+            with self.subTest(address=address):
+                self.assertEqual(findings(f"host {address} here"), [(1, "private IPv4 literal")])
+        self.assertEqual(findings("host " + ".".join(("192", "000", "002", "010"))), [])  # RFC 5737
+
     def test_ignores_documentation_public_and_canonical_notations(self) -> None:
         text = "\n".join((
             "http://192.0.2.10:9000 198.51.100.7 203.0.113.9 8.8.8.8 127.0.0.1 0.0.0.0",
@@ -147,23 +175,41 @@ class DetectorTests(unittest.TestCase):
             "pct " + "exec " + guest + " -- true",
             "C" + "T " + guest,
             "/sys/fs/cgroup/" + "lxc/" + guest,
+            "c" + "t" + guest + "-gateway.md",
+            "C" + "T-" + guest,
+            "c" + "t_" + guest,
+            "vm" + "id " + guest,
+            "conte" + "neur " + guest,
+            "Conte" + "neur: " + guest,
+            "contai" + "ner=" + guest,
         )
         for line in lines:
             with self.subTest(line=line):
                 self.assertTrue(findings(line))
-        self.assertEqual(findings('CONF="/etc/pve/lxc/${CT_CHAT}.conf"; pct exec "$CT_CHAT" -- true'), [])
+        for line in (
+            'CONF="/etc/pve/lxc/${CT_CHAT}.conf"; pct exec "$CT_CHAT" -- true',
+            "select 1234 from exact 5678",
+            "le conteneur du sas, container Qwen, 12 conteneurs",
+        ):
+            with self.subTest(line=line):
+                self.assertEqual(findings(line), [])
 
 
 class RepositoryTests(unittest.TestCase):
     def test_tracked_files_carry_no_private_infrastructure_identifier(self) -> None:
         violations: list[str] = []
         for relative in tracked_files():
-            if relative in ALLOWLIST:
-                continue
             text = read_text(relative)
             if text is None:
                 continue
-            violations.extend(f"{relative}:{line}: {rule}" for line, rule in findings(text))
+            found = findings(text)
+            if relative in ALLOWLIST:
+                counted = dict(Counter(rule for _, rule in found))
+                if counted != ALLOWED_FINDINGS[relative]:
+                    violations.append(f"{relative}: allowlisted findings changed ({counted} instead of "
+                                      f"{ALLOWED_FINDINGS[relative]}); review the new values before updating the pin")
+                continue
+            violations.extend(f"{relative}:{line}: {rule}" for line, rule in found)
         self.assertEqual(
             violations, [],
             "D-036 : identifiant d'infrastructure privée dans un fichier suivi ; le déplacer dans la "
@@ -172,6 +218,7 @@ class RepositoryTests(unittest.TestCase):
 
     def test_allowlist_is_explicit_and_not_stale(self) -> None:
         tracked = set(tracked_files())
+        self.assertEqual(set(ALLOWED_FINDINGS), set(ALLOWLIST))
         for relative, reason in ALLOWLIST.items():
             with self.subTest(path=relative):
                 self.assertIn(relative, tracked)

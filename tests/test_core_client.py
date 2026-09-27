@@ -1,7 +1,9 @@
 import io
 import json
+import os
 import unittest
 from unittest.mock import patch
+from urllib import request
 
 from services.common.private_endpoints import PrivateEndpoint
 from services.web.core_client import CoreClient
@@ -30,9 +32,18 @@ class CoreClientPinTests(unittest.TestCase):
     def test_requests_go_to_the_pinned_endpoint_only(self) -> None:
         client = CoreClient(CORE_ENDPOINT.url, "x" * 32, pinned=CORE_ENDPOINT)
         payload = {"engine": "CORE-700M", "available": True, "state": "ready", "experimental": True}
-        with patch("services.web.core_client.request.urlopen", return_value=io.BytesIO(json.dumps(payload).encode())) as call:
+        with patch.object(client.opener, "open", return_value=io.BytesIO(json.dumps(payload).encode())) as call:
             self.assertEqual(client.status(), payload)
         self.assertEqual(call.call_args.args[0].full_url, CORE_ENDPOINT.url + "/internal/v1/status")
+
+    def test_ignores_proxies_from_the_environment(self) -> None:
+        proxy = "http://192.0.2.80:3128"  # RFC 5737: never contacted
+        with patch.dict(os.environ, {"HTTP_PROXY": proxy, "http_proxy": proxy, "ALL_PROXY": proxy}):
+            client = CoreClient(CORE_ENDPOINT.url, "x" * 32, pinned=CORE_ENDPOINT)
+            default = request.build_opener()
+        # Sanity: a default opener would route through the environment proxy.
+        self.assertTrue(any(isinstance(item, request.ProxyHandler) for item in default.handlers))
+        self.assertFalse(any(isinstance(item, request.ProxyHandler) for item in client.opener.handlers))
 
 
 if __name__ == "__main__":

@@ -1,15 +1,19 @@
+import contextlib
+import io
 import json
+import os
 from pathlib import Path
 import random
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from services.arena import league
+from services.arena import league, runner
 from services.arena.engines import ChatEngine, EngineUnavailable
 from services.arena.runner import APPROVAL_SCHEMA, Arena, ArenaConfig, build_engines
 from services.arena.store import ArenaStore
-from services.common.private_endpoints import PrivateEndpointsError
-from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, write_private_endpoints
+from services.common.private_endpoints import EXIT_CONFIGURATION_REFUSED, PRIVATE_ENDPOINTS_ENV, PrivateEndpointsError
+from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, trust_test_account, write_private_endpoints
 
 TASKS = [
     {"id": "python-01-double", "function_name": "double", "prompt": "Write double(x) that returns 2 * x.",
@@ -317,6 +321,7 @@ class BuildEnginesTests(unittest.TestCase):
         self._directory = tempfile.TemporaryDirectory()
         self.addCleanup(self._directory.cleanup)
         self.directory = self._directory.name
+        trust_test_account(self)
 
     def test_loopback_engines_need_no_private_configuration(self) -> None:
         engines = build_engines({"SOVEREIGN_CHAT14B_ENDPOINT": "http://127.0.0.1:8081"})
@@ -341,6 +346,23 @@ class BuildEnginesTests(unittest.TestCase):
     def test_chat14b_must_stay_on_loopback(self) -> None:
         with self.assertRaises(ValueError):
             build_engines({"SOVEREIGN_CHAT14B_ENDPOINT": CORE_ENDPOINT.url})
+
+    def test_main_records_the_refusal_and_exits_without_restart_loop(self) -> None:
+        # A static configuration fault exits with EX_CONFIG (78), which the unit
+        # lists in RestartPreventExitStatus, instead of restarting every 30 s.
+        state = Path(self.directory) / "state"
+        environ = {key: value for key, value in os.environ.items()
+                   if key not in {PRIVATE_ENDPOINTS_ENV, "SOVEREIGN_QWEN_ENDPOINT", "SOVEREIGN_CHAT14B_ENDPOINT"}}
+        environ.update(SOVEREIGN_ARENA_STATE=str(state), SOVEREIGN_QWEN_TOKEN="t" * 32)
+        stderr = io.StringIO()
+        with patch.dict(os.environ, environ, clear=True), self.assertRaises(SystemExit) as caught,                 contextlib.redirect_stderr(stderr):
+            runner.main()
+        self.assertEqual(caught.exception.code, EXIT_CONFIGURATION_REFUSED)
+        self.assertIn("arena refused to start", stderr.getvalue())
+        self.assertIn(PRIVATE_ENDPOINTS_ENV, stderr.getvalue())
+        overview = ArenaStore(state / "arena.sqlite3", read_only=True).overview()
+        self.assertEqual(overview["state"]["reason"], "engine_configuration_refused")
+        self.assertEqual(overview["state"]["status"], "stopped")
 
 
 if __name__ == "__main__":

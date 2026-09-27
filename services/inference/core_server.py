@@ -55,7 +55,7 @@ def bind_address(environ: Mapping[str, str] | None = None) -> tuple[str, int]:
     endpoint = private_endpoints.endpoint_or_exit("core_inference", environ)
     port_override = environ.get("SOVEREIGN_CORE_PORT")
     if port_override is not None and port_override != str(endpoint.port):
-        raise SystemExit("refusing to start: SOVEREIGN_CORE_PORT does not match the private CORE endpoint")
+        private_endpoints.refuse_to_start("SOVEREIGN_CORE_PORT does not match the pinned endpoint")
     return endpoint.host, endpoint.port
 
 

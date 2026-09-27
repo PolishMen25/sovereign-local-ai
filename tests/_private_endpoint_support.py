@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import unittest
+from unittest.mock import patch
 
+from services.common import private_endpoints
 from services.common.private_endpoints import PRIVATE_ENDPOINTS_ENV, SCHEMA_VERSION, PrivateEndpoint
 
 
@@ -33,3 +36,17 @@ def write_private_endpoints(directory: str | Path, *endpoints: PrivateEndpoint) 
     path.write_text(json.dumps(document), encoding="utf-8")
     os.chmod(path, 0o600)
     return {PRIVATE_ENDPOINTS_ENV: str(path)}
+
+
+def trust_test_account(test: unittest.TestCase) -> None:
+    """Accept files and directories owned by the unprivileged test account.
+
+    On POSIX the loader requires root ownership; test runs (CI included) are not
+    root, so each test that loads a real file substitutes its own uid for the
+    duration of the test only.  Nothing changes on other platforms.
+    """
+
+    if os.name == "posix":
+        patcher = patch.object(private_endpoints, "TRUSTED_OWNER_UID", os.geteuid())
+        patcher.start()
+        test.addCleanup(patcher.stop)

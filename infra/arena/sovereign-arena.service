@@ -15,6 +15,9 @@ Environment=SOVEREIGN_ARENA_STATE=/var/lib/sovereign-arena
 ExecStart=/usr/bin/python3 -B -m services.arena.runner
 Restart=on-failure
 RestartSec=30
+# Configuration refusée (fichier privé absent ou invalide) : code 78 (EX_CONFIG), faute statique
+# qu'un redémarrage ne corrige pas ; l'unité reste en échec au lieu de boucler.
+RestartPreventExitStatus=78
 UMask=0027
 Nice=10
 CPUWeight=20

@@ -1236,14 +1236,16 @@ def pinned_engine(client: Any, name: str, override_variable: str, token: str) ->
     """Build an engine client pinned to its private endpoint (D-036).
 
     The endpoint comes only from the private file installed outside Git; without
-    a valid file the gateway refuses to start.  A legacy override variable is
-    accepted only when it equals the pinned URL exactly.
+    a valid file the gateway refuses to start (exit status 78, no restart loop).
+    A legacy override variable is accepted only when it equals the pinned URL
+    exactly.
     """
     endpoint = private_endpoints.endpoint_or_exit(name)
     try:
         return client(os.environ.get(override_variable, endpoint.url), token, pinned=endpoint)
     except ValueError as failure:
-        raise SystemExit(f"refusing to start: {failure}") from None
+        reason = str(failure)
+    private_endpoints.refuse_to_start(reason)
 
 
 def main() -> int:

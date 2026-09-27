@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -5,12 +7,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from services.common.private_endpoints import PRIVATE_ENDPOINTS_ENV
+from services.common.private_endpoints import EXIT_CONFIGURATION_REFUSED, PRIVATE_ENDPOINTS_ENV
 from services.inference.runtime import LocalInferenceRuntime
 from services.web.app import WEB_PROFILES, WebState, authorize, parse_chat, pinned_engine, response
 from services.web.core_client import CoreClient
 from services.web.qwen_client import QwenClient
-from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, write_private_endpoints
+from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, trust_test_account, write_private_endpoints
 
 
 class BootstrapStatus:
@@ -87,6 +89,7 @@ class PinnedEngineTests(unittest.TestCase):
         self._directory = tempfile.TemporaryDirectory()
         self.addCleanup(self._directory.cleanup)
         self.environ = write_private_endpoints(self._directory.name, CORE_ENDPOINT, QWEN_ENDPOINT)
+        trust_test_account(self)
 
     def isolated(self, **values: str):
         cleared = {key: "" for key in (PRIVATE_ENDPOINTS_ENV, "SOVEREIGN_CORE_ENDPOINT", "SOVEREIGN_QWEN_ENDPOINT")}
@@ -115,9 +118,11 @@ class PinnedEngineTests(unittest.TestCase):
         for environ, client, name, variable in cases:
             with self.subTest(name=name, variables=sorted(environ)):
                 self.isolated(**environ)
-                with self.assertRaises(SystemExit) as caught:
+                stderr = io.StringIO()
+                with self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(stderr):
                     pinned_engine(client, name, variable, "x" * 32)
-                message = str(caught.exception.code)
+                self.assertEqual(caught.exception.code, EXIT_CONFIGURATION_REFUSED)
+                message = stderr.getvalue()
                 self.assertIn("refusing to start", message)
                 for marker in (CORE_ENDPOINT.host, QWEN_ENDPOINT.host, self._directory.name):
                     self.assertNotIn(marker, message)
