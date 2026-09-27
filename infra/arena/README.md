@@ -1,7 +1,10 @@
 # Arène des agents
 
 Service `sovereign-arena` dans le conteneur du sas. Les profils d'agents (auteurs et
-relecteurs) s'affrontent sur les tâches de `configs/evaluation/core-python-e2.candidate.json`.
+relecteurs) s'affrontent sur les tâches de la suite désignée par
+`SOVEREIGN_ARENA_SUITE` ; sans cette variable, la suite d'entraînement
+`configs/arena/practice-suite.v1.json` (voir
+[Suite de tâches et jeu scellé](#suite-de-tâches-et-jeu-scellé)).
 **Seuls les tests de la tâche, exécutés dans le sandbox bwrap hors réseau, décident** ;
 aucun modèle ne note sa propre réponse.
 
@@ -19,6 +22,32 @@ aucun modèle ne note sa propre réponse.
   **Aucun paquet n'est promu ni utilisé pour l'entraînement sans approbation.**
 - Pause automatique quand un moteur sert déjà une requête (`/slots` de llama.cpp),
   budget de 12 matchs par heure par défaut.
+
+## Suite de tâches et jeu scellé
+
+Le runner lit la suite désignée par `SOVEREIGN_ARENA_SUITE`, un chemin relatif
+au répertoire de travail du service. Sans cette variable, il charge la suite
+d'entraînement `configs/arena/practice-suite.v1.json`. Le jeu d'évaluation E2
+`configs/evaluation/core-python-e2.candidate.json` est un benchmark scellé : il
+n'est jamais un défaut et ne se joue que par un choix explicite.
+
+Jusqu'au commit `db9414d` inclus, le runner et
+`tools/build_core_increment_from_arena.py` prenaient E2 par défaut, et ni
+l'unité `sovereign-arena.service` ni l'exemple `arena.env` ci-dessous ne fixent
+cette variable. La suite réellement jouée par une arène déjà déployée ne se
+déduit donc pas du dépôt : elle doit être relevée sur l'hôte avant toute
+conclusion.
+
+Le passage d'un paquet au corpus garde une seconde barrière.
+`tools/build_core_increment_from_arena.py` refuse une suite de schéma
+`core-code-evaluation-suite.v1`, une suite contenant un identifiant de tâche
+`python-NN-` et un paquet contenant une solution pour une telle tâche ; il
+inscrit l'empreinte SHA-256 de la suite utilisée dans le manifeste d'incrément
+(`task_suite_sha256`). Ces contrôles ne voient pas une paraphrase : 14 tâches de
+la suite d'entraînement reprennent le nom de fonction d'une tâche E2. Elles sont
+listées dans `tests/test_arena_practice_suite.py`, en attente d'une décision du
+propriétaire décrite dans la
+[grille d'évaluation V1 proposée](../../docs/model/v1-evaluation-grid.md#séparation-évaluation--entraînement).
 
 ## Séparation des droits
 
@@ -52,6 +81,24 @@ variable `SOVEREIGN_QWEN_ENDPOINT` est facultative ; si elle reste présente, el
 doit être strictement identique à l'adresse épinglée. Les moteurs BOOTSTRAP et
 14B restent sur la boucle locale. Voir
 `docs/operations/private-endpoints-migration.md`.
+
+Variables lues par `services/arena/runner.py` (et `services/arena/status.py`
+pour la dernière) :
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `SOVEREIGN_ARENA_STATE` | répertoire d'état du code, fixé aussi par l'unité | base SQLite, paquets et boîte d'approbations |
+| `SOVEREIGN_ARENA_INBOX` | `inbox/` sous le répertoire d'état | approbations déposées par la passerelle |
+| `SOVEREIGN_ARENA_SUITE` | `configs/arena/practice-suite.v1.json` | suite de tâches jouée ; E2 seulement par choix explicite |
+| `SOVEREIGN_ARENA_PACKET_SIZE` | `50` | solutions validées par paquet |
+| `SOVEREIGN_ARENA_EVOLVE_EVERY` | `12` | matchs entre deux évolutions |
+| `SOVEREIGN_ARENA_MAX_MATCHES_PER_HOUR` | `12` | budget horaire de matchs |
+| `SOVEREIGN_BOOTSTRAP_ENDPOINT` | boucle locale, port 8080 | moteur BOOTSTRAP |
+| `SOVEREIGN_QWEN_TOKEN` | vide | active QWEN-CODER à partir de 32 caractères |
+| `SOVEREIGN_PRIVATE_ENDPOINTS_FILE` | aucun : requis dès qu'un jeton Qwen est fourni | fichier privé hors Git qui épingle le moteur QWEN-CODER (D-036) |
+| `SOVEREIGN_QWEN_ENDPOINT` | adresse épinglée du fichier privé | facultative ; si présente, strictement identique à l'épingle |
+| `SOVEREIGN_CHAT14B_ENDPOINT` | vide : relecteur CHAT-14B absent | moteur CHAT-14B |
+| `SOVEREIGN_ARENA_DB` | `arena.sqlite3` sous le répertoire d'état par défaut, sans suivre `SOVEREIGN_ARENA_STATE` | base lue en lecture seule par l'outil d'état |
 
 ## Page
 

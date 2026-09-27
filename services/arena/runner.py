@@ -27,6 +27,7 @@ from services.arena.store import ArenaStore, utc_now
 from services.common import private_endpoints
 
 APPROVAL_SCHEMA = "arena-approval.v1"
+DEFAULT_SUITE = "configs/arena/practice-suite.v1.json"
 MAX_TOKENS_AUTHOR = 700
 MAX_TOKENS_CRITIC = 220
 MAX_TOKENS_COACH = 400
@@ -52,6 +53,17 @@ class ArenaConfig:
     packet_size: int = 50
     evolve_every: int = 12
     max_matches_per_hour: int = 12
+
+
+def suite_path(environ: Mapping[str, str] | None = None) -> Path:
+    """The suite to play: SOVEREIGN_ARENA_SUITE, else the practice suite.
+
+    The sealed E2 benchmark is never a default: playing it takes an explicit
+    override, and the increment builder refuses its tasks anyway.
+    """
+
+    environ = os.environ if environ is None else environ
+    return Path(environ.get("SOVEREIGN_ARENA_SUITE", DEFAULT_SUITE))
 
 
 def load_suite(path: Path) -> list[dict[str, str]]:
@@ -322,7 +334,7 @@ def main() -> int:
         evolve_every=int(os.environ.get("SOVEREIGN_ARENA_EVOLVE_EVERY", "12")),
         max_matches_per_hour=int(os.environ.get("SOVEREIGN_ARENA_MAX_MATCHES_PER_HOUR", "12")),
     )
-    suite = Path(os.environ.get("SOVEREIGN_ARENA_SUITE", "configs/evaluation/core-python-e2.candidate.json"))
+    suite = suite_path()
     store = ArenaStore(state_dir / "arena.sqlite3")
     store.initialize()
     try:
