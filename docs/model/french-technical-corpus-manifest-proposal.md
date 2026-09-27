@@ -10,8 +10,9 @@ acquises en `RAW` le 2026-09-08 ; aucune n'a été promue dans `VALIDATED`.
 - 97 396 860 tokens estimés, dont 406 893 français (0,417768 %) ;
 - ce résultat dépasse le pilote de 10 M tokens : aucun entraînement ni
   promotion ne peut partir avant un sous-échantillonnage approuvé ;
-- reçu durable :
-  `/volume1/sovereign-ai-secure/raw/corpus-v1-acquisition-20260908.receipt.json`.
+- reçu durable `corpus-v1-acquisition-20260908.receipt.json`, conservé dans
+  la zone RAW du stockage interne ; son emplacement exact reste hors du dépôt
+  public.
 
 ## Cible
 

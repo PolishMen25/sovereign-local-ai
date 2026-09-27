@@ -8,7 +8,7 @@ CORE-80M est un **candidat d'architecture calculable**, pas une spécification f
 final, moteur de génération ou interface de questions-réponses n'existe
 actuellement.
 
-Le projet vise à créer le modèle principal, son tokenizer, son pipeline et tous ses poids — y compris sa matrice d'embedding de tokens — dans ce projet et à les entraîner de zéro. Une décision différente reste ouverte uniquement pour le **moteur d'embeddings du RAG** et un éventuel reranker, qui sont des composants séparés de CORE-80M.
+Le projet vise à créer le modèle principal, son tokenizer, son pipeline et tous ses poids — y compris sa matrice d'embedding de tokens — dans ce projet et à les entraîner de zéro. Le **moteur d'embeddings du RAG** et un éventuel reranker sont des composants séparés de CORE-80M ; un petit moteur d'embeddings pré-entraîné est autorisé pour le RAG par D-028 (voir plus bas).
 
 Le contrat préparatoire de corpus et tokenizer est décrit dans
 [le gate dédié](corpus-and-tokenizer-gate.md). Il ne vaut pas approbation d'un
@@ -207,10 +207,18 @@ offline sans modifier l'artefact source. La preuve publique ne conserve ni
 hostname, ni détail CPU/NUMA exact, ni commande, ni chemin.
 
 Le [protocole CORE-MINI NUMA](core-mini-numa-protocol.md) et les schémas public
-et privé décrivent les refus et la canonicalisation. Aucun run conforme de ce
-nouveau runner n'est encore documenté sur le nœud CPU. Il n'existe pas encore
-de comparateur multi-placement : deux preuves compatibles et distinctes seront
-nécessaires avant toute comparaison descriptive.
+et privé décrivent les refus et la canonicalisation. Des preuves de ce runner
+sont consignées dans le protocole (section « Revérification opérationnelle du
+2026-09-07 »). Le comparateur strict `tools/compare_core_mini_numa_evidence.py`
+(commit `d13b4cf`) lit deux preuves distinctes de même session et de même
+charge, puis publie un ratio descriptif de leurs médianes.
+
+Les deux paires A/B enregistrées, du 2026-09-06 puis du 2026-09-07, donnent
+des écarts de signe opposé, et dans la paire du 2026-09-07 la médiane de B
+tombe dans la plage observée de A : l'observation est **non concluante** et ne
+désigne aucun placement. Les preuves publiques ne permettent pas non plus
+de vérifier que A et B relèvent de deux contrats de placement distincts, car
+l'engagement de contrat est salé à chaque run.
 
 Le passage existant reste donc **préliminaire**. Une charge plus grande, deux
 échelles miniatures, les mesures mémoire et système ainsi qu'une comparaison
@@ -228,16 +236,16 @@ Le benchmark doit :
 
 Une projection vers CORE-80M ne sera qu'une fourchette fondée sur ces mesures, accompagnée de ses hypothèses et marges d'incertitude. **Aucune durée d'entraînement n'est promise à ce stade.** Si les résultats sont défavorables, le jalon doit d'abord revoir l'implémentation, le contexte, le corpus, le plan d'entraînement ou le calendrier. Sortir de la cible confirmée de 50–100M exige une nouvelle décision explicite du propriétaire ; lancer coûte que coûte n'est pas un critère de succès.
 
-## Décision ouverte : moteur d'embeddings du RAG
+## Moteur d'embeddings du RAG : voir D-028 et ADR-0004
 
-Cette décision ne concerne pas la matrice d'embedding de tokens de CORE-80M, qui fait partie du modèle principal créé de zéro. Elle concerne le composant séparé qui transforme les documents et requêtes du RAG en vecteurs, ainsi qu'un éventuel reranker.
+Cette question ne concerne pas la matrice d'embedding de tokens de CORE-80M, qui fait partie du modèle principal créé de zéro. Elle concerne le composant séparé qui transforme les documents et requêtes du RAG en vecteurs, ainsi qu'un éventuel reranker.
 
-Deux voies doivent être comparées dans une note de décision :
+Deux voies étaient comparées :
 
 - **Moteur RAG entraîné de zéro** : contrôle maximal, mais dataset d'apprentissage et évaluation supplémentaires.
 - **Petit modèle d'embeddings pré-entraîné exécuté localement sur CPU** : amorçage potentiellement utile, sous réserve de provenance vérifiable, de licence compatible, de fonctionnement hors ligne, d'absence de télémétrie et d'une évaluation mesurée sur le corpus réel.
 
-Cette décision doit précéder le gel de l'architecture RAG. Si un moteur pré-entraîné est retenu, son origine, son empreinte, sa licence, ses transformations et son statut gelé ou ajustable devront être traçables. Ce choix n'autorise pas l'import de poids pré-entraînés dans CORE-80M.
+La seconde voie est autorisée par [D-028](../project/decisions.md) et par le point 5 d'[ADR-0004](../architecture/adr-0004-core-700m-and-zone-split.md) : un petit moteur pré-entraîné, séparé de CORE, acquis dans la zone externe, figé par empreinte et licence, puis exécuté hors ligne sans télémétrie ni ajustement implicite. Tout moteur concret doit rester traçable : origine, empreinte, licence, transformations et statut gelé ou ajustable. Le reranker et le moteur d'index restent à valider par benchmark (P-004). Cette autorisation ne permet pas l'import de poids pré-entraînés dans CORE-80M.
 
 ## Points à décider avant gel de l'architecture
 
@@ -246,7 +254,7 @@ Cette décision doit précéder le gel de l'architecture RAG. Si un moteur pré-
 - longueur de contexte et configuration de RoPE ;
 - précision numérique, optimiseur, plan de taux d'apprentissage et stratégie de checkpoint ;
 - bibliothèque d'entraînement CPU et stratégie de parallélisme adaptée au NUMA ;
-- moteur d'embeddings du RAG et éventuel reranker, créés de zéro ou pré-entraînés ;
+- reranker et moteur d'index du RAG (le petit moteur d'embeddings pré-entraîné est autorisé par D-028) ;
 - protocoles d'évaluation de qualité, robustesse, mémorisation, biais et sécurité ;
 - format de poids et moteur d'inférence local.
 
