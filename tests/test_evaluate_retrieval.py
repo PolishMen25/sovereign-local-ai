@@ -13,6 +13,7 @@ import math
 from pathlib import Path
 import re
 import socket
+import sqlite3
 import subprocess
 import sys
 import unittest
@@ -208,7 +209,11 @@ class ThreeModeTests(RetrievalCase):
         second = tool.canonical_json_bytes(self.evaluate(embedder=HashingEmbedder()))
         self.assertEqual(first, second)
         report = json.loads(first)
-        self.assertEqual(hashlib.sha256(GOLD_PATH.read_bytes()).hexdigest(), report["gold_set"]["sha256"])
+        self.assertEqual(
+            hashlib.sha256(GOLD_PATH.read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
+            report["gold_set"]["sha256"],
+        )
+        self.assertEqual("utf-8-bytes-crlf-read-as-lf", report["gold_set"]["digest_definition"])
         self.assertEqual(
             hashlib.sha256(HYBRID_INDEX_PATH.read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
             report["retrieval_code"]["hybrid_index_sha256"],
@@ -218,6 +223,52 @@ class ThreeModeTests(RetrievalCase):
         for fragment in ("quarantaine", "Restore drills", "carte graphique", str(self.work), "q-fr-001"):
             self.assertNotIn(fragment, text)
         self.assertEqual([], list(self.work.iterdir()))
+
+    def test_gold_digest_does_not_depend_on_the_checkout_line_endings(self) -> None:
+        lf = GOLD_PATH.read_bytes().replace(b"\r\n", b"\n")
+        pinned = hashlib.sha256(lf).hexdigest()
+        reports = []
+        for name, payload in (("lf.jsonl", lf), ("crlf.jsonl", lf.replace(b"\n", b"\r\n"))):
+            path = self.root / name
+            path.write_bytes(payload)
+            reports.append(tool.canonical_json_bytes(
+                self.evaluate(gold_path=path, embedder=HashingEmbedder(), gold_sha256=pinned)
+            ))
+        self.assertEqual(reports[0], reports[1])
+        self.assertEqual(pinned, json.loads(reports[1])["gold_set"]["sha256"])
+        self.assertEqual(len(lf), json.loads(reports[1])["gold_set"]["byte_size"])
+
+    def test_stop_word_only_query_is_still_ranked_in_vector_mode(self) -> None:
+        def document(document_id: str, content: str) -> dict:
+            return {"record_type": "document", "document_id": document_id, "title": "Notice",
+                    "content": content, "provenance_id": "synthetic-stop-words"}
+
+        stop_words = "le la les de"
+        self.assertEqual([], tool.query_terms(stop_words))
+        path = self.write_gold([
+            {"record_type": "header", "schema_version": tool.GOLD_SCHEMA_VERSION,
+             "gold_set_id": "stop-words-test", "synthetic": True},
+            document("doc-stop", stop_words),
+            document("doc-restore", "Exercices de restauration des sauvegardes."),
+            document("doc-cpu", "Calcul sur processeur uniquement."),
+            {"record_type": "query", "query_id": "q-terms", "language": "fr",
+             "query": "restauration sauvegardes", "relevant": [{"document_id": "doc-restore", "grade": 3}]},
+            {"record_type": "query", "query_id": "q-stop", "language": "en",
+             "query": stop_words, "relevant": [{"document_id": "doc-stop", "grade": 3}]},
+        ])
+        report = self.evaluate(gold_path=path, embedder=HashingEmbedder())
+        self.assertEqual(1, report["gold_set"]["queries_without_lexical_terms"])
+        self.assertTrue(report["weight_sweep"]["parity_with_hybrid_index"])
+        modes = report["modes"]
+        # Production returns nothing without a lexical term, in both modes.
+        self.assertEqual(0.0, modes["lexical"]["by_language"]["en"]["mrr"])
+        self.assertEqual(0.0, modes["hybrid"]["by_language"]["en"]["mrr"])
+        # The vector-only mode ranks every embedded document all the same.
+        self.assertEqual(1.0, modes["vector"]["by_language"]["en"]["mrr"])
+        points = report["weight_sweep"]["points"]
+        self.assertEqual(modes["vector"]["overall"], points[0]["overall"])
+        for point in points[1:]:
+            self.assertEqual(0.0, point["by_language"]["en"]["mrr"], point["lexical_weight"])
 
     def test_lexical_only_command_line_report_is_stable(self) -> None:
         outputs = []
@@ -267,6 +318,7 @@ class FallbackAndRefusalTests(RetrievalCase):
         cases = {
             "non-finite": ScriptedEmbedder([1.0, float("nan")]),
             "infinite": ScriptedEmbedder([float("inf"), 1.0]),
+            "overflow": ScriptedEmbedder([10 ** 400, 1.0]),
             "norm must be finite": ScriptedEmbedder([1e308] * 4),
             "norm must be finite and non-zero": ScriptedEmbedder([0.0, 0.0]),
             "dimension is outside": ScriptedEmbedder([]),
@@ -277,7 +329,7 @@ class FallbackAndRefusalTests(RetrievalCase):
             "dimensions differ": ScriptedEmbedder([1.0] * DIMENSIONS, query_vector=[1.0] * 8),
         }
         expected = {
-            "non-finite": "non-finite", "infinite": "non-finite",
+            "non-finite": "non-finite", "infinite": "non-finite", "overflow": "non-finite",
             "norm must be finite": "norm must be finite", "norm must be finite and non-zero": "non-zero",
             "dimension is outside": "dimension is outside", "too many": "dimension is outside",
             "boolean": "non-numeric", "text": "list of numbers", "missing": "list of numbers",
@@ -326,6 +378,30 @@ class FallbackAndRefusalTests(RetrievalCase):
         self.assertIn("already exists", stderr)
         self.assertEqual(b"keep\n", output.read_bytes())
 
+    def test_file_system_and_index_errors_are_reported_without_paths(self) -> None:
+        output = self.root / "report.json"
+        failures = {
+            "PermissionError": mock.patch.object(
+                tool, "write_report", side_effect=PermissionError(13, "Permission denied", str(output))
+            ),
+            "OperationalError": mock.patch.object(
+                tool, "build_index",
+                side_effect=sqlite3.OperationalError(f"unable to open database file {self.work}"),
+            ),
+        }
+        for name, patch in failures.items():
+            with self.subTest(error=name), patch:
+                code, stdout, stderr = self.cli(
+                    ["--gold", str(GOLD_PATH), "--output", str(output), "--work-dir", str(self.work)]
+                )
+                self.assertEqual(1, code)
+                self.assertEqual("", stdout)
+                self.assertIn(name, stderr)
+                self.assertNotIn(str(self.root), stderr)
+                self.assertNotIn(self.root.name, stderr)
+        self.assertFalse(output.exists())
+        self.assertEqual([], list(self.work.iterdir()))
+
 
 class MalformedGoldSetTests(RetrievalCase):
     def test_malformed_gold_sets_are_refused(self) -> None:
@@ -369,6 +445,10 @@ class MalformedGoldSetTests(RetrievalCase):
             path = self.write_gold(payload)
             with self.subTest(case=message), self.assertRaisesRegex(tool.EvaluationRefused, message):
                 self.evaluate(gold_path=path)
+        # Beyond the interpreter's integer digit limit: a plain ValueError.
+        huge = self.write_gold(GOLD_PATH.read_bytes() + b'{"record_type":"query","n":' + b"9" * 5000 + b"}\n")
+        with self.assertRaisesRegex(tool.EvaluationRefused, "not strict JSON"):
+            self.evaluate(gold_path=huge)
 
 
 class LoopbackTests(RetrievalCase):

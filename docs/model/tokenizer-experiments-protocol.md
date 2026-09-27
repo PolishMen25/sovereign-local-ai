@@ -60,8 +60,12 @@ Codes de sortie :
 | Code | Signification |
 | --- | --- |
 | `0` | Rapport écrit ; tous les allers-retours et invariants tiennent. |
-| `2` | Rapport écrit ; au moins un aller-retour ou un invariant échoue. |
-| `1` | Entrée refusée ; aucun rapport écrit. |
+| `3` | Rapport écrit ; au moins un aller-retour ou un invariant échoue. |
+| `1` | Entrée refusée ou rapport impossible à écrire ; aucun rapport écrit. |
+| `2` | Ligne de commande invalide (argparse) ; aucun rapport écrit. |
+
+Les messages d'erreur ne contiennent ni texte évalué ni chemin local : une
+erreur du système de fichiers n'est signalée que par sa classe.
 
 ## 3. Entrées figées et garde-fous
 
@@ -85,6 +89,12 @@ Codes de sortie :
   mêmes entrées produisent les mêmes octets et la même empreinte, affichée en
   sortie standard.
 - **Pas d'écrasement.** Un rapport existant n'est jamais remplacé.
+- **Empreinte sur les octets bruts.** L'empreinte du fichier d'évaluation porte
+  sur ses octets exacts, comme `content_sha256` du manifeste et
+  `training_corpus_sha256` de l'artefact. Une extraction Git qui convertit les
+  fins de ligne (`core.autocrlf`) change donc l'empreinte d'un fichier versionné,
+  dont la fixture synthétique : une empreinte épinglée avec `--eval-sha256` ne
+  vaut que pour des octets identiques.
 
 Deux formats d'enregistrement sont acceptés, sans mélange dans un même fichier :
 
@@ -188,6 +198,9 @@ Ces points relèvent du gate G3 (issue #7). Ce document n'en tranche aucun :
 2. les critères d'acceptation, par exemple l'écart admissible de
    `bytes_per_token` entre français et anglais, à fixer **après** les mesures ;
 3. le réentraînement éventuel sur le corpus bilingue final ;
-4. la confirmation des quatre tokens spéciaux et du contexte candidat de 2 048
-   ([ADR-0004](../architecture/adr-0004-core-700m-and-zone-split.md), §5) ;
+4. la confirmation des quatre tokens spéciaux, qui sont aujourd'hui le contrat
+   du code (`SPECIAL_TOKENS` de
+   [`services/inference/tokenizer.py`](../../services/inference/tokenizer.py))
+   et non une décision d'ADR, et du contexte candidat de 2 048 tokens
+   ([ADR-0004](../architecture/adr-0004-core-700m-and-zone-split.md), point 1) ;
 5. une éventuelle promotion `approved_core_v1`.

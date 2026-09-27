@@ -8,18 +8,23 @@ in a private work directory, then:
   weights 0.45 lexical / 0.55 vector are hard-coded there);
 * re-scores the same candidates for a sweep of the lexical weight, where
   weight 0 is the vector-only mode. At 0.45 the sweep must reproduce the
-  production ranking and scores exactly, otherwise the run is refused.
+  production ranking and scores exactly, otherwise the run is refused. A
+  query left without lexical terms gets no result from production at any
+  weight, but weight 0 still ranks every embedded document, so the vector
+  mode does not depend on lexical tokenisation.
 
 The embedder is injected. From the command line it is either absent (lexical
 only) or a loopback-only HTTP runtime reached through ``EmbedClient`` on a
 literal loopback address. An unavailable embedder degrades to a lexical-only
 report; an invalid vector is refused, including one the loopback runtime
-returns. The report is deterministic, carries
-the input digests, no query or document text and no path. It decides
-nothing: no threshold, no preferred weight.
+returns. The report is deterministic, carries the input digests, no query or
+document text and no path. The gold-set digest is taken over its bytes with
+CRLF line endings read as LF, so that a Windows checkout and a Linux one pin
+the same value. It decides nothing: no threshold, no preferred weight.
 
-Exit codes: 0 when a report was written, 1 when the inputs were refused
-(nothing is written).
+Exit codes: 0 when a report was written, 1 when the inputs were refused or the
+report could not be written (nothing is written), 2 for a command-line usage
+error (argparse). Refusal messages carry no gold-set text and no local path.
 """
 
 from __future__ import annotations
@@ -95,6 +100,7 @@ QUERY_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 LABEL = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DATABASE_NAME = "retrieval-eval.sqlite3"
+GOLD_DIGEST_DEFINITION = "utf-8-bytes-crlf-read-as-lf"
 
 
 class EvaluationRefused(ValueError):
@@ -118,9 +124,14 @@ def sha256_hex(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def lf_bytes(payload: bytes) -> bytes:
+    """Read CRLF line endings as LF; JSON forbids a raw CR inside a string."""
+    return payload.replace(b"\r\n", b"\n")
+
+
 def source_sha256(path: Path) -> str:
     """Digest of a source file with LF line endings, stable across checkouts."""
-    return sha256_hex(path.read_bytes().replace(b"\r\n", b"\n"))
+    return sha256_hex(lf_bytes(path.read_bytes()))
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -174,7 +185,11 @@ def strict_json(text: str, context: str) -> Any:
         return json.loads(
             text, object_pairs_hook=_strict_object, parse_constant=_reject_constant
         )
-    except (json.JSONDecodeError, RecursionError, _StrictJsonError):
+    except EvaluationRefused:
+        raise
+    except (ValueError, RecursionError):
+        # ValueError covers JSONDecodeError, the strict hooks and the
+        # interpreter's integer digit limit.
         raise EvaluationRefused(f"{context} is not strict JSON") from None
 
 
@@ -324,7 +339,11 @@ def validated_vector(values: Any, expected_dimensions: int | None) -> list[float
         _fail("embedding dimension is outside the bounded range")
     if any(type(value) not in (int, float) for value in values):
         _fail("embedding contains a non-numeric value")
-    vector = [float(value) for value in values]
+    try:
+        vector = [float(value) for value in values]
+    except (OverflowError, ValueError):
+        # A Python int beyond the float range, e.g. 10**400.
+        raise EvaluationRefused("embedding contains a non-finite value") from None
     if any(not math.isfinite(value) for value in vector):
         _fail("embedding contains a non-finite value")
     norm = math.hypot(*vector)
@@ -458,23 +477,29 @@ def query_terms(query: str) -> list[str]:
 def sweep_rankings(
     database: Path, query: str, query_vector: list[float], percents: Sequence[int]
 ) -> dict[int, list[tuple[float, str]]]:
-    """Re-score the production hybrid candidates for each lexical weight."""
+    """Re-score the production hybrid candidates for each lexical weight.
+
+    Without lexical terms, production returns nothing at any weight; every
+    weight above 0 mirrors that. Weight 0 is the vector-only mode and still
+    ranks every embedded document, so a stop-word-only query is not scored
+    as a vector miss because of lexical tokenisation.
+    """
     terms = query_terms(query)
-    if not terms:
-        return {percent: [] for percent in percents}
-    fts_query = " OR ".join(f'"{term.replace(chr(34), "")}"' for term in terms)
     normalized_query = _normalized_vector(query_vector)
     components: list[tuple[str, float, float]] = []
+    lexical_order: dict[str, int] = {}
     uri = database.resolve().as_uri() + "?mode=ro"
     with closing(sqlite3.connect(uri, uri=True, timeout=10)) as connection:
         connection.row_factory = sqlite3.Row
-        lexical_rows = connection.execute(
-            "SELECT c.document_id,bm25(validated_chunks_fts,0,3,1) AS rank FROM validated_chunks_fts "
-            "JOIN validated_chunks c ON c.document_id=validated_chunks_fts.document_id "
-            "WHERE validated_chunks_fts MATCH ? ORDER BY rank,c.document_id LIMIT ?",
-            (fts_query, HYBRID_LEXICAL_DEPTH),
-        ).fetchall()
-        lexical_order = {row["document_id"]: position for position, row in enumerate(lexical_rows)}
+        if terms:
+            fts_query = " OR ".join(f'"{term.replace(chr(34), "")}"' for term in terms)
+            lexical_rows = connection.execute(
+                "SELECT c.document_id,bm25(validated_chunks_fts,0,3,1) AS rank FROM validated_chunks_fts "
+                "JOIN validated_chunks c ON c.document_id=validated_chunks_fts.document_id "
+                "WHERE validated_chunks_fts MATCH ? ORDER BY rank,c.document_id LIMIT ?",
+                (fts_query, HYBRID_LEXICAL_DEPTH),
+            ).fetchall()
+            lexical_order = {row["document_id"]: position for position, row in enumerate(lexical_rows)}
         for row in connection.execute(
             "SELECT document_id,embedding,embedding_dimensions FROM validated_chunks "
             "WHERE embedding_dimensions=?",
@@ -488,6 +513,9 @@ def sweep_rankings(
             components.append((row["document_id"], lexical_score, vector_score))
     rankings: dict[int, list[tuple[float, str]]] = {}
     for percent in percents:
+        if not terms and percent != 0:
+            rankings[percent] = []
+            continue
         lexical_weight = percent / 100
         vector_weight = (100 - percent) / 100
         scored = [
@@ -574,7 +602,7 @@ def evaluate(
             _fail("embedder label must match ^[a-z0-9][a-z0-9._-]{0,63}$")
     if gold_sha256 is not None and (not isinstance(gold_sha256, str) or not SHA256.fullmatch(gold_sha256)):
         _fail("pinned gold set SHA-256 must be 64 lowercase hexadecimal characters")
-    payload = read_bounded_file(gold_path, maximum_bytes=MAXIMUM_GOLD_BYTES, context="gold set")
+    payload = lf_bytes(read_bounded_file(gold_path, maximum_bytes=MAXIMUM_GOLD_BYTES, context="gold set"))
     gold_digest = sha256_hex(payload)
     if gold_sha256 is not None and gold_digest != gold_sha256:
         _fail("gold set does not match its pinned SHA-256")
@@ -661,6 +689,7 @@ def evaluate(
         "gold_set": {
             "sha256": gold_digest,
             "byte_size": len(payload),
+            "digest_definition": GOLD_DIGEST_DEFINITION,
             "gold_set_id": gold.gold_set_id,
             "synthetic": gold.synthetic,
             "documents": len(gold.documents),
@@ -738,8 +767,19 @@ def main(argv: list[str] | None = None) -> int:
             gold_sha256=arguments.gold_sha256,
         )
         report_sha256 = write_report(arguments.output, report)
-    except (OSError, sqlite3.Error, ValueError) as error:
+    except ValueError as error:
         print(f"retrieval evaluation refused: {error}", file=sys.stderr)
+        return 1
+    except sqlite3.Error as error:
+        print(f"retrieval evaluation refused: index error ({type(error).__name__})", file=sys.stderr)
+        return 1
+    except OSError as error:
+        # An OSError message embeds local paths; only its class is reported.
+        print(
+            "retrieval evaluation refused: the work directory or the report could not be "
+            f"written ({type(error).__name__})",
+            file=sys.stderr,
+        )
         return 1
     print(json.dumps(
         {

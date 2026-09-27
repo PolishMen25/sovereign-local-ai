@@ -33,11 +33,14 @@ grand k) et nDCG@k à gains gradués (2^note − 1) dans trois modes :
 - **lexical** : la recherche FTS5/BM25 de production ;
 - **hybride** : la recherche de production, avec les poids 0,45 lexical et
   0,55 vectoriel codés en dur ;
-- **vectoriel** : le point 0 du balayage du poids lexical.
+- **vectoriel** : le point 0 du balayage du poids lexical. Il note toutes les
+  notices dotées d'un embedding, même pour une requête sans terme lexical.
 
 Le balayage (0 à 1, dont 0,45) re-note les mêmes candidats que la production.
 À 0,45, il doit reproduire exactement le classement et les scores de
-`HybridKnowledgeIndex.search` ; sinon l'exécution est refusée.
+`HybridKnowledgeIndex.search` ; sinon l'exécution est refusée. Pour une requête
+sans terme lexical, les points au-dessus de 0 restent vides, comme la
+production ; seul le point 0, mode vectoriel pur, classe les notices.
 
 ```bash
 python3 -B tools/evaluate_retrieval.py \
@@ -63,11 +66,22 @@ Options :
 Un runtime d'embeddings injoignable dégrade le rapport en mode lexical seul.
 Un vecteur invalide est refusé : non fini, nul, non numérique ou de dimension
 variable. Une réponse mal formée du runtime de bouclage est aussi refusée ;
-elle n'est jamais présentée comme une simple indisponibilité. Le rapport est déterministe. Il porte les empreintes du jeu d'or, de
+elle n'est jamais présentée comme une simple indisponibilité.
+
+Le rapport est déterministe. Il porte les empreintes du jeu d'or, de
 `hybrid_index.py` et de l'outil, ainsi qu'une empreinte des vecteurs pour
-comparer deux exécutions. Il ne contient ni texte ni chemin et n'est jamais
-écrasé. `model_identity_verified` reste `false` : l'outil ne vérifie pas le
-modèle servi.
+comparer deux exécutions. Ces trois empreintes de fichiers lisent les fins de
+ligne CRLF comme LF (`digest_definition` vaut `utf-8-bytes-crlf-read-as-lf`
+pour le jeu d'or) : une extraction Git sous Windows et une autre sous Linux
+épinglent la même valeur avec `--gold-sha256`. Pour un fichier en LF, elle est
+égale au SHA-256 de ses octets. Le rapport ne contient ni texte ni chemin et
+n'est jamais écrasé. `model_identity_verified` reste `false` : l'outil ne
+vérifie pas le modèle servi.
+
+Codes de sortie : `0` rapport écrit, `1` entrée refusée ou rapport impossible
+à écrire, `2` ligne de commande invalide. Les messages d'erreur ne contiennent
+pas de chemin : une erreur du système de fichiers ou de l'index n'est signalée
+que par sa classe.
 
 Aucun seuil ni poids recommandé n'est fixé. Le choix du reranker et de l'index
 (P-004) reste au propriétaire. Il suppose une mesure au volume réel sur le nœud
@@ -78,6 +92,7 @@ Deux constats tirés du code actuel éclairent la lecture des résultats :
 - en mode hybride, seules les notices dotées d'un embedding de même dimension
   que la requête sont notées. Une notice sans embedding disparaît donc des
   résultats hybrides, même si elle correspond lexicalement ;
-- une requête dont tous les termes sont des mots vides ne renvoie rien, quel
-  que soit le mode. Le rapport compte ces requêtes
-  (`queries_without_lexical_terms`).
+- une requête dont tous les termes sont des mots vides ne renvoie rien en
+  production, en mode lexical comme en mode hybride. Le rapport compte ces
+  requêtes (`queries_without_lexical_terms`) ; le mode vectoriel les classe
+  quand même, ce qui isole l'effet de la tokenisation lexicale.

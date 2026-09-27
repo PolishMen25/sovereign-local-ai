@@ -76,17 +76,35 @@ RELAY_GUARDED_ZONES = frozenset({"storage-raw", "storage-internal", "transfer-ai
 APPEND_ONLY_ZONE = "storage-raw"
 INTERNET_ZONE = "internet"
 INTERNET_PEER_ZONE = "dmz"
+# R13, connection level (ADR-0004 point 4 and D-029): IA-CORE only opens
+# flows toward the approved internal storage, and only accepts the inference
+# call opened by the interface airlock. Everything else touching IA-CORE is
+# refused, whatever its direction: a pull still carries the request.
+CORE_ZONE = "ia-core"
+CORE_INITIATED_DESTINATIONS = frozenset({"storage-internal"})
+CORE_INBOUND_ORIGIN = "interface-airlock"
+CORE_INBOUND_DATA_CLASS = "inference-call"
 
 # Free text must not carry infrastructure identifiers. Refusals never echo
-# the offending text.
+# the offending text. This is a partial safety net, not a proof of redaction:
+# single-label host names, bare numbers and hardware model names cannot be
+# told apart from ordinary words and remain a reviewer responsibility.
 REDACTION_PATTERNS = (
     re.compile(r"(?<![0-9])[0-9]{1,3}(?:\.[0-9]{1,3}){2,3}(?![0-9])"),
     re.compile(r"(?i)(?<![0-9a-z])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![0-9a-z])"),
     re.compile(r"(?i)(?<![0-9a-z])[0-9a-f]{2}(?:-[0-9a-f]{2}){5}(?![0-9a-z])"),
     re.compile(r"(?i)[a-z][a-z0-9+.-]*://"),
     re.compile(r"(?i)(?<![\w-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z][a-z0-9-]*(?![\w-])"),
-    re.compile(r"(?:^|(?<=[\s(\[\"'`]))/[\w.-]+/"),
-    re.compile(r"(?i)(?<![a-z0-9])(?:ct|vm|lxc|vmid)[\s#_-]?[0-9]+(?![0-9])"),
+    # Absolute paths: POSIX, forward-slash UNC, home directory, drive letter.
+    re.compile(r"(?:^|(?<=[\s(\[{\"'`=,;]))(?:/{1,2}[\w.~-]|~/|[A-Za-z]:[\\/])"),
+    # Ports: protocol suffix, name or bracket followed by a port, port keyword.
+    re.compile(r"(?i)(?<![0-9a-z])[0-9]{1,5}/(?:tcp|udp|sctp)(?![0-9a-z])"),
+    re.compile(r"(?i)(?<=[a-z\]]):[0-9]{2,5}(?![0-9])"),
+    re.compile(r"(?i)(?<![0-9a-z])ports?[\s#:=-]{0,3}[0-9]{1,5}(?![0-9])"),
+    re.compile(
+        r"(?i)(?<![0-9a-z])(?:ct|vm|lxc|vmid|qemu|kvm|conteneur|container|(?:invit[eé]|guest)s?)"
+        r"[\s#_:-]{0,3}[0-9]+(?![0-9])"
+    ),
     re.compile(r"[@\\]"),
 )
 
@@ -180,7 +198,10 @@ def parse_matrix(payload: bytes) -> Any:
         return json.loads(
             text, object_pairs_hook=_strict_object, parse_constant=_reject_constant
         )
-    except (json.JSONDecodeError, RecursionError):
+    except MatrixRefused:
+        raise
+    except (ValueError, RecursionError):
+        # ValueError covers JSONDecodeError and the integer digit limit.
         raise MatrixRefused("matrix is not strict JSON") from None
 
 
@@ -264,6 +285,19 @@ def _validate_graph(flows: list[dict[str, Any]]) -> None:
             _fail(f"{zone} would relay data both ways between two distinct zones")
 
 
+def _validate_core_boundary(flows: list[dict[str, Any]]) -> None:
+    """R13: checked after the graph rules so that R8 to R10 keep their message."""
+    for flow in flows:
+        label = f"flow {flow['flow_id']}"
+        origin, destination = flow["origin_zone"], flow["destination_zone"]
+        if origin == CORE_ZONE and destination not in CORE_INITIATED_DESTINATIONS:
+            _fail(f"{label}: ia-core may only open flows toward storage-internal")
+        if destination == CORE_ZONE and (
+            origin != CORE_INBOUND_ORIGIN or flow["data_class"] != CORE_INBOUND_DATA_CLASS
+        ):
+            _fail(f"{label}: ia-core only accepts the inference call from interface-airlock")
+
+
 def validate(document: Any) -> dict[str, Any]:
     """Refuse any matrix that breaks the contract; return a content-free summary."""
     if not isinstance(document, dict) or set(document) != TOP_LEVEL_KEYS:
@@ -303,6 +337,7 @@ def validate(document: Any) -> dict[str, Any]:
     ):
         _fail("an approved matrix must be real and cite a recorded decision for every flow")
     _validate_graph(flows)
+    _validate_core_boundary(flows)
     return {
         "status": document["status"],
         "synthetic": document["synthetic"],

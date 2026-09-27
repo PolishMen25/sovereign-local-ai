@@ -386,7 +386,7 @@ class TamperAndLeakTests(EvaluationCase):
         self.assertIn("already exists", stderr)
         self.assertEqual(b"keep\n", output.read_bytes())
 
-    def test_integrity_failure_writes_the_report_and_exits_two(self) -> None:
+    def test_integrity_failure_writes_the_report_and_exits_three(self) -> None:
         path, digest = self.write_tokenizer("bpe", tokenizer_document(300))
         output = self.root / "broken.json"
         with mock.patch.object(ByteBpeTokenizer, "decode", lambda self, token_ids: "altéré"):
@@ -394,7 +394,8 @@ class TamperAndLeakTests(EvaluationCase):
                 ["--tokenizer", "bpe", str(path), digest, "--eval-jsonl", str(FIXTURE_PATH),
                  "--output", str(output)]
             )
-        self.assertEqual(2, code)
+        self.assertEqual(3, code)
+        self.assertEqual(tool.INTEGRITY_FAILURE_EXIT_CODE, code)
         self.assertFalse(json.loads(stdout)["integrity_ok"])
         report = json.loads(output.read_text(encoding="utf-8"))
         result = report["tokenizers"][0]
@@ -402,6 +403,30 @@ class TamperAndLeakTests(EvaluationCase):
         self.assertEqual(len(fixture_records()), result["round_trip"]["records_failed"])
         self.assertEqual(tool.MAXIMUM_LISTED_FAILURES, len(result["round_trip"]["failed_line_numbers"]))
         self.assertFalse(result["special_token_invariants"]["decode_stops_at_eos"])
+
+    def test_usage_error_exits_two_without_a_report(self) -> None:
+        path, digest = self.write_tokenizer("bpe", tokenizer_document(300))
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit) as caught:
+            tool.main(["--tokenizer", "bpe", str(path), digest, "--eval-jsonl", str(FIXTURE_PATH)])
+        self.assertEqual(2, caught.exception.code)
+        self.assertNotEqual(tool.INTEGRITY_FAILURE_EXIT_CODE, caught.exception.code)
+        self.assertEqual(["bpe.json"], sorted(item.name for item in self.root.iterdir()))
+
+    def test_file_system_error_is_reported_without_its_path(self) -> None:
+        path, digest = self.write_tokenizer("bpe", tokenizer_document(300))
+        output = self.root / "report.json"
+        failure = PermissionError(13, "Permission denied", str(output))
+        with mock.patch.object(tool, "write_report", side_effect=failure):
+            code, stdout, stderr = self.cli(
+                ["--tokenizer", "bpe", str(path), digest, "--eval-jsonl", str(FIXTURE_PATH),
+                 "--output", str(output)]
+            )
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertIn("PermissionError", stderr)
+        self.assertNotIn(str(self.root), stderr)
+        self.assertNotIn(self.root.name, stderr)
 
 
 class MalformedEvaluationInputTests(EvaluationCase):
@@ -415,6 +440,7 @@ class MalformedEvaluationInputTests(EvaluationCase):
             "keys must be": jsonl([dict(good, source="web")]),
             "not strict JSON": b'{"record_id":"r1","record_id":"r2","text":"x"}\n',
             "non-finite": b'{"record_id":"r1","text":NaN}\n',
+            "huge integer": b'{"record_id":"r1","text":"x","n":' + b"9" * 5000 + b"}\n",
             "byte order mark": b"\xef\xbb\xbf" + jsonl([good]),
             "not valid UTF-8": b'{"record_id":"r1","text":"\xff"}\n',
             "size is outside": b"",
@@ -427,7 +453,7 @@ class MalformedEvaluationInputTests(EvaluationCase):
         path, digest = self.write_tokenizer("bpe", tokenizer_document(300))
         for message, payload in cases.items():
             eval_path = self.write_file("case.jsonl", payload)
-            expected = "not strict JSON" if message == "non-finite" else message
+            expected = "not strict JSON" if message in {"non-finite", "huge integer"} else message
             with self.subTest(case=message), self.assertRaisesRegex(tool.EvaluationRefused, expected):
                 tool.run_evaluation(tokenizers=[("bpe", path, digest)], eval_path=eval_path)
 

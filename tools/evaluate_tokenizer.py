@@ -8,9 +8,10 @@ with the runtime tokenizer itself. It writes one deterministic, content-free
 JSON report: input digests, descriptive metrics and integrity checks. It
 never decides: no threshold, no ranking, no promotion.
 
-Exit codes: 0 when every integrity check holds, 2 when the report was written
+Exit codes: 0 when every integrity check holds, 3 when the report was written
 but a round trip or a special-token invariant failed, 1 when the inputs were
-refused (nothing is written).
+refused or the report could not be written, 2 for a command-line usage error
+(argparse). Refusal messages carry no evaluated text and no local path.
 """
 
 from __future__ import annotations
@@ -60,6 +61,8 @@ MAXIMUM_RECORD_ID_LENGTH = 128
 MAXIMUM_MANIFEST_BYTES = 4 * 1024 * 1024
 MAXIMUM_TOKENIZERS = 8
 MAXIMUM_LISTED_FAILURES = 20
+# Distinct from argparse's usage-error code 2.
+INTEGRITY_FAILURE_EXIT_CODE = 3
 FIRST_BYTE_TOKEN_ID = len(SPECIAL_TOKENS)
 FIRST_LEARNED_TOKEN_ID = FIRST_BYTE_TOKEN_ID + 256
 
@@ -149,7 +152,11 @@ def strict_json(text: str, context: str) -> Any:
         return json.loads(
             text, object_pairs_hook=_strict_object, parse_constant=_reject_constant
         )
-    except (json.JSONDecodeError, RecursionError, _StrictJsonError):
+    except EvaluationRefused:
+        raise
+    except (ValueError, RecursionError):
+        # ValueError covers JSONDecodeError, the strict hooks and the
+        # interpreter's integer digit limit.
         raise EvaluationRefused(f"{context} is not strict JSON") from None
 
 
@@ -647,8 +654,16 @@ def main(argv: list[str] | None = None) -> int:
             split=arguments.split,
         )
         report_sha256 = write_report(arguments.output, report)
-    except (OSError, ValueError) as error:
+    except ValueError as error:
         print(f"tokenizer evaluation refused: {error}", file=sys.stderr)
+        return 1
+    except OSError as error:
+        # An OSError message embeds local paths; only its class is reported.
+        print(
+            "tokenizer evaluation refused: the report could not be written "
+            f"({type(error).__name__})",
+            file=sys.stderr,
+        )
         return 1
     print(json.dumps(
         {
@@ -658,7 +673,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         sort_keys=True,
     ))
-    return 0 if report["integrity_ok"] else 2
+    return 0 if report["integrity_ok"] else INTEGRITY_FAILURE_EXIT_CODE
 
 
 if __name__ == "__main__":

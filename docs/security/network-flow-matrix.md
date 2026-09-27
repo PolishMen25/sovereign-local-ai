@@ -139,7 +139,7 @@ donne les deux.
 | R1 | `default_policy` vaut `deny` ; tout flux non listé est refusé | architecture §2 et §5 |
 | R2 | zones connues seulement ; origine et destination distinctes | modèle de zones §2 |
 | R3 | tous les champs présents ; justification non vide, bornée | AGENTS.md, refus sûrs |
-| R4 | aucun jeton d'infrastructure dans les textes : adresse IPv4 ou IPv6, adresse matérielle, URL, courriel, nom à point, chemin absolu, barre oblique inverse, identifiant de conteneur ou de VM, caractère de contrôle ou de mise en forme | AGENTS.md, D-025 |
+| R4 | aucun jeton d'infrastructure dans les textes : adresse IPv4 ou IPv6, adresse matérielle, URL, courriel, nom à point, chemin absolu (POSIX, même à un seul segment, UNC, répertoire personnel, lettre de lecteur), barre oblique inverse, port (`<n>/tcp`, `nom:<n>`, `port <n>`), identifiant de conteneur, de VM ou d'invité, caractère de contrôle ou de mise en forme. **Filet partiel** : voir les limites ci-dessous | AGENTS.md, D-025 |
 | R5 | `flow_id` uniques ; une identité par flux | ADR-0004 (identités de stockage séparées), moindre privilège |
 | R6 | seule la `dmz` échange avec `internet` | architecture flux F0/F1 |
 | R7 | tout flux vers `storage-raw` est `push` : archive en ajout seul, sans lecture par l'écrivain | architecture flux F3 |
@@ -147,11 +147,25 @@ donne les deux.
 | R9 | aucun chemin de contenu depuis `ia-core`, `storage-internal` ou `storage-raw` vers `dmz` ou `internet` | D-007, D-009, invariants 1 et 5, T07 |
 | R10 | pas de relais bidirectionnel par `storage-raw`, `storage-internal` ou `transfer-airlock` : deux zones distinctes ne peuvent pas à la fois y écrire et y lire | architecture §4.6 et §5, T06 |
 | R11 | exemple synthétique toujours `proposed` et en attente ; matrice `approved` réelle, avec une référence enregistrée par flux | AGENTS.md, gouvernance du registre |
-| R12 | entrée bornée : fichier régulier sans lien symbolique, 256 Kio au plus, UTF-8 strict sans BOM ni NUL, JSON sans clé dupliquée ni NaN | conventions des outils du dépôt |
+| R12 | entrée bornée : fichier régulier sans lien symbolique, 256 Kio au plus, UTF-8 strict sans BOM ni NUL, JSON sans clé dupliquée ni nombre non fini ou démesuré | conventions des outils du dépôt |
+| R13 | frontière d'IA-CORE, au niveau de la **connexion** et quel que soit le sens du contenu : un flux dont l'origine est `ia-core` a pour destination `storage-internal` ; un flux dont la destination est `ia-core` a pour origine `interface-airlock` et pour contenu `inference-call`. Tout autre flux qui touche `ia-core` est refusé, y compris depuis `admin` | ADR-0004 point 4, D-029, T05, T06, invariants 1 et 2 |
 
 Un relais **à sens unique** par une zone de stockage reste permis : c'est la
 forme d'un sas de fichiers. R8 et R9 empêchent qu'il contourne la quarantaine
 ou qu'il fasse sortir du contenu interne.
+
+R8 à R10 raisonnent sur les arêtes de contenu. Un `pull` ouvert par IA-CORE
+n'ajoute aucune arête sortante d'IA-CORE, alors que sa requête quitte la zone.
+R13 raisonne donc sur l'initiateur de la connexion : NT-09 attend l'échec de
+toute session ouverte depuis IA-CORE vers une autre zone que le stockage
+interne.
+
+**HYPOTHÈSE.** R8 traite `quarantine` comme la seule zone qui assainit le
+contenu. Le validateur ne vérifie aucune décision de promotion : il ignore si le
+contenu qui sort de la quarantaine a été validé, et il ne modélise pas l'étape
+de promotion contrôlée de la chaîne de confiance (AGENTS.md, invariants 3 et 4
+du modèle de menaces). Donner à la quarantaine un accès en écriture au stockage
+interne est une question du propriétaire, pas une conséquence de ces règles.
 
 Les messages de refus ne recopient jamais le contenu du document. Codes de
 sortie : `0` matrice valide, `1` matrice refusée, `2` ligne de commande
@@ -162,7 +176,11 @@ Limites :
 - le validateur ne voit que les flux déclarés. Il ignore la réalisation
   physique : commutateur partagé, pont d'hyperviseur, compromission du NAS ;
 - une matrice valide n'est pas une preuve d'isolement. Seuls les tests négatifs
-  de la section 7, exécutés sur le réseau réel, apportent cette preuve.
+  de la section 7, exécutés sur le réseau réel, apportent cette preuve ;
+- R4 est un filet partiel, pas une preuve d'expurgation. Un nom d'hôte sans
+  point, un nombre isolé ou un nom de modèle matériel ne se distinguent pas
+  d'un mot ordinaire et passent le filtre. Leur absence reste à vérifier par
+  une relecture humaine avant tout résumé public.
 
 ## 5. Exemple synthétique
 
@@ -183,9 +201,16 @@ propose aucune topologie réelle. Ses huit flux restent `pending-owner-approval`
 Notes :
 
 - NF-04 n'est **pas** une proposition de mécanisme de sas. Il montre une forme
-  compatible avec ADR-0004 point 4 : depuis IA-CORE, seul le stockage interne
-  approuvé et la réponse à l'appel d'inférence sont autorisés. Le dérivé promu
-  doit donc arriver dans une zone d'import inactive qu'IA-CORE lit ;
+  compatible avec ADR-0004 point 4, que R13 impose : depuis IA-CORE, seul le
+  stockage interne approuvé et la réponse à l'appel d'inférence sont autorisés.
+  Le dérivé promu doit donc arriver dans une zone d'import inactive qu'IA-CORE
+  lit ;
+- **HYPOTHÈSE.** NF-04 donne à la quarantaine un accès en écriture au stockage
+  interne, qui porte aussi les connaissances approuvées, les modèles, les
+  checkpoints et les sauvegardes. Ce n'est pas une forme de référence : R8
+  accepte ce flux parce qu'il traverse la quarantaine, sans vérifier aucune
+  décision de promotion. Le mécanisme du sas reste **OUVERT** (T06) et cet
+  accès en écriture est une question du propriétaire (section 9) ;
 - NF-05 et NF-06 utilisent deux identités distinctes : la lecture et
   l'écriture ne partagent aucun droit ;
 - tout le reste est refusé : administration, sauvegarde, DNS, NTP, mises à
@@ -199,17 +224,17 @@ que soit la décision.
 
 | Sujet | Contrainte déjà vérifiée | Question au propriétaire |
 |---|---|---|
-| DNS (`name-resolution`) | R6 et R9 : aucune résolution externe depuis une zone interne | IA-CORE a-t-elle besoin d'une résolution interne ? Servie par quelle zone ? |
-| NTP (`time-sync`) | R6 et R9 : aucun NTP externe depuis une zone interne | Quelle source de temps de confiance (T17) ? Par quelle zone passe-t-elle ? |
+| DNS (`name-resolution`) | R6 et R9 : aucune résolution externe depuis une zone interne ; R13 : IA-CORE n'ouvre de flux que vers `storage-internal` | IA-CORE a-t-elle besoin d'une résolution interne ? Servie par quelle zone ? |
+| NTP (`time-sync`) | R6 et R9 : aucun NTP externe depuis une zone interne ; R13 : IA-CORE n'ouvre de flux que vers `storage-internal` | Quelle source de temps de confiance (T17) ? Par quelle zone passe-t-elle ? |
 | Mises à jour hors ligne (`software-update`) | R6 : seule la DMZ touche Internet ; R8 : un contenu venu d'Internet ou de la DMZ n'atteint IA-CORE ou le stockage interne qu'en traversant la quarantaine | Quel chemin (quarantaine, sas, support amovible) et quelle vérification d'empreinte (T14) ? |
 | Sauvegarde et restauration (`backup`) | R9 et R10 : pas de sortie ni de relais bidirectionnel par le stockage | Quelle destination, quelle identité en écriture seule, quelle copie indépendante ou hors ligne, quel test de restauration (A6, T13) ? |
-| Administration (`management`) | R8 et R9 : un plan d'administration unique qui échange avec la DMZ **et** avec IA-CORE est refusé, car il crée un chemin de contenu hors quarantaine | Un plan par zone, un bastion, ou une règle d'exception explicite dans une future version du schéma ? Depuis quels postes (questionnaire, réseau Q6) ? |
-| Lecture du RAW | R7 : ajout seul ; R9 : jamais vers la DMZ ; R8 : jamais vers IA-CORE hors quarantaine | Qui lit le RAW (audit, restauration, constitution de corpus) et par quel chemin ? |
-| Mécanisme du sas de transfert | R10 : pas de relais bidirectionnel | Pull interne, dépôt intermédiaire, transfert manuel ou diode (questionnaire, réseau Q4) ? Compatible avec ADR-0004 point 4 ? |
+| Administration (`management`) | R13 : aucun flux entre `admin` et `ia-core`, dans un sens ou dans l'autre (D-029) ; R8 et R9 : un plan d'administration unique qui échange avec la DMZ **et** avec le stockage interne est refusé, car il crée un chemin de contenu hors quarantaine | Un plan par zone, un bastion, ou une règle d'exception explicite dans une future version du schéma ? Depuis quels postes (questionnaire, réseau Q6) ? |
+| Lecture du RAW | R7 : ajout seul ; R9 : jamais vers la DMZ ; R8 : jamais vers IA-CORE hors quarantaine ; R13 : jamais directement vers IA-CORE | Qui lit le RAW (audit, restauration, constitution de corpus) et par quel chemin ? |
+| Mécanisme du sas de transfert | R10 : pas de relais bidirectionnel ; R13 : ADR-0004 point 4 exclut déjà un pull ouvert par IA-CORE vers `transfer-airlock`, sauf si cette zone est réalisée comme une partie de `storage-internal` | Pull interne, dépôt intermédiaire, transfert manuel ou diode (questionnaire, réseau Q4) ? Qui écrit dans le stockage interne, et avec quelle décision de promotion ? |
 | Dépôt entrant `internet` → `dmz` | R6 et R8 | Hors F0/F1, un dépôt initié depuis Internet est-il admis ? Lié à l'ADR Research Gateway (issue #5) |
 | Relais de conversations (`conversation-export`) | R9 : avec NF-07 et NF-08, un poste client qui pousse vers la DMZ crée un chemin de contenu depuis IA-CORE ; le validateur le refuse | Ce relais (D-032) entre-t-il dans la matrice, ou reste-t-il une exception documentée ? Faut-il une frontière humaine explicite ? |
 | Poste client et Internet | R6 : une ligne `local-clients` ↔ `internet` est refusée | L'exemple ne modélise pas l'accès Internet propre du poste client. Ce poste est-il une frontière humaine hors matrice, ou une zone modélisée avec une règle explicite ? |
-| Agent de programmation (`coding-agent`) | toutes les règles de graphe | Quels flux, quelles identités, quel accès au dépôt de code et au stockage (D-034, ADR-0005) ? |
+| Agent de programmation (`coding-agent`) | toutes les règles de graphe ; R13 : aucun flux direct avec `ia-core` | Quels flux, quelles identités, quel accès au dépôt de code et au stockage (D-034, ADR-0005) ? |
 | Journalisation centralisée | aucune catégorie dédiée | Zone et flux des journaux append-only (questionnaire, réseau Q8) ; exige une révision du schéma |
 
 ## 7. Procédure de tests négatifs (PROPOSÉE, non exécutée)
@@ -303,8 +328,8 @@ Aucune de ces questions n'est tranchée ici :
 
 1. Le modèle de zones de la section 2 convient-il, y compris la séparation du
    stockage, `local-clients` et `coding-agent` ?
-2. Les règles R5 (une identité par flux) et R8 à R10 sont-elles retenues telles
-   quelles ?
+2. Les règles R5 (une identité par flux), R8 à R10 et R13 sont-elles retenues
+   telles quelles ?
 3. Le poste client est-il une frontière humaine hors matrice, ou une zone
    modélisée ?
 4. Quelle organisation pour le plan d'administration ?
@@ -317,3 +342,10 @@ Aucune de ces questions n'est tranchée ici :
    Research Gateway (issue #5).
 9. Où conserver la matrice réelle, et sous quelle forme publique ?
 10. À quelle fréquence exécuter les tests négatifs périodiques ?
+11. La quarantaine peut-elle écrire dans le stockage interne (forme de NF-04),
+    ou le dérivé promu doit-il passer par `transfer-airlock` ou par une zone
+    d'import distincte ? Quelle décision de promotion le validateur devrait-il
+    alors exiger ?
+12. Faut-il aussi refuser tout contenu de `quarantine` vers `dmz` ou
+    `internet`, c'est-à-dire une dépendance inverse de la chaîne de confiance
+    (AGENTS.md) ?

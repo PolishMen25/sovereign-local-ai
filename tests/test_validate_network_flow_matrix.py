@@ -127,8 +127,21 @@ class ExampleAndSchemaTests(unittest.TestCase):
                 json.dumps({"properties": {"destination_zone": {"const": matrix_tool.INTERNET_ZONE}}, "required": ["destination_zone"]}, sort_keys=True),
                 json.dumps({"properties": {"origin_zone": {"const": matrix_tool.INTERNET_PEER_ZONE}}}, sort_keys=True),
             ),
+            (
+                json.dumps({"properties": {"origin_zone": {"const": matrix_tool.CORE_ZONE}}, "required": ["origin_zone"]}, sort_keys=True),
+                json.dumps({"properties": {"destination_zone": {"const": "storage-internal"}}}, sort_keys=True),
+            ),
+            (
+                json.dumps({"properties": {"destination_zone": {"const": matrix_tool.CORE_ZONE}}, "required": ["destination_zone"]}, sort_keys=True),
+                json.dumps({"properties": {
+                    "origin_zone": {"const": matrix_tool.CORE_INBOUND_ORIGIN},
+                    "data_class": {"const": matrix_tool.CORE_INBOUND_DATA_CLASS},
+                }}, sort_keys=True),
+            ),
         }
         self.assertEqual(expected, conditions)
+        self.assertEqual({"storage-internal"}, set(matrix_tool.CORE_INITIATED_DESTINATIONS))
+        self.assertIn(matrix_tool.CORE_INBOUND_DATA_CLASS, matrix_tool.DATA_CLASSES)
 
     def test_graph_zone_roles_only_name_known_zones(self) -> None:
         for zones in (
@@ -136,7 +149,11 @@ class ExampleAndSchemaTests(unittest.TestCase):
             matrix_tool.PROTECTED_ZONES,
             matrix_tool.NO_EGRESS_ZONES,
             matrix_tool.RELAY_GUARDED_ZONES,
-            {matrix_tool.INSPECTION_ZONE, matrix_tool.APPEND_ONLY_ZONE},
+            {
+                matrix_tool.INSPECTION_ZONE, matrix_tool.APPEND_ONLY_ZONE,
+                matrix_tool.CORE_ZONE, matrix_tool.CORE_INBOUND_ORIGIN,
+            },
+            matrix_tool.CORE_INITIATED_DESTINATIONS,
         ):
             self.assertTrue(set(zones) <= matrix_tool.ZONES)
         self.assertFalse(matrix_tool.EXPOSED_ZONES & matrix_tool.PROTECTED_ZONES)
@@ -237,6 +254,15 @@ class FlowContractTests(unittest.TestCase):
             "container-id": "CT" + " " + "9" + "9" + "9",
             "vm-id": "vm" + "-" + "4" + "2",
             "control": "texte‮gaid",
+            "single-segment-path": "montage sur " + "/" + "srv",
+            "drive-forward-slash": "C:" + "/" + "data" + "/" + "raw",
+            "unc-forward-slash": "/" + "/" + "partage" + "/" + "commun",
+            "home-path": "~" + "/" + "secrets" + "/",
+            "port-protocol": "2" + "2" + "/" + "tcp",
+            "name-and-port": "core" + ":" + "8" + "4" + "4" + "3",
+            "port-keyword": "port " + "4" + "4" + "3",
+            "guest-id": "invité " + "1" + "0" + "7",
+            "container-word": "conteneur " + "#" + "1" + "2",
         }
         for label, probe in probes.items():
             with self.subTest(probe=label):
@@ -254,6 +280,11 @@ class FlowContractTests(unittest.TestCase):
         document["flows"][0]["justification"] = (
             "F0/F1 : requête déclassifiée, p. ex. une recherche documentaire ; "
             "licence Etalab-2.0 vérifiée, voir ADR-0004 point 4 et D-029."
+        )
+        matrix_tool.validate(document)
+        document["flows"][0]["justification"] = (
+            "F5/F6 : lecture / écriture et/ou transport du rapport, support 2 ; "
+            "deux invités distincts (ADR-0004, décision 3)."
         )
         matrix_tool.validate(document)
 
@@ -341,9 +372,8 @@ class GraphRuleTests(unittest.TestCase):
         document = with_flows(
             flow("NF-90", "quarantine", "transfer-airlock", "push", "airlock-writer", "promoted-derivative"),
             flow("NF-91", "transfer-airlock", "storage-internal", "push", "import-writer", "promoted-derivative"),
-            flow("NF-92", "admin", "ia-core", "bidirectional", "core-operator"),
         )
-        self.assertEqual(11, matrix_tool.validate(document)["flows"])
+        self.assertEqual(10, matrix_tool.validate(document)["flows"])
 
     def test_pull_reverses_the_data_edge(self) -> None:
         edges = matrix_tool.data_edges([
@@ -360,6 +390,80 @@ class GraphRuleTests(unittest.TestCase):
             },
             edges,
         )
+
+
+class CoreBoundaryTests(unittest.TestCase):
+    """R13: ADR-0004 point 4 and D-029 at connection level, not only data edges."""
+
+    OUTBOUND = "ia-core may only open flows toward storage-internal"
+    INBOUND = "ia-core only accepts the inference call from interface-airlock"
+
+    def assertRefused(self, document: dict, message: str) -> None:
+        with self.assertRaisesRegex(matrix_tool.MatrixRefused, message):
+            matrix_tool.validate(document)
+
+    def test_core_initiated_flows_outside_internal_storage_are_refused(self) -> None:
+        cases = {
+            # A pull adds no data edge out of ia-core, yet its request leaves it.
+            "pull-from-quarantine-feeding-dmz": [
+                flow("NF-90", "ia-core", "quarantine", "pull", "core-quarantine-reader"),
+                flow("NF-91", "quarantine", "dmz", "push", "quarantine-exporter"),
+            ],
+            "pull-from-admin-feeding-dmz": [
+                flow("NF-90", "ia-core", "admin", "pull", "core-admin-reader"),
+                flow("NF-91", "admin", "dmz", "push", "admin-exporter"),
+            ],
+            "session-to-admin": [flow("NF-90", "ia-core", "admin", "bidirectional", "core-admin-session")],
+            "push-to-coding-agent": [flow("NF-90", "ia-core", "coding-agent", "push", "core-agent-writer")],
+            "pull-from-transfer-airlock": [
+                flow("NF-90", "ia-core", "transfer-airlock", "pull", "core-import-reader", "promoted-derivative"),
+            ],
+            "session-to-interface-airlock": [
+                flow("NF-90", "ia-core", "interface-airlock", "bidirectional", "core-callback", "inference-call"),
+            ],
+        }
+        for label, extra in cases.items():
+            with self.subTest(case=label):
+                self.assertRefused(with_flows(*extra), self.OUTBOUND)
+
+    def test_only_the_interface_inference_call_enters_ia_core(self) -> None:
+        cases = {
+            "dmz-quarantine-session-then-push-to-core": [
+                flow("NF-90", "dmz", "quarantine", "bidirectional", "dmz-quarantine-session"),
+                flow("NF-91", "quarantine", "ia-core", "push", "quarantine-core-writer", "promoted-derivative"),
+            ],
+            "quarantine-core-session": [
+                flow("NF-90", "quarantine", "ia-core", "bidirectional", "quarantine-core-session"),
+            ],
+            "clients-skip-the-interface-airlock": [
+                flow("NF-90", "local-clients", "ia-core", "bidirectional", "client-core-session", "inference-call"),
+            ],
+            "coding-agent-session": [
+                flow("NF-90", "coding-agent", "ia-core", "bidirectional", "agent-core-session", "inference-call"),
+            ],
+            "transfer-airlock-push": [
+                flow("NF-90", "transfer-airlock", "ia-core", "push", "airlock-core-writer", "promoted-derivative"),
+            ],
+            "admin-session": [flow("NF-90", "admin", "ia-core", "bidirectional", "core-operator")],
+            "storage-push-into-core": [
+                flow("NF-90", "storage-internal", "ia-core", "push", "storage-core-writer", "internal-knowledge"),
+            ],
+            "interface-airlock-other-content": [
+                flow("NF-90", "interface-airlock", "ia-core", "push", "interface-core-writer", "internal-knowledge"),
+            ],
+        }
+        for label, extra in cases.items():
+            with self.subTest(case=label):
+                self.assertRefused(with_flows(*extra), self.INBOUND)
+
+    def test_reference_core_flows_stay_accepted(self) -> None:
+        # NF-05, NF-06 and NF-08 of the synthetic example are the only shapes.
+        core_flows = [
+            item for item in example()["flows"]
+            if matrix_tool.CORE_ZONE in {item["origin_zone"], item["destination_zone"]}
+        ]
+        self.assertEqual(["NF-05", "NF-06", "NF-08"], [item["flow_id"] for item in core_flows])
+        matrix_tool.validate(example())
 
 
 class ApprovalStateTests(unittest.TestCase):
@@ -403,6 +507,8 @@ class StrictInputTests(unittest.TestCase):
             "truncated": b'{"a": ',
             "empty": b"",
             "deep": b"[" * 100000 + b"]" * 100000,
+            # Beyond the interpreter's integer digit limit: a plain ValueError.
+            "huge-integer": b'{"a": ' + b"9" * 5000 + b"}",
         }
         for label, payload in cases.items():
             with self.subTest(case=label):
@@ -465,6 +571,15 @@ class CommandLineTests(unittest.TestCase):
         self.assertNotIn(secret_like, stderr)
         code, _, _ = self.run_main([])
         self.assertEqual(2, code)
+
+    def test_oversized_integer_is_a_clean_refusal(self) -> None:
+        with sovereign_temporary_directory() as directory:
+            oversized = Path(directory) / "oversized.json"
+            oversized.write_bytes(b'{"flows": ' + b"7" * 5000 + b"}")
+            code, stdout, stderr = self.run_main([str(oversized)])
+        self.assertEqual(1, code)
+        self.assertEqual("", stdout)
+        self.assertEqual("invalid network flow matrix: matrix is not strict JSON\n", stderr)
 
     def test_file_entrypoint_is_independent_of_working_directory(self) -> None:
         completed = subprocess.run(
