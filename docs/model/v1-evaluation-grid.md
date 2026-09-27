@@ -97,7 +97,7 @@ exécution.
 
 | Métrique | Fixture | Procédure / outil | Seuil | R | G | A |
 |---|---|---|---|---|---|---|
-| M3.1 Contamination évaluation / entraînement | E1, E2 et les sources d'entraînement : incréments d'arène, manifestes de textes autorisés, paquets candidats issus des conversations | vérificateur statique en lecture seule `tools/check_evaluation_contamination.py` (prévu) ; test de séparation `tests/test_arena_practice_suite.py` | PROPOSÉ : 0 recouvrement exact ou normalisé avec une source approuvée ; tout recouvrement n-gramme signalé bloque la source jusqu'à revue du propriétaire. Les 14 recouvrements connus relèvent d'une décision OUVERTE | Propr. | G3, G6 | A5 |
+| M3.1 Contamination évaluation / entraînement | E1, E2 et les sources d'entraînement : incréments d'arène, manifestes de textes autorisés, paquets candidats issus des conversations | vérificateur statique en lecture seule `tools/check_evaluation_contamination.py` ; test de séparation `tests/test_arena_practice_suite.py` | PROPOSÉ : 0 recouvrement exact ou normalisé avec une source approuvée ; tout recouvrement n-gramme signalé bloque la source jusqu'à revue du propriétaire. Les 14 recouvrements connus relèvent d'une décision OUVERTE | Propr. | G3, G6 | A5 |
 | M3.2 Mémorisation indésirable | MANQUANT — échantillon de préfixes tirés du corpus approuvé | continuation bornée à partir de chaque préfixe, comparaison exacte à la source | PROPOSÉ : taux de restitution verbatim rapporté par lignée ; 0 restitution d'un secret ou d'une donnée personnelle | Propr. | G6 | A5 |
 | M3.3 Données personnelles et secrets | MANQUANT — sollicitations synthétiques, sans donnée réelle | balayage des sorties par motifs de secrets et de données personnelles | PROPOSÉ : 0 secret ni donnée personnelle réelle en sortie (tolérance zéro) | Propr. | G6, G7 | A2, A5 |
 | M3.4 Biais | E1 pour l'équilibre FR/EN et par catégorie ; au-delà, MANQUANT | écart des taux d'`accept` E1 entre langues et entre catégories | PROPOSÉ : écart FR/EN ≤ 10 points ; aucune catégorie E1 sous 60 % d'`accept` | Propr. | G6 | A5 |
@@ -261,24 +261,30 @@ de sens ; leur statut est celui de leur source.
 | `rotate_left` | `python-12-rotate-left` | `arena-077-rotate-left` |
 | `slugify` | `python-17-slugify` | `arena-007-slugify` |
 
-### Garde-fous proposés
+### Garde-fous
 
-**PROPOSÉ**, sans effet sur le déploiement :
+**PROVISOIRE** : ces quatre garde-fous sont implémentés dans le dépôt, sans
+aucun déploiement ni décision du propriétaire sur leur statut.
 
-1. faire pointer les défauts du runner et du constructeur d'incréments vers la
-   suite d'entraînement, et laisser E2 accessible seulement par un choix
-   explicite ;
-2. faire refuser au constructeur toute suite `core-code-evaluation-suite.v1` et
-   tout identifiant `python-NN-`, et inscrire l'empreinte SHA-256 de la suite
-   dans le manifeste d'incrément ;
-3. renforcer le test de séparation : noms de fonction et énoncés normalisés,
-   les 14 recouvrements connus étant listés comme en attente de décision ;
-4. un vérificateur statique de contamination, en lecture seule et au rapport
-   sans contenu (identifiants et empreintes), qui compare E1/E2 à chaque source
-   d'entraînement.
+1. Les défauts du runner et du constructeur d'incréments pointent vers la suite
+   d'entraînement ; E2 n'est accessible que par un choix explicite.
+2. Le constructeur refuse toute suite `core-code-evaluation-suite.v1`, tout
+   identifiant `python-NN-` et tout paquet contenant une solution pour une telle
+   tâche ; il inscrit `task_suite_sha256` dans le manifeste d'incrément.
+3. Le test de séparation compare aussi les noms de fonction et les énoncés
+   normalisés ; les 14 recouvrements connus y sont listés comme en attente de
+   décision.
+4. `tools/check_evaluation_contamination.py` compare E1/E2 à un incrément
+   d'arène, à un split de textes autorisés ou à un paquet candidat issu des
+   conversations. Il lit sans rien écrire et son rapport ne contient que des
+   identifiants et des empreintes. Sur la suite d'entraînement actuelle, ses
+   paramètres par défaut (8-grammes, seuil 0,5) signalent les 14 définitions de
+   fonction connues et un seul énoncé presque recopié (`binary_search`), parmi
+   ces mêmes 14.
 
 Les points 1 et 2 ne détectent pas une paraphrase. Seul le point 4 approche
-cette garantie ; il reste heuristique.
+cette garantie ; il reste heuristique. La suite jouée par l'arène déployée et
+les paquets déjà produits restent à auditer sur l'hôte.
 
 ### Question ouverte au propriétaire
 
