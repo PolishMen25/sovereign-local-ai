@@ -31,7 +31,7 @@ def embeddings_payload(vector):
 class EmbedClientTests(unittest.TestCase):
     def test_endpoint_must_be_loopback(self):
         with self.assertRaises(ValueError):
-            validate_endpoint("http://192.168.0.99:8082")
+            validate_endpoint("http://192.0.2.99:8082")
         self.assertEqual(validate_endpoint("http://127.0.0.1:8082/"), "http://127.0.0.1:8082")
 
     def test_embed_returns_vector(self):

@@ -12,6 +12,14 @@ et contient un jeton de première installation aléatoire d'au moins 32
 caractères. Le propriétaire saisit ce jeton et choisit son mot de passe dans le
 navigateur ; le mot de passe n'est jamais envoyé dans Git ou un journal.
 
+Les adresses des moteurs internes (CORE, Qwen Coder) ne figurent pas dans le
+dépôt (D-036). Lorsque `SOVEREIGN_CORE_TOKEN` ou `SOVEREIGN_QWEN_TOKEN` est
+défini, la passerelle lit le point de terminaison correspondant dans le fichier
+privé désigné par `SOVEREIGN_PRIVATE_ENDPOINTS_FILE` (contrat
+`schemas/private-endpoints.schema.json`) et l'épingle exactement ; sans fichier
+valide, elle refuse de démarrer. Voir
+`docs/operations/private-endpoints-migration.md`.
+
 La mémoire SQLite reste active dans `/var/lib/sovereign-gateway`. Lorsqu'un
 montage de sauvegarde dédié est fourni, `sovereign-memory-backup.timer` appelle
 un outil local de copie SQLite cohérente toutes les quinze minutes. Le manifeste

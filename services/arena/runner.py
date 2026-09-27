@@ -19,11 +19,12 @@ import random
 import shutil
 import tempfile
 import time
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Mapping, Protocol
 
 from services.arena import league
 from services.arena.engines import ChatEngine, EngineUnavailable
 from services.arena.store import ArenaStore, utc_now
+from services.common import private_endpoints
 
 APPROVAL_SCHEMA = "arena-approval.v1"
 MAX_TOKENS_AUTHOR = 700
@@ -295,6 +296,23 @@ class Arena:
         return "played"
 
 
+def build_engines(environ: Mapping[str, str]) -> dict[str, Engine]:
+    """Loopback engines plus, when its token is set, the pinned Qwen engine.
+
+    The Qwen address comes only from the private file installed outside Git
+    (D-036); a legacy ``SOVEREIGN_QWEN_ENDPOINT`` must equal it exactly.
+    """
+    engines: dict[str, Engine] = {"BOOTSTRAP": ChatEngine("BOOTSTRAP", environ.get("SOVEREIGN_BOOTSTRAP_ENDPOINT", "http://127.0.0.1:8080"))}
+    qwen_token = environ.get("SOVEREIGN_QWEN_TOKEN", "")
+    if len(qwen_token) >= 32:
+        qwen_endpoint = private_endpoints.require_endpoint("qwen_coder", environ)
+        engines["QWEN-CODER"] = ChatEngine("QWEN-CODER", environ.get("SOVEREIGN_QWEN_ENDPOINT", qwen_endpoint.url), qwen_token, pinned=qwen_endpoint)
+    chat14b_endpoint = environ.get("SOVEREIGN_CHAT14B_ENDPOINT", "")
+    if chat14b_endpoint:
+        engines["CHAT-14B"] = ChatEngine("CHAT-14B", chat14b_endpoint)
+    return engines
+
+
 def main() -> int:
     state_dir = Path(os.environ.get("SOVEREIGN_ARENA_STATE", "/var/lib/sovereign-arena"))
     config = ArenaConfig(
@@ -305,15 +323,14 @@ def main() -> int:
         max_matches_per_hour=int(os.environ.get("SOVEREIGN_ARENA_MAX_MATCHES_PER_HOUR", "12")),
     )
     suite = Path(os.environ.get("SOVEREIGN_ARENA_SUITE", "configs/evaluation/core-python-e2.candidate.json"))
-    engines: dict[str, Engine] = {"BOOTSTRAP": ChatEngine("BOOTSTRAP", os.environ.get("SOVEREIGN_BOOTSTRAP_ENDPOINT", "http://127.0.0.1:8080"))}
-    qwen_token = os.environ.get("SOVEREIGN_QWEN_TOKEN", "")
-    if len(qwen_token) >= 32:
-        engines["QWEN-CODER"] = ChatEngine("QWEN-CODER", os.environ.get("SOVEREIGN_QWEN_ENDPOINT", "http://192.168.0.144:8790"), qwen_token)
-    chat14b_endpoint = os.environ.get("SOVEREIGN_CHAT14B_ENDPOINT", "")
-    if chat14b_endpoint:
-        engines["CHAT-14B"] = ChatEngine("CHAT-14B", chat14b_endpoint)
     store = ArenaStore(state_dir / "arena.sqlite3")
     store.initialize()
+    try:
+        engines = build_engines(os.environ)
+    except (private_endpoints.PrivateEndpointsError, ValueError) as failure:  # content-free messages
+        store.set_state(status="stopped", reason="engine_configuration_refused", detail=str(failure)[:300], heartbeat=utc_now())
+        # Static fault: exit 78 so that RestartPreventExitStatus ends the loop.
+        private_endpoints.refuse_to_start(str(failure), prefix="arena refused to start")
     try:
         referee = sandbox_referee(Path(tempfile.gettempdir()) / "sovereign-arena")
     except Exception as failure:  # the status must reach the page, whatever refused

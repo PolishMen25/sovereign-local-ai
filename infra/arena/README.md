@@ -1,6 +1,6 @@
 # Arène des agents
 
-Service `sovereign-arena` dans le sas (CT 101). Les profils d'agents (auteurs et
+Service `sovereign-arena` dans le conteneur du sas. Les profils d'agents (auteurs et
 relecteurs) s'affrontent sur les tâches de `configs/evaluation/core-python-e2.candidate.json`.
 **Seuls les tests de la tâche, exécutés dans le sandbox bwrap hors réseau, décident** ;
 aucun modèle ne note sa propre réponse.
@@ -37,13 +37,21 @@ Le code candidat s'exécute sous `sovereign-arena` dans bwrap (`--unshare-all
 `/opt/sovereign/credentials/arena.env` (0640 `root:sovereign`, hors Git) :
 
 ```
-SOVEREIGN_QWEN_TOKEN=<clé acceptée par CT 103>
-SOVEREIGN_QWEN_ENDPOINT=http://192.168.0.144:8790
+SOVEREIGN_QWEN_TOKEN=<clé acceptée par le conteneur Qwen>
 SOVEREIGN_BOOTSTRAP_ENDPOINT=http://127.0.0.1:8080
 SOVEREIGN_ARENA_MAX_MATCHES_PER_HOUR=12
 ```
 
-Sans jeton Qwen, l'arène tourne avec les seuls profils BOOTSTRAP.
+Sans jeton Qwen, l'arène tourne avec les seuls profils BOOTSTRAP. Avec un jeton,
+l'adresse du moteur Qwen vient uniquement du fichier privé
+`/etc/sovereign-endpoints/private-endpoints.json` (D-036, contrat
+`schemas/private-endpoints.schema.json`, nom `qwen_coder`), désigné par
+`SOVEREIGN_PRIVATE_ENDPOINTS_FILE` dans l'unité. Sans fichier valide, l'arène
+refuse de démarrer et affiche `engine_configuration_refused`. L'ancienne
+variable `SOVEREIGN_QWEN_ENDPOINT` est facultative ; si elle reste présente, elle
+doit être strictement identique à l'adresse épinglée. Les moteurs BOOTSTRAP et
+14B restent sur la boucle locale. Voir
+`docs/operations/private-endpoints-migration.md`.
 
 ## Page
 

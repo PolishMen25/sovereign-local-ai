@@ -3,15 +3,22 @@ from __future__ import annotations
 import json
 from urllib import error, request
 
+from services.common.private_endpoints import PrivateEndpoint
+
 class QwenClient:
     engine = "QWEN-CODER"
-    def __init__(self, endpoint: str, token: str) -> None:
-        if endpoint != "http://192.168.0.144:8790" or len(token) < 32:
-            raise ValueError("Qwen client requires the private endpoint and a token")
-        self.endpoint, self.token = endpoint.rstrip("/"), token
+    def __init__(self, endpoint: str, token: str, *, pinned: PrivateEndpoint) -> None:
+        # Exact-match pin on the private address configured outside Git (D-036).
+        if (not isinstance(pinned, PrivateEndpoint) or pinned.name != "qwen_coder"
+                or endpoint != pinned.url or len(token) < 32):
+            raise ValueError("Qwen client requires the pinned private endpoint and a token")
+        self.endpoint, self.token = pinned.url, token
+        # Never follow a proxy from the environment: the pin must reach the
+        # private endpoint directly (D-036), as the arena's ChatEngine does.
+        self.opener = request.build_opener(request.ProxyHandler({}))
     def status(self) -> dict:
         try:
-            with request.urlopen(request.Request(self.endpoint + "/health"), timeout=5) as response:
+            with self.opener.open(request.Request(self.endpoint + "/health"), timeout=5) as response:
                 value = json.loads(response.read().decode("utf-8"))
         except (OSError, error.URLError, json.JSONDecodeError) as failure:
             raise RuntimeError("Qwen coding runtime is unavailable") from failure
@@ -28,7 +35,7 @@ class QwenClient:
         body = json.dumps({"messages": messages, "max_tokens": 512, "temperature": 0.2}, separators=(",", ":")).encode()
         target = request.Request(self.endpoint + "/v1/chat/completions", data=body, headers={"Authorization": "Bearer " + self.token, "Content-Type": "application/json"})
         try:
-            with request.urlopen(target, timeout=90) as response:
+            with self.opener.open(target, timeout=90) as response:
                 value = json.loads(response.read().decode("utf-8"))
         except (OSError, error.URLError, json.JSONDecodeError) as failure:
             raise RuntimeError("Qwen coding runtime is unavailable") from failure

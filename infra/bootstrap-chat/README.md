@@ -2,7 +2,7 @@
 
 Ce lot déploie temporairement un chat local réel, distinct de CORE :
 
-- LXC Debian non privilégié `sovereign-ml` ;
+- LXC Debian non privilégié dédié au sas (nom d'hôte et identifiant hors Git, D-036) ;
 - runtime CPU-only llama.cpp `b10537` vérifié par SHA-256 ;
 - modèle Qwen 2.5 1.5B Instruct Q4_K_M vérifié par SHA-256 ;
 - interface Web native de llama.cpp liée au loopback du LXC ;

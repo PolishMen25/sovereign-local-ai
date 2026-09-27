@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/private-endpoints/v1/schema.json",
+  "title": "Points de terminaison privés hors Git",
+  "description": "Contrat opérateur installé hors Git (D-036). Ses valeurs réelles ne doivent jamais être publiées. Le chargeur services/common/private_endpoints.py applique en plus : adresse IPv4 canonique dans une plage privée RFC 1918 ou de boucle locale, ni adresse de réseau ni de diffusion, paires adresse/port distinctes, fichier régulier d'au plus 16 384 octets ; sous POSIX, fichier et répertoire parent appartenant à root et non modifiables par le groupe ni par les autres.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "endpoints"],
+  "properties": {
+    "schema_version": { "const": "private-endpoints.v1" },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "core_inference": { "$ref": "#/$defs/endpoint" },
+        "qwen_coder": { "$ref": "#/$defs/endpoint" }
+      }
+    }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "format": "ipv4",
+          "minLength": 7,
+          "maxLength": 15,
+          "pattern": "^(10|127|172\\.(1[6-9]|2[0-9]|3[01])|192\\.168)\\.[0-9.]+$"
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    }
+  }
+}

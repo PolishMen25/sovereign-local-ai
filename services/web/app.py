@@ -21,6 +21,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from services.arena.store import ArenaStore
+from services.common import private_endpoints
 from services.memory.store import MemoryStore
 from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.knowledge.document_ingest import ingest as ingest_document, IngestError
@@ -1231,6 +1232,22 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         print(f"web event status={arguments[1] if len(arguments) > 1 else 'unknown'}", flush=True)
 
 
+def pinned_engine(client: Any, name: str, override_variable: str, token: str) -> Any:
+    """Build an engine client pinned to its private endpoint (D-036).
+
+    The endpoint comes only from the private file installed outside Git; without
+    a valid file the gateway refuses to start (exit status 78, no restart loop).
+    A legacy override variable is accepted only when it equals the pinned URL
+    exactly.
+    """
+    endpoint = private_endpoints.endpoint_or_exit(name)
+    try:
+        return client(os.environ.get(override_variable, endpoint.url), token, pinned=endpoint)
+    except ValueError as failure:
+        reason = str(failure)
+    private_endpoints.refuse_to_start(reason)
+
+
 def main() -> int:
     host = os.environ.get("SOVEREIGN_WEB_HOST", "127.0.0.1")
     if host not in {"127.0.0.1", "::1", "localhost"}:
@@ -1249,11 +1266,11 @@ def main() -> int:
     core_token = os.environ.get("SOVEREIGN_CORE_TOKEN", "")
     core_runtime: Any = LocalInferenceRuntime("CORE-700M", Path("/nonexistent-core-checkpoint"))
     if len(core_token) >= 32:
-        core_runtime = CoreClient(os.environ.get("SOVEREIGN_CORE_ENDPOINT", "http://192.168.0.143:9000"), core_token)
+        core_runtime = pinned_engine(CoreClient, "core_inference", "SOVEREIGN_CORE_ENDPOINT", core_token)
     qwen_runtime: Any = UnconfiguredEngine("QWEN-CODER")
     qwen_token = os.environ.get("SOVEREIGN_QWEN_TOKEN", "")
     if len(qwen_token) >= 32:
-        qwen_runtime = QwenClient(os.environ.get("SOVEREIGN_QWEN_ENDPOINT", "http://192.168.0.144:8790"), qwen_token)
+        qwen_runtime = pinned_engine(QwenClient, "qwen_coder", "SOVEREIGN_QWEN_ENDPOINT", qwen_token)
     server = ThreadingHTTPServer((host, int(os.environ.get("SOVEREIGN_WEB_PORT", "8765"))), LocalWebHandler)
     arena = ArenaStore(Path(os.environ.get("SOVEREIGN_ARENA_DB", "/var/lib/sovereign-arena/arena.sqlite3")), read_only=True)
     arena_inbox = Path(os.environ.get("SOVEREIGN_ARENA_INBOX", "/var/lib/sovereign-arena/inbox"))

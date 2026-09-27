@@ -11,6 +11,7 @@ Ce dossier réserve les contextes fonctionnels sans choisir encore leur langage,
 | `orchestrator` | IA-CORE | Router les tâches vers agents, modèles et outils permis. | Contourner les permissions des agents. |
 | `inference` | IA-CORE | Encapsuler le moteur CORE CPU-only et son statut local. | Fallback cloud/GPU ou téléchargement automatique. |
 | `web` | réseau interne | Fournir l'interface utilisateur et l'authentification. | Devenir un proxy Internet pour IA-CORE. |
+| `common` | toutes | Charger strictement la configuration privée hors Git (points de terminaison internes, D-036). | Porter une valeur d'infrastructure réelle ou un repli par défaut. |
 
 Chaque sous-dossier contient seulement un contrat de responsabilité. L'implémentation commence après les ADR de pile, réseau, stockage et identité.
 

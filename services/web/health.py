@@ -6,7 +6,7 @@ already holds (knowledge index, arena, corpus, workspace) plus container-level
 resource files.  Nothing shells out and nothing benchmarks a model, so the page
 can be refreshed freely.
 
-Note on scope: the gateway lives inside the CT 101 container, so the resource
+Note on scope: the gateway lives inside its own gateway container, so the resource
 figures describe that container (via lxcfs), not the whole Proxmox host.
 """
 

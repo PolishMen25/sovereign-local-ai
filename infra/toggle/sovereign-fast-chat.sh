@@ -1,5 +1,6 @@
 #!/bin/bash
-# Mode "chat rapide" (turbo) pour le 14B, à lancer sur l'hôte pve-ml-master.
+# Mode "chat rapide" (turbo) pour le 14B, à lancer en root sur l'hôte Proxmox
+# du nœud de calcul.
 #
 #   sovereign-fast-chat on      -> met l'entraînement CORE-30M en pause (SIGSTOP,
 #                                  run conservé) et donne les 2 sockets au 14B
@@ -9,16 +10,50 @@
 #   sovereign-fast-chat status  -> état courant + petit bench
 #
 # Ne tue jamais l'entraînement (SIGSTOP/SIGCONT uniquement). Réversible.
+#
+# D-036 : les identifiants des conteneurs ne sont pas dans le dépôt. Ils sont lus
+# dans un fichier privé hors Git (par défaut /etc/sovereign/fast-chat.conf,
+# modifiable par SOVEREIGN_FAST_CHAT_CONFIG), appartenant à root, non modifiable
+# par le groupe ni par les autres, et contenant exactement deux lignes :
+#   SOVEREIGN_CT_CHAT=<identifiant du conteneur du 14B>
+#   SOVEREIGN_CT_TRAIN=<identifiant du conteneur d'entraînement>
+# Le fichier n'est jamais exécuté (pas de `source`). Sans fichier valide : refus.
 set -euo pipefail
 
-CONF=/etc/pve/lxc/101.conf
 SVC=/etc/systemd/system/sovereign-chat-14b.service
-TRAIN_PATTERN='train_core'   # process d'entraînement dans CT 102
-CT_TRAIN=102
-CT_CHAT=101
+TRAIN_PATTERN='train_core'   # process d'entraînement dans le conteneur d'entraînement
+PRIVATE_CONFIG=${SOVEREIGN_FAST_CHAT_CONFIG:-/etc/sovereign/fast-chat.conf}
 
 usage() { echo "usage: $0 {on|off|status}"; exit 1; }
 [ $# -eq 1 ] || usage
+
+refuse() { echo "refus : $1 (voir docs/operations/private-endpoints-migration.md)" >&2; exit 2; }
+
+load_private_ids() {  # lecture stricte, sans afficher le contenu
+  local line key value seen=""
+  [ -f "$PRIVATE_CONFIG" ] && [ ! -L "$PRIVATE_CONFIG" ] || refuse "configuration privée absente ou non régulière"
+  [ "$(stat -c '%u' "$PRIVATE_CONFIG")" = 0 ] || refuse "la configuration privée doit appartenir à root"
+  (( (8#$(stat -c '%a' "$PRIVATE_CONFIG") & 8#022) == 0 )) || refuse "configuration privée modifiable par le groupe ou les autres"
+  CT_CHAT=""; CT_TRAIN=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    key=${line%%=*}; value=${line#*=}
+    [ "$key" != "$line" ] || refuse "ligne inattendue dans la configuration privée"
+    [[ "$value" =~ ^[1-9][0-9]{2,8}$ ]] || refuse "identifiant de conteneur invalide"
+    case " $seen " in *" $key "*) refuse "clé dupliquée dans la configuration privée" ;; esac
+    seen="$seen $key"
+    case "$key" in
+      SOVEREIGN_CT_CHAT) CT_CHAT=$value ;;
+      SOVEREIGN_CT_TRAIN) CT_TRAIN=$value ;;
+      *) refuse "clé inattendue dans la configuration privée" ;;
+    esac
+  done < "$PRIVATE_CONFIG"
+  [ -n "$CT_CHAT" ] && [ -n "$CT_TRAIN" ] || refuse "identifiants de conteneurs manquants"
+  [ "$CT_CHAT" != "$CT_TRAIN" ] || refuse "les deux conteneurs doivent être distincts"
+}
+
+load_private_ids
+CONF="/etc/pve/lxc/${CT_CHAT}.conf"
+[ -f "$CONF" ] || refuse "configuration Proxmox du conteneur du 14B introuvable"
 
 cg_chat() {
   for p in "/sys/fs/cgroup/lxc/${CT_CHAT}" "/sys/fs/cgroup/lxc/${CT_CHAT}/ns"; do
@@ -104,7 +139,7 @@ case "$1" in
   status)
     echo "== ÉTAT =="
     echo -n "entraînement CORE-30M : "; training_state
-    echo -n "cpuset CT101 : "; { grep -E '^lxc.cgroup2.cpuset' "$CONF" || true; } | tr '\n' ' '; echo
+    echo -n "cpuset conteneur 14B : "; { grep -E '^lxc.cgroup2.cpuset' "$CONF" || true; } | tr '\n' ' '; echo
     echo -n "service 14B : "; { pct exec "$CT_CHAT" -- grep -oE '\-\-numa [a-z]+|\-\-threads [0-9]+' "$SVC" || true; } | tr '\n' ' '; echo
     echo -n "débit 14B : "; bench_14b
     ;;

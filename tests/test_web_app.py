@@ -1,9 +1,18 @@
+import contextlib
+import io
 import json
+import os
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
+from services.common.private_endpoints import EXIT_CONFIGURATION_REFUSED, PRIVATE_ENDPOINTS_ENV
 from services.inference.runtime import LocalInferenceRuntime
-from services.web.app import WEB_PROFILES, WebState, authorize, parse_chat, response
+from services.web.app import WEB_PROFILES, WebState, authorize, parse_chat, pinned_engine, response
+from services.web.core_client import CoreClient
+from services.web.qwen_client import QwenClient
+from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, trust_test_account, write_private_endpoints
 
 
 class BootstrapStatus:
@@ -72,6 +81,51 @@ class WebAppTests(unittest.TestCase):
     def test_bootstrap_is_not_advertised_when_its_health_check_fails(self) -> None:
         state = WebState(None, None, BootstrapStatus(False), LocalInferenceRuntime("CORE-700M", Path("missing.pt")), None, "x" * 32)
         self.assertFalse(state.engines()[0]["available"])
+
+
+
+class PinnedEngineTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self._directory.cleanup)
+        self.environ = write_private_endpoints(self._directory.name, CORE_ENDPOINT, QWEN_ENDPOINT)
+        trust_test_account(self)
+
+    def isolated(self, **values: str):
+        cleared = {key: "" for key in (PRIVATE_ENDPOINTS_ENV, "SOVEREIGN_CORE_ENDPOINT", "SOVEREIGN_QWEN_ENDPOINT")}
+        patcher = patch.dict(os.environ, cleared)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        for key in cleared:
+            del os.environ[key]
+        os.environ.update(values)
+
+    def test_engines_are_pinned_to_the_private_configuration(self) -> None:
+        self.isolated(**self.environ)
+        self.assertEqual(pinned_engine(CoreClient, "core_inference", "SOVEREIGN_CORE_ENDPOINT", "x" * 32).endpoint, CORE_ENDPOINT.url)
+        self.assertEqual(pinned_engine(QwenClient, "qwen_coder", "SOVEREIGN_QWEN_ENDPOINT", "x" * 32).endpoint, QWEN_ENDPOINT.url)
+
+    def test_a_matching_legacy_override_is_accepted(self) -> None:
+        self.isolated(**self.environ, SOVEREIGN_QWEN_ENDPOINT=QWEN_ENDPOINT.url)
+        self.assertEqual(pinned_engine(QwenClient, "qwen_coder", "SOVEREIGN_QWEN_ENDPOINT", "x" * 32).endpoint, QWEN_ENDPOINT.url)
+
+    def test_gateway_refuses_to_start_on_mismatch_or_missing_configuration(self) -> None:
+        cases = (
+            ({**self.environ, "SOVEREIGN_CORE_ENDPOINT": QWEN_ENDPOINT.url}, CoreClient, "core_inference", "SOVEREIGN_CORE_ENDPOINT"),
+            ({**self.environ, "SOVEREIGN_QWEN_ENDPOINT": QWEN_ENDPOINT.url + "/"}, QwenClient, "qwen_coder", "SOVEREIGN_QWEN_ENDPOINT"),
+            ({}, CoreClient, "core_inference", "SOVEREIGN_CORE_ENDPOINT"),
+        )
+        for environ, client, name, variable in cases:
+            with self.subTest(name=name, variables=sorted(environ)):
+                self.isolated(**environ)
+                stderr = io.StringIO()
+                with self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(stderr):
+                    pinned_engine(client, name, variable, "x" * 32)
+                self.assertEqual(caught.exception.code, EXIT_CONFIGURATION_REFUSED)
+                message = stderr.getvalue()
+                self.assertIn("refusing to start", message)
+                for marker in (CORE_ENDPOINT.host, QWEN_ENDPOINT.host, self._directory.name):
+                    self.assertNotIn(marker, message)
 
 
 if __name__ == "__main__":
