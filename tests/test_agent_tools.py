@@ -180,8 +180,60 @@ class DriveActionTests(unittest.TestCase):
                     {"id": "a1", "function": {"name": "run_python", "arguments": "{}"}}]}
             return {"content": "répondu sans exécuter", "tool_calls": []}
 
-        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec)  # no action_tools
-        self.assertEqual(res["status"], "final")  # run_python treated as unknown tool, error fed back
+        refused = []
+        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec, on_action_refused=refused.append)  # no action_tools
+        self.assertEqual(res["status"], "final")  # refused with a generic result, never proposed
+        self.assertEqual(refused, ["run_python"])
+        tool_results = [m for m in res["work"] if m.get("role") == "tool"]
+        self.assertEqual([m["content"] for m in tool_results], [at.ACTION_REFUSED_RESULT])
+
+    def test_disabled_offers_no_action_spec(self):
+        offered = []
+
+        def chat(work, tools):
+            offered.append({spec["function"]["name"] for spec in tools})
+            return {"content": "ok", "tool_calls": []}
+
+        at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec)
+        self.assertEqual(offered, [set(at.TOOL_NAMES)])
+        self.assertTrue(offered[0].isdisjoint(at.ACTION_TOOL_NAMES))
+        at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec, action_tools=at.ACTION_TOOL_NAMES)
+        self.assertEqual(offered[1], set(at.TOOL_NAMES) | set(at.ACTION_TOOL_NAMES))
+
+    def test_an_action_outside_the_offered_subset_is_refused_not_executed(self):
+        executed = []
+        seq = {"n": 0}
+
+        def execute(name, arguments):
+            executed.append(name)
+            return self._exec(name, arguments)
+
+        def chat(work, tools):
+            seq["n"] += 1
+            if seq["n"] == 1:
+                return {"content": None, "tool_calls": [
+                    {"id": "a1", "function": {"name": "run_python", "arguments": json.dumps({"code": "print(1)"})}},
+                    {"id": "c1", "function": {"name": "current_time", "arguments": "{}"}}]}
+            return {"content": "fini", "tool_calls": []}
+
+        refused = []
+        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=execute,
+                       action_tools=frozenset({"write_file"}), on_action_refused=refused.append)
+        self.assertEqual((res["status"], refused, executed), ("final", ["run_python"], ["current_time"]))
+
+    def test_read_only_tools_cannot_be_turned_into_actions(self):
+        def chat(work, tools):
+            if any(m.get("role") == "tool" for m in work):
+                return {"content": "fini", "tool_calls": []}
+            return {"content": None, "tool_calls": [{"id": "c1", "function": {"name": "current_time", "arguments": "{}"}}]}
+
+        res = at.drive(chat, [{"role": "user", "content": "go"}], execute=self._exec, action_tools=frozenset({"current_time"}))
+        self.assertEqual(res["status"], "final")  # ran immediately, never paused for confirmation
+
+    def test_execute_tool_never_runs_an_action(self):
+        for name in at.ACTION_TOOL_NAMES:
+            with self.assertRaises(at.ToolError):
+                at.execute_tool(name, {"code": "print(1)", "path": "x", "content": "x"}, knowledge=self.k)
 
 
 if __name__ == "__main__":

@@ -97,12 +97,21 @@ TOOLS_CLAUSE = (
     "de toi-même AVANT de répondre, puis appuie-toi sur les extraits et cite leur provenance. "
     "N'invente jamais le contenu d'un document."
 )
-TOOLS_SYSTEM_PROMPT = (
-    "Tu es l'assistant local Sovereign, hors ligne, distinct de CORE-700M. " + TOOLS_CLAUSE
-    + " Tu n'as pas d'accès Internet. Tu peux en revanche PROPOSER une action : exécuter du code Python"
-    + " dans un bac à sable isolé (run_python), ou écrire un fichier dans ton dossier de travail (write_file)."
-    + " Ces actions ne s'exécutent jamais d'elles-mêmes : l'utilisateur les confirme une par une. Propose-en une seule à la fois."
+TOOLS_BASE_PROMPT = "Tu es l'assistant local Sovereign, hors ligne, distinct de CORE-700M. " + TOOLS_CLAUSE + " Tu n'as pas d'accès Internet."
+ACTIONS_CLAUSE = (
+    " Tu peux en revanche PROPOSER une action : exécuter du code Python"
+    " dans un bac à sable isolé (run_python), ou écrire un fichier dans ton dossier de travail (write_file)."
+    " Ces actions ne s'exécutent jamais d'elles-mêmes : l'utilisateur les confirme une par une. Propose-en une seule à la fois."
 )
+# D-035: with the switch off the model is told plainly, so it neither proposes
+# an action nor pretends to have run one.
+ACTIONS_DISABLED_CLAUSE = (
+    " Les actions (exécution de code, écriture de fichier) sont désactivées sur cette installation :"
+    " n'en propose aucune et ne prétends jamais en avoir exécuté."
+)
+TOOLS_SYSTEM_PROMPT = TOOLS_BASE_PROMPT + ACTIONS_CLAUSE
+TOOLS_SYSTEM_PROMPT_WITHOUT_ACTIONS = TOOLS_BASE_PROMPT + ACTIONS_DISABLED_CLAUSE
+ACTION_REFUSED_ANSWER = "Cette action n'est pas disponible sur cette installation. Rien n'a été exécuté ni écrit."
 STREAM_INTERRUPTED_ANSWER = "Le moteur local demandé est indisponible ou son flux a été interrompu."
 RUNTIME_REFUSED_ANSWER = "Le moteur local demandé est indisponible ou son checkpoint a été refusé."
 
@@ -242,6 +251,13 @@ class WebState:
             stored = dict(payload)
             stored["created_at"] = now
             self.pending_actions[action_id] = stored
+
+    def discard_pending_actions(self) -> int:
+        """Forget every pending action (D-035 refusal path); returns how many."""
+        with self.pending_lock:
+            count = len(self.pending_actions)
+            self.pending_actions.clear()
+        return count
 
     def pop_pending_action(self, action_id: str, *, ttl: int = 900) -> dict[str, Any] | None:
         now = time.time()
@@ -482,6 +498,19 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         self.begin_event_stream()
         for event, payload in events:
             self.send_event(event, payload)
+
+    def log_security_event(self, event: str, **fields: str) -> None:
+        """One content-free line in the service journal: never a message, code, path or id."""
+        details = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
+        print(f"web security event={event} {details}".rstrip(), flush=True)
+
+    def _log_action_refused(self, stage: str, tool: str | None = None) -> None:
+        self.log_security_event(
+            "action_refused",
+            reason="actions_disabled" if not self.state.actions_enabled else "action_unavailable",
+            stage=stage,
+            tool=tool if tool in agent_tools.ACTION_TOOL_NAMES else "other",
+        )
 
     def wants_event_stream(self) -> bool:
         return "text/event-stream" in self.headers.get("Accept", "")
@@ -851,8 +880,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         try:
             self.state.memory.append_message(conversation_id, role="user", content=request_value["message"])
             if tools_profile and requested_engine == "BOOTSTRAP" and self.wants_event_stream() and self.state.tools_enabled:
-                base_system = TOOLS_SYSTEM_PROMPT if system_prompt is None else f"{system_prompt} {TOOLS_CLAUSE}"
-                self._chat_with_tools_stream(request_value, conversation_id, base_system=base_system)
+                self._chat_with_tools_stream(request_value, conversation_id, base_system=self._tools_system_prompt(system_prompt))
                 return
             messages, citations = self._conversation_messages(request_value["message"], conversation_id, system_prompt=system_prompt)
             if agent is None and requested_engine == "BOOTSTRAP" and self.wants_event_stream():
@@ -956,13 +984,21 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         payload = response(request_value["request_id"], profile_id, "completed", answer, engine="BOOTSTRAP", conversation_id=conversation_id, citations=citations)
         self.send_event("completed", payload)
 
-    def _chat_with_tools_stream(self, request_value: dict[str, Any], conversation_id: str, *, base_system: str = TOOLS_SYSTEM_PROMPT) -> None:
+    def _tools_system_prompt(self, persona: str | None = None) -> str:
+        """System prompt of a tool-enabled turn; advertises actions only when enabled (D-035)."""
+        if persona is None:
+            return TOOLS_SYSTEM_PROMPT if self.state.actions_enabled else TOOLS_SYSTEM_PROMPT_WITHOUT_ACTIONS
+        prompt = f"{persona} {TOOLS_CLAUSE}"
+        return prompt if self.state.actions_enabled else prompt + ACTIONS_DISABLED_CLAUSE
+
+    def _chat_with_tools_stream(self, request_value: dict[str, Any], conversation_id: str, *, base_system: str | None = None) -> None:
         """Agentic 14B turn: the model may call read-only local tools, then answers.
 
         ``base_system`` is the persona/system prompt (coordination or a catalog
         profile). Handles its own errors and event stream — never raises.
         """
 
+        base_system = base_system if base_system is not None else self._tools_system_prompt()
         profile_id = request_value.get("profile_id", "coordination")
         try:
             history = self.state.memory.export_conversation(conversation_id)["messages"][-20:]
@@ -983,6 +1019,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                 execute=lambda name, arguments: agent_tools.execute_tool(name, arguments, knowledge=self.state.knowledge, embed_query=self._embed_query, workspace=self.state.workspace_dir),
                 action_tools=action_tools,
                 on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
+                on_action_refused=lambda name: self._log_action_refused("model", name),
             )
         except RuntimeError:
             payload = response(request_value["request_id"], profile_id, "error", STREAM_INTERRUPTED_ANSWER, engine="BOOTSTRAP", conversation_id=conversation_id)
@@ -993,6 +1030,13 @@ class LocalWebHandler(BaseHTTPRequestHandler):
 
     def _finish_tool_result(self, request_id: str, profile_id: str, conversation_id: str, result: dict[str, Any]) -> None:
         """Emit the final answer, or a confirmation request for a pending action."""
+        if result["status"] == "confirm" and result["call"].get("name") not in self._action_tools():
+            # Defense in depth (D-035): drive() only pauses on offered actions.
+            self._log_action_refused("propose", result["call"].get("name"))
+            payload = response(request_id, profile_id, "error", ACTION_REFUSED_ANSWER, engine="BOOTSTRAP", conversation_id=conversation_id)
+            payload["error"] = "action_refused"
+            self.send_event("error", payload)
+            return
         if result["status"] == "confirm":
             call = result["call"]
             try:
@@ -1034,6 +1078,10 @@ class LocalWebHandler(BaseHTTPRequestHandler):
 
     def _run_action(self, call: dict[str, Any]) -> str:
         """Execute one human-approved action and return the text fed back to the model."""
+        if call.get("name") not in self._action_tools():
+            # Defense in depth (D-035): nothing runs unless the action is offered now.
+            self._log_action_refused("execute", call.get("name"))
+            return agent_tools.ACTION_REFUSED_RESULT
         try:
             arguments = agent_tools._parse_arguments(call["arguments"])
         except agent_tools.ToolError as failure:
@@ -1075,6 +1123,12 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         except ValueError:
             self.send_json(422, {"error": "invalid_request"})
             return
+        if not self.state.actions_enabled:
+            # D-035: same answer for a real, stale or forged action id; nothing runs.
+            self.state.discard_pending_actions()
+            self._log_action_refused("confirm")
+            self.send_json(403, {"error": "actions_disabled"})
+            return
         action_id = body.get("action_id")
         decision = body.get("decision")
         conversation_id = body.get("conversation_id")
@@ -1110,6 +1164,7 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                 action_tools=action_tools,
                 citations=citations, seen_provenance=seen,
                 on_tool=lambda name, call_id: self.send_event("tool", {"name": name}),
+                on_action_refused=lambda name: self._log_action_refused("model", name),
             )
         except RuntimeError:
             payload = response(pending["request_id"], profile_id, "error", STREAM_INTERRUPTED_ANSWER, engine="BOOTSTRAP", conversation_id=conversation_id)

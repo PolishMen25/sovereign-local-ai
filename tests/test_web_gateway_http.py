@@ -109,6 +109,7 @@ class FakeBootstrap:
 
     def __init__(self) -> None:
         self.last_messages: list[dict[str, str]] = []
+        self.offered_tools: list[set[str]] = []
 
     def status(self) -> dict[str, Any]:
         return {"available": True, "state": "ready"}
@@ -128,6 +129,7 @@ class FakeBootstrap:
 
     def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
         self.last_messages = messages
+        self.offered_tools.append({spec["function"]["name"] for spec in tools})
         if messages[-1].get("role") == "tool":  # resuming after a tool/action result
             return {"content": "résultat intégré: " + (messages[-1].get("content") or "")[:40], "tool_calls": []}
         last = messages[-1].get("content") or ""
@@ -166,6 +168,9 @@ class QuietHandler(gateway.LocalWebHandler):
     def log_message(self, format_string: str, *arguments: object) -> None:
         pass
 
+    def log_security_event(self, event: str, **fields: str) -> None:
+        self.server.security_events.append((event, fields))  # type: ignore[attr-defined]
+
 
 class GatewayTestCase(unittest.TestCase):
     def start(self, qwen_runtime: Any) -> None:
@@ -173,6 +178,7 @@ class GatewayTestCase(unittest.TestCase):
         self.bootstrap = FakeBootstrap()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
         self.server.state = gateway.WebState(self.auth, self.memory, self.bootstrap, FakeCore(), FakeKnowledge(), SETUP_TOKEN, qwen_runtime, tools_enabled=False)  # type: ignore[attr-defined]
+        self.server.security_events = []  # type: ignore[attr-defined]
         threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
@@ -468,6 +474,138 @@ class GatewayHttpTests(GatewayTestCase):
         self.assertEqual(json.loads(self.request("DELETE", "/v1/conversations/conversation_001", session=True, csrf=True)[2]), {"status": "deleted", "conversation_id": "conversation_001"})
         self.assertEqual(self.request("DELETE", "/v1/conversations/conversation_001", session=True, csrf=True)[0], 404)
         self.assertEqual(self.request("DELETE", "/v1/elsewhere", session=True, csrf=True)[0], 404)
+
+
+class ActionSwitchGatewayTests(GatewayTestCase):
+    """D-035: with SOVEREIGN_ACTIONS_ENABLED off, no path proposes, confirms or runs an action."""
+
+    READ_ONLY_TOOLS = {"search_knowledge", "list_documents", "read_document", "current_time", "list_workspace"}
+    ACTIONS = {"run_python", "write_file"}
+
+    def setUp(self) -> None:
+        import tempfile
+        from pathlib import Path
+        import services.web.code_sandbox as sandbox
+
+        self.start(FakeQwen())
+        self.login()
+        self.server.state.tools_enabled = True
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.workspace = Path(directory.name)
+        self.server.state.workspace_dir = self.workspace
+        # A sandbox that "works" and counts every execution: any run is a failure.
+        self.executions: list[str] = []
+        original = (sandbox.available, sandbox.run_python)
+        sandbox.available = lambda: True
+        sandbox.run_python = lambda code: self.executions.append(code) or {"ok": True, "timed_out": False, "exit_code": 0, "output": "RAN"}
+        self.addCleanup(lambda: (setattr(sandbox, "available", original[0]), setattr(sandbox, "run_python", original[1])))
+
+    def stream(self, message: str) -> list[tuple[str, dict[str, Any]]]:
+        status, _, body = self.request("POST", "/v1/chat", self.chat(message), headers={"Accept": "text/event-stream"}, session=True, csrf=True)
+        self.assertEqual(status, 200)
+        return self.events(body)
+
+    def confirm(self, action_id: str, decision: str = "approve", **options: Any) -> tuple[int, bytes]:
+        body = {"conversation_id": "conversation_001", "action_id": action_id, "decision": decision}
+        status, _, payload = self.request("POST", "/v1/chat/confirm", body, headers={"Accept": "text/event-stream"}, **{"session": True, "csrf": True, **options})
+        return status, payload
+
+    def refusals(self) -> list[dict[str, str]]:
+        return [fields for event, fields in self.server.security_events if event == "action_refused"]
+
+    def forged_pending_action(self, action_id: str, tool: str = "run_python") -> None:
+        arguments = '{"code": "print(1)"}' if tool == "run_python" else '{"path": "forged.md", "content": "X"}'
+        self.server.state.pending_actions[action_id] = {
+            "conversation_id": "conversation_001", "profile_id": "coordination", "request_id": "req-12345678",
+            "work": [{"role": "user", "content": "EXECUTE"}], "citations": [],
+            "call": {"id": "a1", "name": tool, "arguments": arguments}, "created_at": __import__("time").time(),
+        }
+
+    def handler(self) -> gateway.LocalWebHandler:
+        import io
+        handler = QuietHandler.__new__(QuietHandler)
+        handler.server = self.server
+        handler.wfile = io.BytesIO()
+        return handler
+
+    def test_actions_are_disabled_by_default(self) -> None:
+        self.assertFalse(self.server.state.actions_enabled)
+
+    def test_disabled_offers_only_read_only_tools_and_prompt_does_not_advertise_actions(self) -> None:
+        events = self.stream("Salut")
+        self.assertEqual([name for name, _ in events], ["metadata", "completed"])
+        self.assertEqual(self.bootstrap.offered_tools[0], self.READ_ONLY_TOOLS)
+        system = self.bootstrap.last_messages[0]["content"]
+        self.assertEqual(system, gateway.TOOLS_SYSTEM_PROMPT_WITHOUT_ACTIONS)
+        self.assertNotIn("run_python", system)
+        self.assertNotIn("write_file", system)
+
+    def test_disabled_read_only_tools_are_unaffected(self) -> None:
+        events = self.stream("CHERCHE le statut")
+        self.assertEqual([name for name, _ in events], ["metadata", "tool", "completed"])
+        self.assertEqual(events[1][1], {"name": "search_knowledge"})
+        self.assertEqual(events[-1][1]["citations"][0]["provenance_id"], "project-sha256:abc")
+        self.assertEqual(self.refusals(), [])
+
+    def test_disabled_model_action_call_is_refused_never_proposed_nor_run(self) -> None:
+        for message, tool in (("EXECUTE ceci", "run_python"), ("ECRIS un fichier", "write_file")):
+            events = self.stream(message)
+            self.assertEqual([name for name, _ in events], ["metadata", "completed"], message)
+            self.assertIn("Action refusée", events[-1][1]["answer"])
+            self.assertEqual(self.refusals()[-1], {"reason": "actions_disabled", "stage": "model", "tool": tool})
+        self.assertEqual(self.server.state.pending_actions, {})
+        self.assertEqual(self.executions, [])
+        self.assertEqual(list(self.workspace.iterdir()), [])
+
+    def test_disabled_confirm_refuses_pending_and_forged_ids(self) -> None:
+        self.forged_pending_action("0123456789abcdef")
+        self.forged_pending_action("fedcba9876543210", tool="write_file")
+        for action_id, decision in (("0123456789abcdef", "approve"), ("fedcba9876543210", "approve"),
+                                    ("ffffffffffffffff", "approve"), ("0123456789abcdef", "reject")):
+            status, payload = self.confirm(action_id, decision)
+            self.assertEqual((status, json.loads(payload)), (403, {"error": "actions_disabled"}), (action_id, decision))
+        # malformed ids get the same generic refusal: nothing about the action is processed
+        status, _, payload = self.request("POST", "/v1/chat/confirm", {"action_id": "../../x"}, session=True, csrf=True)
+        self.assertEqual((status, json.loads(payload)), (403, {"error": "actions_disabled"}))
+        self.assertEqual(self.server.state.pending_actions, {})  # a pending action created before is dropped
+        self.assertEqual(self.executions, [])
+        self.assertEqual(list(self.workspace.iterdir()), [])
+        self.assertEqual(self.refusals()[0], {"reason": "actions_disabled", "stage": "confirm", "tool": "other"})
+        self.assertEqual(len(self.refusals()), 5)
+
+    def test_disabled_confirm_still_requires_a_session_and_csrf(self) -> None:
+        self.assertEqual(self.confirm("0123456789abcdef", session=False)[0], 401)
+        self.assertEqual(self.confirm("0123456789abcdef", csrf=False)[0], 401)
+        self.assertEqual(self.refusals(), [])
+
+    def test_disabled_executor_and_proposal_paths_refuse_even_if_reached(self) -> None:
+        handler = self.handler()
+        for call in ({"id": "a1", "name": "run_python", "arguments": '{"code": "print(1)"}'},
+                     {"id": "w1", "name": "write_file", "arguments": '{"path": "x.md", "content": "X"}'}):
+            self.assertEqual(handler._run_action(call), gateway.agent_tools.ACTION_REFUSED_RESULT)
+        self.assertEqual(self.executions, [])
+        self.assertEqual(list(self.workspace.iterdir()), [])
+        # a forged "confirm" loop result never becomes a pending action
+        forged = {"status": "confirm", "call": {"id": "a1", "name": "run_python", "arguments": "{}"}, "work": [], "citations": []}
+        handler._finish_tool_result("req-12345678", "coordination", "conversation_001", forged)
+        self.assertEqual(self.server.state.pending_actions, {})
+        self.assertEqual([name for name, _ in self.events(handler.wfile.getvalue())], ["error"])
+        self.assertEqual(self.events(handler.wfile.getvalue())[0][1]["error"], "action_refused")
+        self.assertEqual([fields["stage"] for fields in self.refusals()], ["execute", "execute", "propose"])
+
+    def test_enabled_path_offers_actions_with_the_unchanged_prompt(self) -> None:
+        self.enable_actions()
+        events = self.stream("EXECUTE ceci")
+        self.assertEqual([name for name, _ in events], ["metadata", "confirmation_required"])
+        self.assertEqual(self.bootstrap.offered_tools[0], self.READ_ONLY_TOOLS | self.ACTIONS)
+        self.assertEqual(self.bootstrap.last_messages[0]["content"], gateway.TOOLS_SYSTEM_PROMPT)
+        self.assertIn("run_python", gateway.TOOLS_SYSTEM_PROMPT)
+        status, payload = self.confirm(events[-1][1]["action_id"])
+        self.assertEqual(status, 200)
+        self.assertEqual([name for name, _ in self.events(payload)], ["metadata", "tool", "completed"])
+        self.assertEqual(self.executions, ["print(1)"])
+        self.assertEqual(self.refusals(), [])
 
 
 class ArenaGatewayTests(GatewayTestCase):
