@@ -56,7 +56,7 @@ Le choix entre ce validateur stdlib et une dépendance `jsonschema` de test rest
 
 | Code | Règle | Pointeur |
 |---|---|---|
-| `PKG_LIFECYCLE_STATE_NOT_RAW` | Un producteur ne déclare que `RAW`. `PENDING`, `VALIDATED` ou toute autre valeur est refusée, en plus de `PKG_CONST_MISMATCH`. Les états suivants n'existent que dans le journal d'événements interne (`docs/data/provenance-and-lifecycle.md`). | `/lifecycle_state` |
+| `PKG_LIFECYCLE_STATE_NOT_RAW` | Un producteur ne déclare que `RAW`. `PENDING`, `VALIDATED` ou toute autre valeur est refusée, en plus de `PKG_CONST_MISMATCH`. Les états suivants n'existent que dans le journal d'événements (`docs/data/lifecycle-events.md`). | `/lifecycle_state` |
 | `PKG_TIMESTAMP_ORDER` | Ordre candidat : `request_started_at` ≤ `response_completed_at` ≤ `collected_at` ≤ `created_at`, comparés en UTC à la nanoseconde. L'égalité est admise. | le second horodatage de la paire fautive |
 | `PKG_DUPLICATE_ID` | Unicité de `sources[].source_id`, `citations[].citation_id`, `attachments[].attachment_id` et `generation_parameters[].name`. | la deuxième occurrence |
 | `PKG_CITATION_SOURCE_UNKNOWN` | Chaque `citations[].source_id` désigne une source déclarée. | `/citations/i/source_id` |
