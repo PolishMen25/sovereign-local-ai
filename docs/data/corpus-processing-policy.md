@@ -280,6 +280,18 @@ n'est appliquée par ce document.
 Chaque question est fermée ; la valeur par défaut proposée est la plus sûre.
 Aucune n'est tranchée ici.
 
+**Mise à jour du 2026-09-27** — Après la rédaction, le propriétaire a consigné
+D-039 à D-042 au registre de `main` ; voir la
+[note de décision G3](../project/decision-brief-g3.md#mise-à-jour-du-2026-09-27).
+D-039 ratifie le retrait du fichier d'approbation (section 2.10) et répond à la
+question 8 : une version de corpus est autorisée par un manifeste `VALIDATED`
+produit par la politique automatique versionnée et auditée, non par un artefact
+distinct du propriétaire ; le défaut proposé n'est pas retenu. D-040 tranche le
+conflit sur les incréments de l'arène (section 2.10) en faveur de sa règle ;
+l'alignement des validateurs reste à faire. Aucune entrée ne choisit les règles
+de la section 4 : cette politique reste **PROVISOIRE**, et les questions 1 à 7
+et 9 restent ouvertes.
+
 1. **Quasi-doublons** : faut-il les retirer avant toute nouvelle
    matérialisation ? Défaut proposé : oui, avec un seuil à fixer après mesure.
 2. **Découpage** : le découpage par paquet devient-il obligatoire pour tous

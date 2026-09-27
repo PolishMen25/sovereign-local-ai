@@ -1,7 +1,9 @@
 # Note de décision G3 — corpus, tokenizer et embeddings RAG
 
-- Statut : **PROVISOIRE** (matériau de décision pour le propriétaire)
-- Date : 2026-09-26
+- Statut : **PROVISOIRE** (matériau de décision pour le propriétaire) ; les
+  sujets 1, 2, 4 et 5 ont été tranchés depuis, voir la
+  [mise à jour du 2026-09-27](#mise-à-jour-du-2026-09-27)
+- Date : 2026-09-26 ; mise à jour le 2026-09-27
 - Base examinée : `main` au commit `db9414d`
 - Issue : #7 (gate G3)
 - Entrées factuelles : [politique de traitement candidate](../data/corpus-processing-policy.md),
@@ -18,6 +20,37 @@ décision. Aucun agent ne crée `core-v1-source-policy.approved.json`.
 (proposition non validée), **OUVERT** (non tranché), **HYPOTHÈSE** (déduction
 non mesurée). Aucun état n'a été revérifié en direct à la date de rédaction
 (2026-09-26).
+
+## Mise à jour du 2026-09-27
+
+Après la rédaction de cette note, le propriétaire a consigné D-035 à D-042 au
+[registre](decisions.md) de `main` (commits `8eb9c07` et `5e28408`). La note
+n'est pas réécrite : les sections 1 à 7 restent la trace du matériau présenté.
+Leurs recommandations sont caduques là où une entrée tranche.
+
+| # | Sujet | État | Reste ouvert |
+| --- | --- | --- | --- |
+| 1 | Gate `approved.json` | **CONFIRMÉ** — D-039 ratifie le retrait (proche de l'option A) : un manifeste `VALIDATED` produit par la politique automatique versionnée et auditée autorise une version de corpus, avec un acteur de politique journalisé et une révocation possible avant consommation. L'option C recommandée ici n'est pas retenue. | Mise en œuvre de la journalisation et de la révocation, non vérifiée par cette note. Alignement du README, de la spécification d'auto-entraînement et du gate corpus. Sort de `verify_corpus_approval.py`. |
+| 2 | Proportions du corpus | **CONFIRMÉ** — D-041 fixe environ 40 % de français technique, au-delà des options chiffrées de la section 2, et impose l'acquisition de sources françaises sous licence admise par le flux contrôlé. | **OUVERT** : taille du sous-échantillon, plafond par source, répartition entre code et anglais technique, unité de mesure de la part. |
+| 3 | Politique de traitement | **OUVERT** — D-039 fixe le cadre (politique, seuils et code versionnés ; modification par PR revue avec CI verte) sans choisir aucun axe de la section 3. | Tous les axes de la section 3. |
+| 4 | Tokenizer | **CONFIRMÉ** — D-042 : réentraînement sur le corpus final (proche de l'option C) ; 32 000 unités, 4 tokens spéciaux et contexte 2 048 conservés ; acceptation sur métriques mesurées (octets par token et tokens par mot en français, anglais et code, aller-retour exact). La lignée CORE-30M reste attachée à l'ancien tokenizer. | **OUVERT** : valeurs numériques des seuils d'acceptation. Le corpus final dépend du sujet 2. |
+| 5 | Données synthétiques | **CONFIRMÉ** — D-040 : admissibles, limitées au code de Qwen2.5-Coder dont chaque solution est validée par ses tests en bac à sable, étiquetées synthétiques, sans recouvrement avec les jeux d'évaluation ; plafond de 20 % des tokens d'une version de corpus ; sorties de BOOTSTRAP exclues ; conflit entre `promote_arena_increment` et `validate_training_corpus_manifest` résolu en faveur de cette règle (proche de l'option B). | Alignement des validateurs, application du plafond à l'assemblage et contrôle du recouvrement avec E2 : travail postérieur à l'entrée, non fait ici. |
+| 6 | `0BSD`, `Unlicense`, `verified-public-domain` | **OUVERT** — D-041 mentionne des licences « permissives » sans les nommer ; aucune entrée ne nomme ces trois valeurs. | Toute la section 6. |
+| 7 | Embeddings, reranker, index | **OUVERT** — aucune entrée ne porte sur ce moteur. Le nouvel `AGENTS.md` (`4775afb`) le range parmi les composants à régulariser, sans lock ni reçu de promotion. | Toute la section 7 et l'ADR-0007. |
+
+**HYPOTHÈSE** — Conséquence chiffrée du sujet 2, calculée sur les mesures RAW
+publiées de la section 2, en supposant une part mesurée en tokens estimés et
+un sous-échantillon maintenu à 10 M : 40 % représentent 4 000 000 tokens de
+français, soit 3 593 107 de plus que le disponible. Un suréchantillonnage seul
+imposerait un facteur d'environ 9,8. L'acquisition prescrite par D-041 est donc
+indispensable avant toute matérialisation à cette proportion.
+
+**CONFIRMÉ** — Les incréments construits sur la suite E2 recopient des
+consignes E2 ([inventaire](../data/training-sources-inventory.md), section
+2.5). D-040 exige l'absence de recouvrement avec les jeux d'évaluation : ces
+incréments ne satisfont pas cette condition en l'état.
+
+D-035 à D-038 ne portent pas sur G3. D-038 fait passer le projet en phase 1.
 
 ## Synthèse
 

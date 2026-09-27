@@ -220,6 +220,19 @@ l'acquisition, pas des tokens Byte-BPE ; voir la
 Chaque question est fermée ; le défaut proposé est le plus sûr. Aucune n'est
 tranchée ici.
 
+**Mise à jour du 2026-09-27** — Après la rédaction, le propriétaire a consigné
+D-039 à D-042 au registre de `main` ; voir la
+[note de décision G3](../project/decision-brief-g3.md#mise-à-jour-du-2026-09-27).
+D-040 répond aux questions 3, 4 et 5 : les incréments de l'arène sont
+admissibles s'ils ne contiennent que du code de Qwen2.5-Coder validé par ses
+tests, étiqueté synthétique, sans recouvrement avec les jeux d'évaluation et
+dans un plafond de 20 % des tokens ; les sorties de BOOTSTRAP sont exclues.
+L'entrée d'un incrément dans un manifeste attend l'alignement des validateurs
+que D-040 prescrit. D-039 ratifie le retrait du fichier d'approbation du
+préflight ; son application aux familles 2 et 5 n'est pas vérifiée ici. Les
+questions 1, 2, 6 et 7 restent ouvertes. Les sections 1 à 4 décrivent l'état
+à `db9414d`.
+
 1. pilote-v3 : faut-il publier, sans contenu, la liste de ses paquets et de
    leurs licences, puis la rattacher à une entrée du registre ? Défaut
    proposé : oui.

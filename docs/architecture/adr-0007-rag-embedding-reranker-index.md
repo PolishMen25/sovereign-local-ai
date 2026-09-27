@@ -5,6 +5,10 @@
 - Autorité : aucune ; en attente de validation explicite du propriétaire
 - Issue : #7 (gate G3)
 - Décision et orientation concernées : D-028 (confirmée), P-004 (provisoire)
+- Mise à jour du 2026-09-27 : aucune des entrées D-035 à D-042, consignées
+  depuis sur `main`, ne porte sur ce moteur. D-038 fait passer le projet en
+  phase 1 ; un nouveau service ou port y exige toujours une décision du
+  propriétaire au registre.
 - Numérotation : le tri de phase 0 proposait « ADR-0006 » ; ce numéro est
   pris par l'[ADR-0006](adr-0006-research-gateway-vs-direct-deposit.md)
   (Research Gateway, PROPOSÉ). Cet ADR prend donc le numéro 0007.
@@ -153,7 +157,7 @@ d'adresses ni les destinations réseau.
 | I2 | sqlite-vec, extension chargeable de SQLite | oui ou approché selon le mode | code natif ; `sqlite3` doit autoriser le chargement d'extensions (**à vérifier**) | un seul fichier | aucun |
 | I3 | FAISS-cpu | selon l'index | bibliothèque native lourde, avec NumPy | fichier d'index séparé à sauvegarder ou reconstruire | aucun |
 | I4 | hnswlib | non (approché) | code natif | fichier séparé | aucun |
-| I5 | Serveur vectoriel dédié | selon le produit | service complet | procédure propre | **oui** : exclu tant que la phase 0 interdit l'ouverture de port |
+| I5 | Serveur vectoriel dédié | selon le produit | service complet | procédure propre | **oui** : exclu sans décision du propriétaire au registre, qu'exige tout nouveau service ou port |
 
 ## 4. Estimation statique du balayage exhaustif
 
@@ -218,7 +222,7 @@ médiane, dispersion et période de chauffe, conformément à `AGENTS.md`.
 4. I1 tant qu'une mesure au volume réel reste sous un budget de latence à
    fixer par le propriétaire. Ensuite, examiner d'abord I1b ou I2, qui
    conservent la sauvegarde en un seul fichier, avant I3 ou I4. I5 reste
-   exclu en phase 0.
+   exclu sans décision du propriétaire au registre.
 5. Aligner l'unité d'embeddings sur les restrictions de l'unité BOOTSTRAP. Ce
    changement de déploiement relève du propriétaire et n'est pas fait ici.
 
@@ -302,5 +306,6 @@ champs liés au lock.
 
 **CONFIRMÉ** — Aucune unité ni aucun service ne lit ce lock : la vérification
 est un contrôle du dépôt, pas une barrière d'exécution. Brancher une
-vérification au démarrage du runtime serait un changement de déploiement, hors
-du périmètre de la phase 0.
+vérification au démarrage du runtime serait un changement de déploiement,
+hors du périmètre d'un agent tant que le propriétaire n'a pas régularisé ce
+moteur.
