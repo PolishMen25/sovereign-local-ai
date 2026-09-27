@@ -26,10 +26,12 @@ from services.knowledge.hybrid_index import HybridKnowledgeIndex
 from services.knowledge.document_ingest import ingest as ingest_document, IngestError
 from services.knowledge import document_analysis
 from services.knowledge import corpus_paths
+from services.web import action_switch
 from services.web import agent_tools
 from services.web import code_sandbox
 from services.web import health
 from services.web import workspace
+from services.web.action_switch import ActionSwitch
 from services.web.catalog_profiles import load_catalog_profiles
 from services.web.authentication import AuthenticationStore
 from services.web.bootstrap_client import BootstrapClient
@@ -220,9 +222,14 @@ class WebState:
     embed_runtime: Any = None
     catalog: list[dict[str, Any]] | None = None
     state_root: Path | None = None
-    actions_enabled: bool = True
+    action_switch: ActionSwitch = field(default_factory=ActionSwitch)  # D-035: disabled unless "1" at startup
     pending_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
     pending_lock: Any = field(default_factory=threading.Lock)
+
+    @property
+    def actions_enabled(self) -> bool:
+        """D-035: chat actions run only when the startup switch says so."""
+        return self.action_switch.enabled is True
 
     def store_pending_action(self, action_id: str, payload: dict[str, Any], *, ttl: int = 900, cap: int = 100) -> None:
         now = time.time()
@@ -1183,8 +1190,10 @@ def main() -> int:
     embed_endpoint = os.environ.get("SOVEREIGN_EMBED_ENDPOINT", "http://127.0.0.1:8082")
     embed_runtime = EmbedClient(embed_endpoint) if embed_endpoint else None
     catalog = load_catalog_profiles(Path(os.environ.get("SOVEREIGN_AGENT_REGISTRY", "configs/agents/registry.json")))
+    actions = action_switch.from_environment(os.environ)
     server.state = WebState(authentication, memory, runtime, core_runtime, knowledge, setup_token, qwen_runtime, arena, arena_inbox,  # type: ignore[attr-defined]
-                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, workspace_dir, tools_enabled, embed_runtime, catalog, state_root)
+                            corpus_raw_root, corpus_validated_root, corpus_inbox, documents_dir, workspace_dir, tools_enabled, embed_runtime, catalog, state_root,
+                            action_switch=actions)
     server.serve_forever()
     return 0
 

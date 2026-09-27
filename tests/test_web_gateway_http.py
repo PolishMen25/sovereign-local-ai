@@ -16,6 +16,7 @@ from http.server import ThreadingHTTPServer
 from typing import Any
 
 from services.web import app as gateway
+from services.web.action_switch import ActionSwitch
 
 SETUP_TOKEN = "s" * 40
 SESSION = "session-token-0001"
@@ -195,6 +196,10 @@ class GatewayTestCase(unittest.TestCase):
     def login(self) -> None:
         self.auth.owner = True
 
+    def enable_actions(self) -> None:
+        """D-035: what SOVEREIGN_ACTIONS_ENABLED=1 gives the gateway at startup."""
+        self.server.state.action_switch = ActionSwitch(enabled=True)
+
     def chat(self, message: str, **fields: Any) -> dict[str, Any]:
         return {"schema_version": "local-chat-request.v1", "request_id": "req-12345678", "message": message, **fields}
 
@@ -344,6 +349,7 @@ class GatewayHttpTests(GatewayTestCase):
     def test_action_confirmation_flow(self) -> None:
         self.login()
         self.server.state.tools_enabled = True
+        self.enable_actions()
         import services.web.code_sandbox as cs
         orig = (cs.available, cs.run_python)
         cs.available = lambda: True
@@ -373,6 +379,7 @@ class GatewayHttpTests(GatewayTestCase):
     def test_action_reject_does_not_execute(self) -> None:
         self.login()
         self.server.state.tools_enabled = True
+        self.enable_actions()
         import services.web.code_sandbox as cs
         orig = (cs.available, cs.run_python)
         calls = {"n": 0}
@@ -393,6 +400,7 @@ class GatewayHttpTests(GatewayTestCase):
     def test_write_file_action_flow(self) -> None:
         self.login()
         self.server.state.tools_enabled = True
+        self.enable_actions()
         import tempfile
         from pathlib import Path as _Path
         directory = tempfile.TemporaryDirectory()
