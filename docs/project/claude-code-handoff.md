@@ -2,7 +2,7 @@
 
 Dernière mise à jour : 2026-09-27, documentaire seulement : serveur de calcul
 hors ligne, aucun relevé en direct depuis le 2026-09-10 ; registre des
-décisions jusqu'à D-042 et `AGENTS.md` en phase 1 (D-038).
+décisions jusqu'à D-045 et `AGENTS.md` en phase 1 (D-038).
 
 Ce document est le point de reprise public et expurgé. Il ne contient ni
 adresse privée, compte, secret, chemin d'administration ou inventaire détaillé.
@@ -17,7 +17,9 @@ traçabilité. Elle couvre les 43 commits intégrés sur `main` entre `8ec82e0`,
 dernière mise à jour de ce fichier, et `db9414d` du 2026-09-13, puis les cinq
 commits qui mènent `main` à `c0b169e` : `8eb9c07` et `5e28408` consignent
 D-035 à D-042, `4775afb` réécrit `AGENTS.md` pour la phase 1, `1cf5daf` ajoute
-le contrôleur de disponibilité du NAS et `c0b169e` l'interrupteur de D-035.
+le contrôleur de disponibilité du NAS et `c0b169e` l'interrupteur de D-035,
+puis les neuf commits qui mènent `main` à `eea75b5`, résumés sous « Depuis
+`c0b169e` » ci-dessous.
 Elle a été rédigée sans accès au serveur de calcul et ne décrit **aucun état
 d'exécution actuel**.
 
@@ -58,9 +60,14 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
 - **D-036** : adresses, noms d'hôte, identifiants de conteneurs et chemins
   d'hyperviseur internes sortent du dépôt public vers une configuration
   privée hors Git, avec échec fermé ; la configuration privée précède le
-  déploiement du code ; historique Git non réécrit. Non implémenté.
+  déploiement du code ; historique Git non réécrit. Code sur `main` depuis
+  `6a79309` (#24) **[C]**, non déployé : chargeur
+  `services/common/private_endpoints.py`, fichier désigné par
+  `SOVEREIGN_PRIVATE_ENDPOINTS_FILE`, épinglage exact conservé ; procédure
+  dans `docs/operations/private-endpoints-migration.md`.
 - **D-037** : intégration continue sur un runner Linux hébergé, sans secret ni
-  déploiement automatique. Aucun workflow versionné sur `main`.
+  déploiement automatique. Workflow `.github/workflows/tests.yml` sur `main`
+  depuis `ad1ed68` (#19), sous Python 3.11 et 3.13.
 - **D-038** : phase 1, socle expérimental en service ; `AGENTS.md` liste les
   composants rattachés à une décision et ceux à régulariser, et fixe ce qu'un
   agent peut modifier.
@@ -70,12 +77,45 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
 - **D-040** : code synthétique de l'arène admissible, généré par
   Qwen2.5-Coder, validé par ses tests, sans recouvrement avec les jeux
   d'évaluation, plafonné à 20 % des tokens d'une version de corpus ; sorties de
-  BOOTSTRAP exclues. Validateurs pas encore alignés (voir le pont paquets).
+  BOOTSTRAP exclues. Validateurs pas encore alignés (voir le pont paquets) ;
+  depuis `eea75b5` (#31), le constructeur d'incréments refuse les tâches E2.
 - **D-041** : environ 40 % de français technique dans le corpus cible, par
   acquisition contrôlée de sources sous licence admise.
 - **D-042** : tokenizer réentraîné sur le corpus final (vocabulaire 32 000,
   4 tokens spéciaux, contexte 2 048), accepté sur métriques mesurées ; la
   lignée CORE-30M garde l'ancien tokenizer.
+- **D-043** : révocation de l'autorisation d'entraînement des incréments
+  arena `0001` et `0002`, promus en `VALIDATED` le 2026-09-11 (tâches E2 et
+  code de BOOTSTRAP) ; révocation append-only, originaux conservés ; les
+  outils qui construisent un corpus doivent refuser un incrément révoqué. Non
+  implémenté sur `main`.
+- **D-044** : évaluation de code sur une suite E2-v2 scellée hors dépôt, dont
+  seule l'empreinte est versionnée ; E2 étiquetée « contaminée ». Empreinte de
+  E2-v2 non versionnée au 2026-09-27.
+- **D-045** : approbation automatique réelle des paquets arena selon D-039 et
+  D-040, acteur `policy:auto-v1`, chaîne d'audit, interrupteur d'arrêt et
+  révocation. Non implémenté sur `main`. Son articulation avec la
+  régularisation de l'arène demandée par `AGENTS.md` reste **OUVERT**.
+
+### Depuis `c0b169e`
+
+Neuf commits fusionnés par PR, tous **[C]** et sans relevé de déploiement :
+
+- `6a79309` (#24) : points d'accès et identifiants privés hors Git (D-036).
+- `485fd72` (#25) : connexion SQLite fermée dans `tests/test_arena.py`, D-025
+  verrouillé sur la documentation publique, surface V0 du collecteur figée
+  par des tests, Etalab-2.0 accepté par l'audit d'approbation.
+- `ad1ed68` (#19) : CI de D-037.
+- `654b730` (#26) : comparateur NUMA durci, contrat de sortie v2, vérificateur
+  de distinction des placements, protocole G4 étendu PROVISOIRE.
+- `367f48a` (#28) : D-043 à D-045 au registre.
+- `48fc63f` (#27) : matrice des flux interzones, évaluation du tokenizer et
+  évaluation de la recherche hors ligne.
+- `30f5e8e` (#29) : contrats candidats d'ingestion et de quarantaine.
+- `c7d1510` (#30) : ADR-0006 et ADR-0007 PROPOSÉS, note de décision G3,
+  inventaire du corpus, lock candidat du modèle d'embeddings.
+- `eea75b5` (#31) : grille d'évaluation V1 et suites candidates proposées ;
+  E2 tenue hors du corpus par défaut.
 
 ### Commits par thème
 
@@ -157,6 +197,9 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
   sorties, et les outils d'incrément ne lisent pas ce champ. Le modèle de
   confiance des approbations relève de la régularisation de l'arène ; le
   détail reste hors dépôt.
+- D-043 révoque l'autorisation d'entraînement des incréments `0001` et
+  `0002` ; D-045 active l'approbation automatique réelle des paquets. Ni l'une
+  ni l'autre n'est implémentée sur `main`.
 
 **Santé des paquets**
 
@@ -237,8 +280,10 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
   boucle locale (`infra/embed/sovereign-embed.service`) et
   `tools/reembed_validated_chunks.py`. **[C]** Code présent, déploiement non
   vérifié. D-028 autorise un petit moteur d'embeddings sous réserve de licence
-  et d'empreinte vérifiées, mais `configs/runtime/` ne contient aucun lock pour
-  ce modèle ; `AGENTS.md` range ce moteur parmi les composants à régulariser.
+  et d'empreinte vérifiées ; depuis `c7d1510`, un lock candidat
+  (`configs/runtime/qwen3-embedding-0.6b-q8_0.lock.candidate.json`) attend la
+  relecture RAW de l'empreinte et de la licence, et l'ADR-0007 est PROPOSÉ.
+  `AGENTS.md` range ce moteur parmi les composants à régulariser.
 
 **Santé de la pile**
 
@@ -255,7 +300,8 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
 
 - `aec81e3` : script hôte `infra/toggle/sovereign-fast-chat.sh`. **[C]** pour
   le script ; **[O]** pour les débits rapportés, environ 6 contre 9 à 11
-  jetons/s. Voir les écarts ci-dessous.
+  jetons/s. Voir les écarts ci-dessous. Depuis `6a79309`, ses identifiants de
+  conteneurs viennent d'une configuration privée hors Git (D-036).
 
 **Refactorisations et tests sans changement de capacité**
 
@@ -269,12 +315,12 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
 - Exécution locale Windows du 2026-09-26 sur `db9414d`, Python 3.14 avec
   `-B` : 484 tests, 7 échecs, 6 erreurs, 2 sautés, liés à l'environnement
   Windows (API POSIX, modes de fichiers, séparateurs de chemin, fins de ligne)
-  et à une connexion SQLite non fermée dans `tests/test_arena.py`. Cette
-  exécution n'est pas une référence.
-- D-037 décide une intégration continue sur un runner Linux hébergé ; aucun
-  workflow n'est encore versionné sur `main` et aucune exécution Linux n'est
-  consignée pour cette révision ; les comptes de 254 et 271 tests plus bas
-  sont historiques.
+  et à une connexion SQLite non fermée dans `tests/test_arena.py`, corrigée
+  depuis par `485fd72`. Cette exécution n'est pas une référence.
+- D-037 décide une intégration continue sur un runner Linux hébergé ;
+  `ad1ed68` versionne son workflow et `485fd72` rapporte la suite Linux verte
+  **[O]**. Aucune exécution sur le nœud de calcul n'est consignée ; les
+  comptes de 254 et 271 tests plus bas sont historiques.
 
 ### NUMA : deux paires A/B de sens opposé
 
@@ -287,15 +333,19 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
 - Le sens s'inverse d'une paire à l'autre et les plages se recouvrent :
   l'observation est **non concluante**. Aucun placement n'est désigné, le gate
   G4 reste ouvert et la paire qui ferait foi reste **OUVERT**.
-- Le comparateur de `main` (`d13b4cf`) ne vérifie pas que A et B reposent sur
-  deux contrats de placement distincts ; l'engagement public étant salé à
-  chaque run, cette distinction ne se contrôle pas depuis les preuves
-  publiques.
+- Le comparateur employé pour ces paires (`d13b4cf`) ne vérifiait pas que A
+  et B reposaient sur deux contrats de placement distincts ; l'engagement
+  public étant salé à chaque run, cette distinction ne se contrôle pas depuis
+  les preuves publiques. Depuis `654b730` (#26) **[C]**, le comparateur refuse
+  deux preuves de même engagement et produit une sortie v2 fermée, et
+  `tools/verify_core_mini_placement_distinctness.py` établit la distinction
+  hors ligne à partir des contrats privés ; rien n'a été rejoué sur les
+  preuves réelles.
 - PR #16 : comparateur concurrent basé sur `codex/cpu-offline-harness`, qui
-  n'accepte que l'évidence `0.1.0` et exprime le ratio en B/A.
-  Recommandation, soumise au propriétaire : la fermer sans fusion ni rebase,
-  ne pas la fusionner dans `codex/cpu-offline-harness`, et porter ses contrôles
-  utiles sur le comparateur de `main`.
+  n'acceptait que l'évidence `0.1.0` et exprimait le ratio en B/A. Fermée sans
+  fusion le 2026-09-26 ; son commentaire de fermeture la rattache à une
+  décision du propriétaire, et ses champs descriptifs sont repris par le
+  contrat v2 de `654b730`.
 
 ### Écarts aux règles constatés
 
@@ -312,18 +362,18 @@ Décisions consignées par le propriétaire, avec l'état du code de `main` au
    règle « ne jamais interrompre un entraînement actif pour une opération de
    confort », reprise par `AGENTS.md`, « Exploitation ». Le script vise une unité 14B absente du dépôt ; son usage réel et
    son état ne sont pas consignés. Décision du propriétaire requise.
-3. **Suite par défaut de l'arène : le benchmark E2 scellé.**
-   `services/arena/runner.py` (`SOVEREIGN_ARENA_SUITE`) et
-   `tools/build_core_increment_from_arena.py` (`--suite`) désignent par défaut
-   `configs/evaluation/core-python-e2.candidate.json`, alors que `1857089`
-   pose que l'arène ne doit pas s'entraîner sur E2 ; `infra/arena/README.md`
-   décrit aussi E2. Seul `tools/build_increments_for_approved_packets.py`
-   pointe par défaut vers une copie de la suite d'entraînement. La suite
-   utilisée par l'arène sur le serveur, si elle y a tourné, n'est consignée
-   nulle part : **OUVERT**. Changer la valeur par défaut ne suffira pas :
-   14 noms de fonction sont communs à E2 et à la suite d'entraînement. Si E2 a
-   servi, la contamination des scores E2 et des incréments promus relève du
-   propriétaire.
+3. **Suite par défaut de l'arène : le benchmark E2 scellé.** Jusqu'à
+   `eea75b5`, `services/arena/runner.py` (`SOVEREIGN_ARENA_SUITE`) et
+   `tools/build_core_increment_from_arena.py` (`--suite`) désignaient par
+   défaut `configs/evaluation/core-python-e2.candidate.json`, alors que
+   `1857089` pose que l'arène ne doit pas s'entraîner sur E2. Depuis
+   `eea75b5` (#31) **[C]**, les deux prennent la suite d'entraînement par
+   défaut et le constructeur refuse les tâches E2 ; les 14 noms de fonction
+   communs aux deux suites restent listés en attente d'une décision du
+   propriétaire. D-044 consigne que l'arène a joué sur E2 le 2026-09-11,
+   étiquette E2 « contaminée » et la remplace par une suite E2-v2 scellée ;
+   D-043 révoque l'autorisation d'entraînement des incréments `0001` et
+   `0002`. La suite effectivement installée sur le serveur reste à relever.
 
 ### Passages remplacés plus bas
 
@@ -370,19 +420,22 @@ Rien n'est tranché ici :
   unité de passerelle qu'exigerait bwrap ;
 - documents partagés : niveau de confiance, isolement des extracteurs, effet
   d'une reconstruction de l'index ;
-- régularisation de l'arène et de la boucle, suite utilisée, contamination E2,
-  modèle de confiance des approbations d'incréments ;
-- lock, licence et empreinte du modèle d'embeddings ;
-- bascule « chat rapide » face à la règle de non-interruption ;
-- sort de la PR #16.
+- régularisation de l'arène et de la boucle, et son articulation avec D-045,
+  qui active l'approbation automatique réelle des paquets (**OUVERT**) ;
+- traitement des 14 tâches communes à E2 et à la suite d'entraînement ;
+- ratification du modèle d'embeddings au titre de D-028 (lock candidat depuis
+  `c7d1510`, ADR-0007 PROPOSÉ) ;
+- bascule « chat rapide » face à la règle de non-interruption.
 
 Ne sont plus en attente : l'interrupteur des actions (D-035, code sur `main`
 depuis `c0b169e`, non déployé), les identifiants d'infrastructure privés
-(D-036, mise en œuvre à livrer), la CI (D-037), la phase (D-038), la
-ratification de `6d959d7` et l'approbation par version de corpus (D-039),
-l'admissibilité des incréments synthétiques (D-040), la part de français
-(D-041), le tokenizer (D-042) et la ligne d'`AGENTS.md` sur le DL380p Gen8
-(`4775afb`).
+(D-036, code sur `main` depuis `6a79309`, non déployé), la CI (D-037,
+`ad1ed68`), la phase (D-038), la ratification de `6d959d7` et l'approbation
+par version de corpus (D-039), l'admissibilité des incréments synthétiques
+(D-040), la part de français (D-041), le tokenizer (D-042), la révocation des
+incréments `0001` et `0002` (D-043), le remplacement de E2 par E2-v2 (D-044),
+l'approbation automatique des paquets (D-045), la ligne d'`AGENTS.md` sur le
+DL380p Gen8 (`4775afb`) et la PR #16, fermée sans fusion le 2026-09-26.
 
 ### Travail possible pendant l'indisponibilité
 

@@ -1,10 +1,13 @@
 # Capacités réellement disponibles
 
 Dernière vérification en direct : 2026-09-09. Dernier relevé versionné :
-2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `c0b169e` :
-registre des décisions jusqu'à D-042, `AGENTS.md` réécrit pour la phase 1
-(D-038) ; depuis `db9414d`, le code n'a reçu que l'interrupteur D-035 et le
-contrôleur de disponibilité du NAS.
+2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `eea75b5` :
+registre des décisions jusqu'à D-045, `AGENTS.md` réécrit pour la phase 1
+(D-038) ; depuis `db9414d`, le code a reçu l'interrupteur D-035, le contrôleur
+de disponibilité du NAS, les points d'accès privés hors Git (D-036), la CI
+(D-037), le comparateur NUMA durci, des contrats et outils candidats hors
+ligne et la séparation par défaut entre E2 et l'arène, sans aucun relevé de
+déploiement.
 
 Ce document est la source de vérité publique sur l'état exécutable du projet.
 Il distingue ce qui fonctionne de l'architecture visée, et ce qui a été relevé
@@ -90,31 +93,31 @@ génère pas une réponse d'IA.
 | Runtime tensoriel CPU hors ligne | Installé et vérifié dans le conteneur CORE | Vérifié en direct | PyTorch `2.13.0+cpu` et NumPy `2.5.2` ont été réinjectés depuis des wheels vérifiés ; CUDA est indisponible et non compilé | Runtime technique isolé, pas un assistant ni des poids CORE |
 | Emplacement de chat `BOOTSTRAP` | Qwen2.5-1.5B vérifié au relevé ; libellé « CHAT-14B » dans l'interface, sans décision au registre | Vérifié en direct pour le 1.5B ; code seul pour le libellé 14B (`9b31b41` pour l'interface, `017e79f` pour `/sante`) | Qwen2.5-1.5B-Instruct Q4_K_M générait réellement sur CPU avec llama.cpp en boucle locale ; la passerelle authentifiée nomme le moteur, conserve localement les échanges masqués et peut joindre des références avec provenance | Modèle tiers temporaire, pas CORE. L'interface et `/sante` présentent cet emplacement comme Qwen2.5-14B, alors que le dépôt ne verrouille que le 1.5B (lock et unité avec `--no-agent`) : aucun lock, licence, unité ni entrée du registre pour un 14B ; `AGENTS.md` range le moteur 14B parmi les composants à régulariser. D-024 exclut outil, agent et RAG pour BOOTSTRAP ; voir les outils de chat plus bas |
 | Agent Qwen2.5-Coder-7B (`QWEN-CODER`) | Promu par le propriétaire le 2026-09-10 et déployé sur un nœud physique séparé selon le relevé | Relevés : `configs/runtime/qwen2.5-coder-7b-q4km.promotion.json` (`bf13670`, `e09c521`) et `docs/operations/qwen-conversation-fix.md` (`ac05afc`, `7b2111b`, `a2e40ea`, `1ba28b6`) | Empreintes SHA-256 relues en RAW, en VALIDATED et sur le nœud d'exécution ; E2 : 38/50 en un essai et 45/50 avec une passe de réparation, contre 23/50 pour Qwen2.5-1.5B ; la passerelle transmet les 20 derniers messages et les références lexicales ; une seule entrée réseau admise depuis la passerelle, sortie refusée ; réponse 503 quand le moteur n'est pas configuré (`ec56b30`, code seul) | État présent non revérifié. Le correctif de la passerelle a été déployé par fichiers ciblés, hors archive versionnée. La passe de réparation montre l'assertion échouée : elle mesure un agent qui lit ses erreurs |
-| Évaluation de code et réparation | Outils hors ligne versionnés | Code seul : `e09c521`, `e292451`, `58c26c9` ; observation de commit : `0a1c2ee`, `58c26c9` | Générateur de candidats sans nouvel essai ; boucle écrire, tester, corriger avec `first_pass` et `final_pass` ; réparation de projet sur copie, fichiers de test jamais modifiés, diff remis à un humain ; budget de tâches et auto-test du bac à sable | Aucune exécution postérieure au 2026-09-10 consignée. `0a1c2ee` rapporte un bac à sable qui rejetait chaque tâche avant correction |
+| Évaluation de code et réparation | Outils hors ligne versionnés | Code seul : `e09c521`, `e292451`, `58c26c9` ; observation de commit : `0a1c2ee`, `58c26c9` | Générateur de candidats sans nouvel essai ; boucle écrire, tester, corriger avec `first_pass` et `final_pass` ; réparation de projet sur copie, fichiers de test jamais modifiés, diff remis à un humain ; budget de tâches et auto-test du bac à sable | Aucune exécution postérieure au 2026-09-10 consignée. `0a1c2ee` rapporte un bac à sable qui rejetait chaque tâche avant correction. D-044 étiquette E2 « contaminée » et la remplace, pour l'évaluation, par une suite E2-v2 scellée hors dépôt dont l'empreinte n'est pas encore versionnée ; les scores E2 cités restent historiques |
 | CORE-MINI-1M | Entraînement `authorized-text` borné et reprise vérifiés | Vérifié en direct | Modèle de 1 328 256 paramètres ; 50 étapes sur le corpus approuvé, checkpoint durable, puis reprise contrôlée de 10 étapes jusqu'à 60 avec journal continu et empreintes ; modes explicitement séparés | 60 étapes ne produisent pas un assistant : aucune évaluation linguistique ni question CORE possible |
 | CORE-30M | Pilote de pipeline, palier final de 19 532 étapes atteint | Relevé : section du 2026-09-09 de `docs/project/claude-code-handoff.md` | Checkpoint final avec copie durable relue et empreinte identique ; lecture pré-tokenisée liée par empreintes au manifeste, au split et au tokenizer | Pas un chat ni un assistant de code (D-034) : la tentative E1 du 2026-09-09 sur le checkpoint final a été refusée par le garde E0 sur une sortie répétitive (`ff16ad9`) ; aucun paquet E1 n'a été créé. Aucun entraînement postérieur au 2026-09-09 n'est consigné |
-| Runner CORE-MINI NUMA | Deux paires A/B répétées, résultat non concluant | Vérifié en direct ; détail dans `docs/model/core-mini-numa-protocol.md` | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Paire du 2026-09-06 : A 3,8 % au-dessus de B. Paire du 2026-09-07, révision `6cebad1` : ratio A/B 0,9497, soit B environ 5,3 % au-dessus, plages observées qui se recouvrent. Non concluant, aucun placement désigné. Le comparateur ne vérifie pas que les deux contrats de placement sont distincts. Mesures mémoire/NUMA élargies et décision G4 absentes |
+| Runner CORE-MINI NUMA | Deux paires A/B répétées, résultat non concluant | Vérifié en direct ; détail dans `docs/model/core-mini-numa-protocol.md` | Contrats privés hors Git, archive source et runtimes offline vérifiés, placement externe, sockets INET refusées, trois répétitions fraîches par placement et comparaison fermée | Paire du 2026-09-06 : A 3,8 % au-dessus de B. Paire du 2026-09-07, révision `6cebad1` : ratio A/B 0,9497, soit B environ 5,3 % au-dessus, plages observées qui se recouvrent. Non concluant, aucun placement désigné. Le comparateur employé pour ces paires ne vérifiait pas que les deux contrats de placement étaient distincts ; depuis `654b730` (code seul), il refuse deux preuves de même engagement et produit une sortie v2 fermée avec le recouvrement des plages, et `tools/verify_core_mini_placement_distinctness.py` établit la distinction à partir des contrats privés, sans exécution consignée sur ces preuves. Mesures mémoire/NUMA élargies et décision G4 absentes |
 | Zone de calcul CORE | Invité non privilégié au relevé | Vérifié en direct | Runtime CPU hors ligne isolé, stockage de travail local et accès borné au stockage durable ; aucun téléchargement à l'exécution ; deux paliers CORE-700M exécutés | Aucun poids CORE utile ; preuve d'isolation après redémarrage reste à compléter |
 | CORE-700M | Preuves mécaniques archivées | Vérifié en direct | Configuration, tokenizer et checkpoints techniques sont conservés pour traçabilité | Aucun entraînement long ni objectif de chat ou code ; cette voie est remplacée par D-034 |
 | Corpus / tokenizer | Candidat 32k traçable | Vérifié en direct ; changement de gate `6d959d7`, ratifié par D-039 | Manifeste `0.2.0`, split `train` lié par taille/compte/SHA, Byte-BPE ordonné, NFC partagé, encode/decode et promotion `experimental` → `candidate_core` avec reçu | Depuis `6d959d7`, un manifeste `VALIDATED` suffit au préflight ; D-039 ratifie ce changement et autorise une version de corpus dès qu'une politique automatique versionnée et auditée produit ce manifeste. Cette politique n'est pas désignée dans le dépôt. D-041 vise environ 40 % de français technique, contre 0,42 % dans le catalogue RAW actuel. D-042 décide de réentraîner le tokenizer sur le corpus final (vocabulaire 32 000, 4 tokens spéciaux, contexte 2 048) ; le candidat actuel, entraîné sur 44 documents, reste celui de la lignée CORE-30M |
 | Moteur d'inférence CORE | Runtime expérimental CPU au relevé | Vérifié en direct | Checkpoint d'inférence compact validé, contrat configuration/tokenizer/manifeste/préflight vérifié, API privée authentifiée sur une adresse privée configurée hors Git (D-036), génération gloutonne bornée et déterministe | Vingt étapes ne constituent pas une qualité linguistique ; aucune promesse d'assistant général. Le runtime ne reçoit ni Internet ni outil arbitraire |
 | MCP Knowledge | Prototype `stdio` fonctionnel | Vérifié en direct | Handshake MCP, état, recherche lexicale et récupération bornée d'une provenance exacte | Trois notices synthétiques ; non raccordé au chat |
 | RAG | Index lexical approuvé vérifié au relevé ; recherche hybride et documents partagés dans le code | Vérifié en direct pour l'index lexical ; code seul : `d7cc78c`, `010706c`, `5c917de` | L'index SQLite/FTS5 fournit des extraits bornés et des citations depuis quatre documents internes approuvés ; toute reconstruction exige un manifeste exact, son empreinte et une référence d'audit ; le rappel passe de 2 à 6 extraits (`5c917de`) | Conversations et RAW restent hors index. Les documents partagés y entrent aussi (voir plus bas). Ce fichier appartient au manifeste `project-internal-v1`, à réapprouver puis reconstruire |
-| Moteur d'embeddings RAG | Code présent (`d7cc78c`), déploiement non vérifié | Code seul : `d7cc78c` | Client en boucle locale pour Qwen3-Embedding-0.6B servi par llama.cpp, recherche hybride avec repli lexical, `tools/reembed_validated_chunks.py` | D-028 autorise un petit moteur d'embeddings, mais aucun lock, licence ni empreinte de ce modèle n'est versionné dans `configs/runtime/` ; à régulariser selon `AGENTS.md` |
+| Moteur d'embeddings RAG | Code présent (`d7cc78c`), déploiement non vérifié | Code seul : `d7cc78c` | Client en boucle locale pour Qwen3-Embedding-0.6B servi par llama.cpp, recherche hybride avec repli lexical, `tools/reembed_validated_chunks.py` | D-028 autorise un petit moteur d'embeddings. Depuis `c7d1510`, un lock candidat `configs/runtime/qwen3-embedding-0.6b-q8_0.lock.candidate.json` attend la relecture RAW de l'empreinte, de la taille, de la révision et de la licence, et l'ADR-0007 est PROPOSÉ ; aucun service ne lit ce lock et le modèle n'est pas ratifié ; à régulariser selon `AGENTS.md` |
 | Documents partagés et analyse | Code sur `main`, sans décision au registre ; à régulariser selon `AGENTS.md` | Code seul : `010706c`, `5c917de`, `a8151e7` | Dépôt jusqu'à 25 Mo, extraction hors ligne (texte, docx, PDF via poppler, OCR Tesseract), analyse map-reduce bornée à 30 passages, rendu Markdown des réponses | Les passages déposés sont écrits dans la table de l'index approuvé, par `upsert_validated` ; leur niveau de confiance et l'isolement des extracteurs relèvent de la régularisation par le propriétaire. Présence de poppler et Tesseract non consignée. Une reconstruction de l'index approuvé effacerait ces passages avec les embeddings |
 | Outils de chat en lecture seule | Code sur `main`, sans décision au registre ; à régulariser selon `AGENTS.md` | Code seul : `a133659` | `search_knowledge`, `list_documents`, `read_document` et `current_time`, sans système de fichiers, shell ni réseau ; enclenchés par défaut dans le code via `SOVEREIGN_TOOLS_ENABLED` | Contredit D-024 pour BOOTSTRAP. Exige un serveur 14B lancé avec `--jinja`, dont l'unité n'est pas versionnée |
 | Outils d'action | Code sur `main`, désactivé par défaut depuis `c0b169e` (D-035) ; non déployé | Code seul : `04473fe`, `3410b36`, `c0b169e` | `run_python` dans le bac à sable bwrap et `write_file` dans un espace de travail, chacun après une confirmation humaine à usage unique ; fichiers produits listés par `GET /v1/workspace` | Depuis `c0b169e`, seule la valeur exacte `SOVEREIGN_ACTIONS_ENABLED=1`, lue au démarrage, active ces actions ; sinon elles ne sont pas offertes et toute proposition, confirmation ou exécution est refusée et journalisée sans contenu. Aucun déploiement de ce code n'est consigné : D-035 accepte que l'installation en service garde son comportement antérieur jusqu'à ce déploiement, et toute réactivation exige une décision distincte. L'unité versionnée de la passerelle garde `PrivateDevices=yes` sans `AF_NETLINK`. **HYPOTHÈSE** : interrupteur activé, l'auto-test du bac à sable échouerait sous cette unité et `run_python` ne serait pas proposé |
 | Collector de conversations | Ingress write-only fonctionnel | Vérifié en direct | Endpoint HTTPS de santé et dépôt authentifié vers RAW | Aucune lecture interne ni promotion automatique vers `VALIDATED` |
 | Synology | Stockage durable monté et persistant sur l'hôte de calcul | Vérifié en direct | SMB 3.1.1 chiffré, compte de service limité, montage activé au démarrage, lecture/écriture CORE et aller-retour synthétique vérifiés via un point de montage contrôlé ; mémoire, index lexical et checkpoint CORE-MINI sont sauvegardés et restaurés avec empreintes vérifiées | Le remplacement d'une base utilisée, la restauration d'un checkpoint CORE-700M et le test de droits négatifs restent à faire. Depuis `1cf5daf`, `tools/check_synology_readiness.py`, en lecture seule, et le runbook PROVISOIRE `docs/operations/synology-restart-readiness.md` préparent la vérification du stockage avant relance du calcul ; aucune exécution n'est consignée (code seul) |
-| Arène d'agents | Code sur `main` ; exécutions rapportées seulement par des commits ; activation sans décision au registre, à régulariser selon `AGENTS.md` | Code seul : `0dcbe8c`, `b5f0227`, `015b815`, `9b31b41`, `cd68960`, `d9c0e42`, `b486851` ; observations de commit : `8ef2f8a`, `dbca0c6`, `b486851` | Auteurs arbitrés par le bac à sable hors ligne, relecteur, Elo, paquets de 50 solutions avec manifeste et SHA-256 en attente d'approbation ; page `/arena` et approbations par fichier ; résumé en terminal ; santé mesurée sur l'ensemble retenu avec `max_task_share` borné à 0,25 | `docs/model/self-training-loop-spec.md` reste `INACTIVE`. Les commits rapportent 41 puis 28 paquets. La suite par défaut de `services/arena/runner.py` est le benchmark E2 scellé ; la suite réellement utilisée n'est pas consignée |
-| Suite d'entraînement de l'arène | 182 tâches versionnées | Code seul : `1857089`, `0655d42`, `db9414d` | `configs/arena/practice-suite.v1.json`, auto-validée par des solutions de référence, identifiants disjoints de E2 | Aucun relevé de chargement. 14 noms de fonction sont communs avec E2. Ni l'arène (`services/arena/runner.py`) ni `tools/build_core_increment_from_arena.py` ne la chargent par défaut ; seul `tools/build_increments_for_approved_packets.py` pointe par défaut vers une copie de cette suite hors dépôt, dont la présence n'est pas consignée |
-| Incréments de corpus issus de l'arène | Code sur `main` ; usage rapporté par des commits ; admissibilité décidée au registre (D-040), validateurs pas encore alignés | Code seul : `229ffe0`, `689fa70`, `75d234a`, `0655d42` ; observations de commit : `5f59591`, `dbca0c6` | Paquet approuvé converti en incrément RAW synthétique déterministe ; promotion RAW → VALIDATED demandée depuis `/corpus` et appliquée par un service périodique qui vérifie l'empreinte ; aucun entraînement déclenché | D-040 admet pour l'entraînement de CORE le code synthétique de l'arène dont chaque solution passe ses tests en bac à sable, généré par Qwen2.5-Coder, étiqueté synthétique, sans recouvrement avec les jeux d'évaluation, dans la limite de 20 % des tokens d'une version de corpus ; les sorties de BOOTSTRAP restent exclues. D-040 résout le conflit entre `promote_arena_increment` et `validate_training_corpus_manifest` et demande l'alignement des validateurs ; dans le code de `main`, ce validateur refuse encore un matériau `synthetic` autorisé `approved`. Les paquets enregistrent le moteur de chaque solution (`engine`), les profils `author-bootstrap` de `services/arena/league.py` sont servis par BOOTSTRAP, et les outils d'incrément ne lisent pas ce champ. Le modèle de confiance des approbations relève de la régularisation de l'arène. `dbca0c6` rapporte 2 incréments pour 41 paquets |
+| Arène d'agents | Code sur `main` ; exécutions rapportées seulement par des commits ; activation sans décision au registre, à régulariser selon `AGENTS.md` | Code seul : `0dcbe8c`, `b5f0227`, `015b815`, `9b31b41`, `cd68960`, `d9c0e42`, `b486851` ; observations de commit : `8ef2f8a`, `dbca0c6`, `b486851` | Auteurs arbitrés par le bac à sable hors ligne, relecteur, Elo, paquets de 50 solutions avec manifeste et SHA-256 en attente d'approbation ; page `/arena` et approbations par fichier ; résumé en terminal ; santé mesurée sur l'ensemble retenu avec `max_task_share` borné à 0,25 | `docs/model/self-training-loop-spec.md` reste `INACTIVE`. Les commits rapportent 41 puis 28 paquets. D-044 consigne que l'arène a joué sur E2 le 2026-09-11 et étiquette E2 « contaminée ». Depuis `eea75b5` (code seul), la suite par défaut de `services/arena/runner.py` est la suite d'entraînement et E2 ne se joue que par choix explicite ; la suite jouée depuis le 2026-09-11 n'est pas consignée. D-045 active l'approbation automatique réelle des paquets selon D-039 et D-040 ; elle n'est pas implémentée dans le code de `main` |
+| Suite d'entraînement de l'arène | 182 tâches versionnées | Code seul : `1857089`, `0655d42`, `db9414d`, `eea75b5` | `configs/arena/practice-suite.v1.json`, auto-validée par des solutions de référence, identifiants disjoints de E2 | Aucun relevé de chargement. 14 noms de fonction sont communs avec E2 ; `tests/test_arena_practice_suite.py` les liste en attente d'une décision du propriétaire et fait échouer tout nouveau recouvrement. Depuis `eea75b5`, l'arène (`services/arena/runner.py`) et `tools/build_core_increment_from_arena.py` la chargent par défaut ; le constructeur refuse une suite E2 et les solutions de tâches E2, et inscrit l'empreinte de la suite dans le manifeste d'incrément. `tools/build_increments_for_approved_packets.py` pointe par défaut vers une copie de cette suite hors dépôt, dont la présence n'est pas consignée |
+| Incréments de corpus issus de l'arène | Code sur `main` ; usage rapporté par des commits ; admissibilité décidée au registre (D-040), validateurs pas encore alignés | Code seul : `229ffe0`, `689fa70`, `75d234a`, `0655d42` ; observations de commit : `5f59591`, `dbca0c6` | Paquet approuvé converti en incrément RAW synthétique déterministe ; promotion RAW → VALIDATED demandée depuis `/corpus` et appliquée par un service périodique qui vérifie l'empreinte ; aucun entraînement déclenché | D-040 admet pour l'entraînement de CORE le code synthétique de l'arène dont chaque solution passe ses tests en bac à sable, généré par Qwen2.5-Coder, étiqueté synthétique, sans recouvrement avec les jeux d'évaluation, dans la limite de 20 % des tokens d'une version de corpus ; les sorties de BOOTSTRAP restent exclues. D-040 résout le conflit entre `promote_arena_increment` et `validate_training_corpus_manifest` et demande l'alignement des validateurs ; dans le code de `main`, ce validateur refuse encore un matériau `synthetic` autorisé `approved`. Les paquets enregistrent le moteur de chaque solution (`engine`), les profils `author-bootstrap` de `services/arena/league.py` sont servis par BOOTSTRAP, et les outils d'incrément ne lisent pas ce champ. Le modèle de confiance des approbations relève de la régularisation de l'arène. `dbca0c6` rapporte 2 incréments pour 41 paquets. D-043 révoque l'autorisation d'entraînement des incréments `0001` et `0002`, promus en `VALIDATED` le 2026-09-11 ; les outils qui construisent un corpus doivent refuser un incrément révoqué, ce que le code de `main` ne fait pas encore |
 | Orchestrateur | Préparation fail-closed | Vérifié en direct | Chargement du registre et validation partielle d'enveloppes/permissions | Aucun appel de modèle, d'outil ou de file d'exécution ; les outils du chat passent par la passerelle, pas par l'orchestrateur |
 | Profils d'agents | Registre de 60 profils `draft` ; profils sélectionnables dans le chat par le code, sans décision au registre, à régulariser selon `AGENTS.md` | Code seul : `5891fff`, `91ff285`, `9ac11cd` | Selon `91ff285`, 59 profils du catalogue deviennent sélectionnables (49 sur le moteur 14B avec outils, 10 de la famille `development` sur Qwen-Coder), avec `coordination` et les agents d'arène approuvés, groupés par famille | Les gates d'évaluation par profil ne sont pas appliqués ; seul un commentaire de `services/web/catalog_profiles.py` l'attribue à un choix du propriétaire. `configs/agents/registry.json` garde les 60 profils en `draft` |
 | Mémoire conversationnelle | SQLite local avec sauvegarde durable vérifiée | Vérifié en direct | Masquage de secrets, empreintes, historique, export, suppression avec reçu sans contenu et sauvegarde SQLite vérifiée vers le NAS | Pas raccordée au RAG ; restauration applicative de remplacement reste manuelle |
 | Interface Web du projet | Passerelle installée derrière le HTTPS privé au relevé du 2026-09-09 | Vérifié en direct ; relevé `docs/operations/qwen-conversation-fix.md` pour le moteur Qwen ; code seul pour les pages ajoutées ensuite | Première configuration, login, CSRF, historique réouvrable, export, suppression et `/v1/chat` vers llama.cpp, CORE ou Qwen-Coder ; le sélecteur marque CORE-700M comme expérimental ; pages `/arena`, `/corpus` et `/sante` dans le code | Depuis le correctif ciblé, aucune archive versionnée ne correspond au HEAD de `main` : l'état installé est inconnu |
 | Page `/sante` | Code sur `main` | Code seul : `017e79f` | `GET /v1/health` et page authentifiée : joignabilité des moteurs, index, arène, incréments, espace de travail et ressources du conteneur de la passerelle | Décrit le conteneur de la passerelle, pas l'hôte ; libelle l'emplacement BOOTSTRAP comme Qwen2.5-14B |
-| Bascule « chat rapide » | Script hôte versionné, sans décision au registre | Code seul : `aec81e3` ; observation de commit pour les débits rapportés | Suspend l'entraînement CORE-30M par `SIGSTOP` et donne les deux sockets au moteur 14B, puis reprend par `SIGCONT` | Contraire à la règle de ne jamais interrompre un entraînement pour une opération de confort ; vise une unité 14B absente du dépôt ; usage et état non consignés |
+| Bascule « chat rapide » | Script hôte versionné, sans décision au registre | Code seul : `aec81e3`, `6a79309` ; observation de commit pour les débits rapportés | Suspend l'entraînement CORE-30M par `SIGSTOP` et donne les deux sockets au moteur 14B, puis reprend par `SIGCONT` | Contraire à la règle de ne jamais interrompre un entraînement pour une opération de confort ; vise une unité 14B absente du dépôt ; usage et état non consignés. Depuis `6a79309`, les identifiants de conteneurs viennent d'une configuration privée hors Git (D-036) |
 | Authentification/RBAC | Argon2id et sessions en place au relevé | Vérifié en direct | Secret propriétaire créé dans le navigateur, jetons de session hachés, cookie sécurisé et CSRF | Initialisation du compte propriétaire non consignée ; politiques des agents non raccordées |
 
 ## Correspondance des commits
@@ -146,6 +149,22 @@ D-042, `1cf5daf` ajoute le contrôleur en lecture seule
 `docs/operations/synology-restart-readiness.md`, et `c0b169e` implémente
 l'interrupteur `SOVEREIGN_ACTIONS_ENABLED` de D-035. Aucun des deux derniers
 n'a de relevé de déploiement ni d'exécution sur le serveur.
+
+Les neuf commits de `c0b169e..eea75b5`, tous sans relevé de déploiement ni
+d'exécution sur le serveur : `6a79309` (#24) sort du code les points d'accès
+et identifiants privés vers une configuration hors Git (D-036) ; `485fd72`
+(#25) ferme la connexion SQLite fuitée par `tests/test_arena.py`, verrouille
+D-025 sur la documentation publique, fige par des tests la surface V0 du
+collecteur et accepte Etalab-2.0 dans l'audit d'approbation ; `ad1ed68` (#19)
+versionne la CI de D-037 ; `654b730` (#26) durcit le comparateur NUMA et
+ajoute son contrat v2, le vérificateur de distinction et le protocole G4
+étendu PROVISOIRE ; `367f48a` (#28) consigne D-043 à D-045 ; `48fc63f` (#27)
+ajoute la matrice des flux interzones, l'évaluation du tokenizer et
+l'évaluation de la recherche hors ligne ; `30f5e8e` (#29) ajoute des contrats
+candidats d'ingestion et de quarantaine ; `c7d1510` (#30) propose les ADR-0006
+et 0007, la note de décision G3, l'inventaire du corpus et le lock candidat
+d'embeddings ; `eea75b5` (#31) propose la grille d'évaluation V1 et ses suites
+candidates et tient E2 hors du corpus par défaut.
 
 ## Vérifications confirmées jusqu'au 2026-09-10
 
@@ -260,12 +279,13 @@ l'état à leur date.
   (observation de commit).
 - Une exécution locale Windows du 2026-09-26 sur `db9414d`, Python 3.14 avec
   `-B`, compte 484 tests : 7 échecs, 6 erreurs et 2 sautés, liés à
-  l'environnement Windows et à une connexion SQLite non fermée dans un test.
-  Elle n'est pas une référence.
+  l'environnement Windows et à une connexion SQLite non fermée dans un test,
+  corrigée depuis par `485fd72`. Elle n'est pas une référence.
 - D-037 décide une intégration continue GitHub sur un runner Linux hébergé,
-  sans secret ni déploiement automatique ; aucun workflow n'est encore
-  versionné sur `main` au 2026-09-27, et aucune exécution Linux n'est
-  consignée pour `db9414d`.
+  sans secret ni déploiement automatique ; `ad1ed68` versionne
+  `.github/workflows/tests.yml`, qui exécute la suite sous Python 3.11 et
+  3.13. `485fd72` rapporte la suite Linux verte (observation de commit).
+  Aucune exécution sur le nœud de calcul n'est consignée.
 
 Le relais HTTPS et le coffre ont été établis comme preuves opérationnelles
 réversibles pendant la phase 0. Le passage en phase 1 (D-038) ne valide ni
@@ -361,22 +381,28 @@ doit jamais être présenté comme CORE. Aucune inférence distante n'est utilis
 ## Décidé au registre, pas encore dans le code
 
 Au 2026-09-27, ces décisions sont consignées mais le code de `main` ne les
-implémente pas encore ; aucune n'est livrée ni déployée. D-035 n'en fait plus
-partie : son interrupteur est sur `main` depuis `c0b169e`, sans déploiement
-consigné.
+implémente pas encore, ou seulement en partie ; aucune n'est déployée. D-035,
+D-036 et D-037 n'en font plus partie : l'interrupteur des actions est sur
+`main` depuis `c0b169e`, la configuration privée hors Git depuis `6a79309` et
+la CI depuis `ad1ed68` ; les deux premiers n'ont aucun déploiement consigné,
+et la configuration privée doit précéder le déploiement du code de D-036.
 
-- D-036 : adresses, noms d'hôte, identifiants de conteneurs et chemins
-  d'hyperviseur internes déplacés vers une configuration privée hors Git,
-  avec échec fermé ; la configuration privée précède le déploiement du code ;
-- D-037 : intégration continue sur un runner Linux hébergé ;
 - D-039 : politique automatique versionnée et auditée qui produit le manifeste
   `VALIDATED` d'une version de corpus ;
 - D-040 : alignement des validateurs de corpus et exclusion des solutions
-  qui ne viennent pas de Qwen2.5-Coder ;
+  qui ne viennent pas de Qwen2.5-Coder ; depuis `eea75b5`, le constructeur
+  d'incréments refuse déjà une suite E2 et les solutions de tâches E2 ;
 - D-041 : acquisition, par le flux contrôlé, de sources françaises sous
   licence admise et plan d'échantillonnage déterministe versionné ;
 - D-042 : tokenizer réentraîné sur le corpus final et accepté sur métriques
-  mesurées.
+  mesurées ;
+- D-043 : révocation tracée des incréments `0001` et `0002`, et refus de tout
+  incrément révoqué par les outils qui construisent un corpus ;
+- D-044 : suite E2-v2 scellée hors dépôt, dont l'empreinte est versionnée et
+  vérifiée par les outils d'évaluation avant usage ;
+- D-045 : approbation automatique réelle des paquets de l'arène par la
+  politique de D-039 (acteur `policy:auto-v1`), avec chaîne d'audit,
+  interrupteur d'arrêt et révocation.
 
 ## Décisions du propriétaire en attente
 
@@ -388,8 +414,10 @@ Ce document ne tranche aucun de ces points :
   l'unité de passerelle qu'exigerait bwrap ;
 - les documents partagés : niveau de confiance, isolement des extracteurs et
   effet d'une reconstruction de l'index ;
-- la régularisation de l'arène et de la boucle, la suite utilisée, la
-  contamination éventuelle de E2 et le modèle de confiance des approbations
-  d'incréments ;
-- le lock, la licence et l'empreinte du modèle d'embeddings ;
+- la régularisation de l'arène et de la boucle, que `AGENTS.md` range parmi
+  les composants à régulariser, et son articulation avec D-045, qui active
+  l'approbation automatique réelle des paquets (**OUVERT**) ;
+- le traitement des 14 tâches communes à E2 et à la suite d'entraînement ;
+- la ratification du modèle d'embeddings au titre de D-028 : lock candidat
+  depuis `c7d1510`, empreinte et licence à relire, ADR-0007 PROPOSÉ ;
 - la bascule « chat rapide » face à la règle de non-interruption.

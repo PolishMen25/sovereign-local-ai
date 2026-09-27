@@ -3,8 +3,9 @@
 ## Statut et invariant
 
 **Statut factuel au 2026-09-27**, établi sans accès au serveur de calcul, hors
-ligne depuis le 2026-09-14 environ, contre `main` à `c0b169e` (code de l'arène
-et du pont inchangé depuis `db9414d`, registre jusqu'à D-042) :
+ligne depuis le 2026-09-14 environ, contre `main` à `eea75b5` (depuis
+`db9414d`, l'arène a reçu l'épinglage privé de Qwen-Coder, `6a79309`, et sa
+suite par défaut, `eea75b5` ; registre jusqu'à D-045) :
 
 - **Spécification** : ce document ne lance lui-même ni génération, ni sandbox,
   ni entraînement.
@@ -26,12 +27,19 @@ et du pont inchangé depuis `db9414d`, registre jusqu'à D-042) :
   propriétaire. Rien dans ce document ne vaut approbation d'activation.
 - **Données produites** : D-040 rend admissible pour l'entraînement de CORE le
   code synthétique de l'arène, dans les limites données au §4 ; cette
-  admissibilité ne vaut pas activation de la boucle.
-- **Suite jouée non consignée** : la suite par défaut de
-  `services/arena/runner.py` est le benchmark scellé E2
-  (`configs/evaluation/core-python-e2.candidate.json`) et 14 noms de fonction
-  sont communs à E2 et à `configs/arena/practice-suite.v1.json`. La suite
-  réellement jouée par l'arène est **OUVERT**.
+  admissibilité ne vaut pas activation de la boucle. D-045 active
+  l'approbation automatique réelle des paquets selon D-039 et D-040 ; elle
+  n'est pas implémentée sur `main`, et son articulation avec les critères
+  d'activation ci-dessus et avec la régularisation demandée par `AGENTS.md`
+  est **OUVERT**, décision du propriétaire.
+- **Suite jouée** : D-044 consigne que l'arène a joué sur le benchmark scellé
+  E2 (`configs/evaluation/core-python-e2.candidate.json`) le 2026-09-11,
+  étiquette E2 « contaminée » et la remplace, pour l'évaluation, par une suite
+  E2-v2 scellée hors dépôt ; D-043 révoque l'autorisation d'entraînement des
+  incréments `0001` et `0002`. Depuis `eea75b5`, la suite par défaut de
+  `services/arena/runner.py` est `configs/arena/practice-suite.v1.json` et E2
+  ne se joue que par choix explicite ; 14 noms de fonction restent communs
+  aux deux suites. La suite jouée depuis le 2026-09-11 n'est pas consignée.
 
 Les sections suivantes restent la spécification cible ; les écarts du code sont
 signalés là où ils s'appliquent. Selon cette spécification, une boucle ne peut
@@ -96,6 +104,11 @@ recouvrement avec les jeux d'évaluation, dans la limite de 20 % des tokens
 d'une version de corpus ; les sorties de BOOTSTRAP restent exclues. D-040
 résout le conflit entre `promote_arena_increment` et
 `validate_training_corpus_manifest` et demande l'alignement des validateurs.
+D-043 révoque l'autorisation d'entraînement des incréments `0001` et `0002`
+et exige que les outils qui construisent un corpus refusent tout incrément
+révoqué. D-045 active l'approbation automatique réelle des paquets par cette
+politique (acteur `policy:auto-v1`), avec chaîne d'audit, interrupteur
+d'arrêt et révocation.
 
 **Écart du code au 2026-09-27.** Dans le code de `main`, un paquet approuvé
 depuis `/arena` est converti en incrément RAW synthétique par un outil lancé à
@@ -104,8 +117,11 @@ la main (`tools/build_core_increment_from_arena.py`,
 depuis `/corpus` est ensuite appliquée toutes les deux minutes par un service
 périodique qui promeut l'incrément en `VALIDATED` avec
 `training_authorization` `approved` (`tools/promote_arena_increment.py`).
-Restent à livrer par PR : la politique automatique de D-039, qui n'est pas
-désignée dans le dépôt ; l'alignement de
+Depuis `eea75b5`, `tools/build_core_increment_from_arena.py` refuse une suite
+E2 et les solutions de tâches E2, et inscrit l'empreinte de la suite dans le
+manifeste d'incrément. Restent à livrer par PR : la politique automatique de
+D-039 et l'approbation automatique réelle de D-045, absentes du code de
+`main` ; le refus des incréments révoqués par D-043 ; l'alignement de
 `tools/validate_training_corpus_manifest.py`, qui refuse encore un matériau
 `synthetic` dont l'autorisation vaut `approved` ; et l'exclusion des
 solutions qui ne viennent pas de Qwen2.5-Coder : les paquets enregistrent le

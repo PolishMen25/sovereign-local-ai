@@ -2,7 +2,7 @@
 
 Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du propriétaire. La V1 vise un modèle de langage créé localement, un RAG traçable, des agents logiques et une séparation stricte entre ingestion externe et connaissances internes, sans donner d'accès Internet à IA-CORE. Depuis D-034, deux voies sont distinctes : CORE-30M valide le pipeline d'entraînement CPU, sans objectif conversationnel, et l'agent de programmation repose sur un modèle tiers, Qwen2.5-Coder-7B, isolé sur un nœud physique séparé ; CORE-700M ne reçoit pas de palier long. Deux services MCP distincts constituent l'option candidate actuelle, encore soumise à audit.
 
-> État documentaire au 2026-09-27, contre `main` à `c0b169e` (registre jusqu'à D-042 ; depuis `db9414d`, le code n'a reçu que l'interrupteur D-035 et le contrôleur de disponibilité du NAS) : **phase 1, socle expérimental en service** (D-038). Les gates G0 à G8 et A0 à A8 restent ouverts. Le serveur de calcul est hors ligne depuis le 2026-09-14 environ ; le dernier relevé en direct date du 2026-09-09 et le dernier relevé versionné du 2026-09-10. Ce README décrit le code de `main` et ces relevés, pas un état d'exécution présent. Ce dépôt ne prétend pas fournir une plateforme de production. La reprise technique par un autre agent est décrite dans le [handoff public](docs/project/claude-code-handoff.md), sans exposer de détail d'accès.
+> État documentaire au 2026-09-27, contre `main` à `eea75b5` (registre jusqu'à D-045 ; depuis `db9414d`, le code a reçu l'interrupteur D-035, le contrôleur de disponibilité du NAS, les points d'accès privés hors Git de D-036, la CI de D-037, le comparateur NUMA durci, des contrats et outils candidats hors ligne et la séparation par défaut entre E2 et l'arène, sans relevé de déploiement) : **phase 1, socle expérimental en service** (D-038). Les gates G0 à G8 et A0 à A8 restent ouverts. Le serveur de calcul est hors ligne depuis le 2026-09-14 environ ; le dernier relevé en direct date du 2026-09-09 et le dernier relevé versionné du 2026-09-10. Ce README décrit le code de `main` et ces relevés, pas un état d'exécution présent. Ce dépôt ne prétend pas fournir une plateforme de production. La reprise technique par un autre agent est décrite dans le [handoff public](docs/project/claude-code-handoff.md), sans exposer de détail d'accès.
 
 > **Au dernier relevé, l'interface privée servait le moteur BOOTSTRAP par
 > défaut.** Il fournissait les réponses exploitables ; l'agent de programmation
@@ -141,6 +141,11 @@ règle de sélection reproductible avant toute version de corpus.
    l'arène générés par Qwen2.5-Coder, dans la limite de 20 % des tokens d'une
    version de corpus, et demande l'alignement des validateurs :
    `tools/validate_training_corpus_manifest.py` refuse encore ce matériau.
+   D-043 révoque l'autorisation d'entraînement des incréments `0001` et
+   `0002`, D-044 remplace l'évaluation E2, étiquetée « contaminée », par une
+   suite E2-v2 scellée hors dépôt, et D-045 active l'approbation automatique
+   réelle des paquets de l'arène ; aucune des trois n'est encore implémentée
+   dans le code de `main`.
 3. D-042 : le tokenizer sera réentraîné sur le corpus final, avec le même
    vocabulaire de 32 000, 4 tokens spéciaux et un contexte de 2 048, puis
    accepté sur métriques mesurées.
@@ -282,10 +287,11 @@ leurs valeurs par défaut, dans [services/web/README.md](services/web/README.md)
 celles des composants de connaissance dans
 [services/knowledge/README.md](services/knowledge/README.md). La variable
 `SOVEREIGN_ACTIONS_ENABLED` (D-035, `c0b169e`) laisse les actions du chat
-désactivées sauf valeur exacte `1`. D-036 décide de sortir du dépôt les
-adresses et identifiants internes que le code contient encore, vers une
-configuration privée hors Git installée avant le déploiement du code
-correspondant.
+désactivées sauf valeur exacte `1`. Depuis `6a79309` (D-036), les points
+d'accès privés épinglés de CORE et de Qwen-Coder viennent d'un fichier privé
+hors Git désigné par `SOVEREIGN_PRIVATE_ENDPOINTS_FILE`, à installer avant le
+déploiement de ce code selon
+[la migration D-036](docs/operations/private-endpoints-migration.md).
 
 ## Commencer correctement
 
@@ -303,10 +309,11 @@ ni de système de queue. Pour les embeddings, D-028 autorise un petit moteur
 pré-entraîné séparé de CORE, sous réserve de licence et d'empreinte vérifiées.
 Le code de `main` contient un client en boucle locale pour
 Qwen3-Embedding-0.6B et une recherche hybride SQLite avec repli lexical
-(`d7cc78c`) : **code présent, déploiement non vérifié**. Aucun lock, licence ni
-empreinte de ce modèle n'est versionné et aucune entrée du registre ne le
-désigne : composant à régulariser selon `AGENTS.md`, décision du propriétaire
-en attente. Le reranker et le moteur d'index
+(`d7cc78c`) : **code présent, déploiement non vérifié**. Depuis `c7d1510`, un
+lock candidat attend la relecture RAW de son empreinte, de sa taille, de sa
+révision et de sa licence, et l'ADR-0007 est PROPOSÉ ; aucune entrée du
+registre ne ratifie ce modèle : composant à régulariser selon `AGENTS.md`,
+décision du propriétaire en attente. Le reranker et le moteur d'index
 restent à valider par benchmark (P-004). SMB est utilisé pour les essais de
 stockage actuels ; son rôle définitif reste soumis à décision. Les options
 devront être comparées sur les contraintes réelles, puis consignées dans le

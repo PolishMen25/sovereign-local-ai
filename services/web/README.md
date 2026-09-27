@@ -1,7 +1,8 @@
 # Interface Web interne
 
-> Mise à jour documentaire du 2026-09-27, contre `main` à `c0b169e`
-> (interrupteur D-035 inclus, registre jusqu'à D-042). Ce document décrit le
+> Mise à jour documentaire du 2026-09-27, contre `main` à `eea75b5`
+> (interrupteur D-035 et points d'accès privés D-036 inclus, registre jusqu'à
+> D-045). Ce document décrit le
 > code de la passerelle, pas l'état installé : le serveur de
 > calcul est hors ligne et le dernier relevé en direct date du 2026-09-09. Le
 > niveau de preuve de chaque capacité figure dans
@@ -40,14 +41,17 @@ encore `QWEN-CODER`.
 | `QWEN-CODER` | `qwen_client.py` : point d'accès privé épinglé par égalité exacte | `SOVEREIGN_QWEN_TOKEN` d'au moins 32 caractères ; sinon le moteur est « non configuré » et la route répond 503 | Promu le 2026-09-10 (D-034, ADR-0005). |
 | `CORE-700M` | `core_client.py` : point d'accès privé épinglé par égalité exacte | `SOVEREIGN_CORE_TOKEN` d'au moins 32 caractères ; sinon moteur indisponible | Expérimental ; voie archivée par D-034, aucun palier long. |
 
-L'épinglage des clients CORE et Qwen est un contrôle de sécurité. Lorsque le
-jeton correspondant est fourni (au moins 32 caractères), toute autre valeur de
-`SOVEREIGN_CORE_ENDPOINT` ou `SOVEREIGN_QWEN_ENDPOINT` fait échouer le
-démarrage de la passerelle ; sans ce jeton, la variable n'est pas lue et le
-moteur reste indisponible ou non configuré. Les valeurs épinglées sont des
-adresses privées codées dans le client, non recopiées ici. D-036 décide de les
-sortir du dépôt vers une configuration privée hors Git, avec échec fermé et
-épinglage exact conservé ; ce code n'est pas encore livré.
+L'épinglage des clients CORE et Qwen est un contrôle de sécurité. Depuis
+`6a79309` (D-036), la valeur épinglée ne figure plus dans le code : elle vient
+du fichier privé hors Git désigné par `SOVEREIGN_PRIVATE_ENDPOINTS_FILE` et lu
+par `services/common/private_endpoints.py`. Lorsque le jeton correspondant est
+fourni (au moins 32 caractères), la passerelle refuse de démarrer sans fichier
+privé valide, et `SOVEREIGN_CORE_ENDPOINT` ou `SOVEREIGN_QWEN_ENDPOINT`,
+désormais facultatives, font échouer le démarrage si elles diffèrent de
+l'épingle ; sans ce jeton, ni le fichier ni la variable ne sont lus et le
+moteur reste indisponible ou non configuré. Ce code n'est pas déployé : le
+fichier privé doit être installé avant lui, selon
+[la migration D-036](../../docs/operations/private-endpoints-migration.md).
 
 ## Connaissances, documents et embeddings
 
@@ -61,8 +65,11 @@ modèle comme des données non exécutables.
   0,55 vectoriel, pondération codée en dur et non mesurée ; sinon le mode reste
   lexical. Le client d'embeddings n'accepte que la boucle locale avec un port
   explicite. D-028 autorise un petit moteur d'embeddings sous réserve de
-  licence et d'empreinte vérifiées, mais aucun lock de Qwen3-Embedding-0.6B
-  n'est versionné : composant à régulariser selon `AGENTS.md`, décision du
+  licence et d'empreinte vérifiées. Depuis `c7d1510`, un lock candidat
+  (`configs/runtime/qwen3-embedding-0.6b-q8_0.lock.candidate.json`, empreinte,
+  taille, révision et licence en attente de relecture RAW) et l'ADR-0007 au
+  statut PROPOSÉ existent ; aucun service ne lit ce lock et le modèle n'est
+  pas ratifié : composant à régulariser selon `AGENTS.md`, décision du
   propriétaire en attente. Le champ `rag_mode`
   de `/v1/session` et des métadonnées de flux reste fixé à `lexical` (ou
   `tools`), même quand la recherche est hybride.
@@ -146,7 +153,10 @@ code contredit.
   corpus et rien ne déclenche d'entraînement. D-040 plafonne le synthétique à
   20 % des tokens d'une version de corpus et n'admet que le code généré par
   Qwen2.5-Coder ; les validateurs de corpus ne sont pas encore alignés sur
-  cette règle.
+  cette règle. D-043 révoque l'autorisation d'entraînement des incréments
+  `0001` et `0002`, et D-045 active l'approbation automatique réelle des
+  paquets (acteur `policy:auto-v1`) : ni l'une ni l'autre n'est implémentée
+  dans le code de `main` au 2026-09-27.
 - **Format des approbations.** Ce sont des fichiers JSON (`schema_version`,
   `kind`, `target_id`, `target_sha256` le cas échéant, `approved_by` issu de la
   session, `approved_at`) créés en exclusif avec le mode `0640`. Leur modèle
@@ -176,8 +186,9 @@ complète.
 
 ## Variables de configuration
 
-Variables `SOVEREIGN_*` lues par la passerelle (`app.py`, et
-`services/knowledge/corpus_paths.py` qu'elle importe). Les valeurs par défaut
+Variables `SOVEREIGN_*` lues par la passerelle (`app.py`, ainsi que
+`services/knowledge/corpus_paths.py` et `services/common/private_endpoints.py`
+qu'elle importe). Les valeurs par défaut
 sont celles du code ; `<état>` désigne la valeur de `SOVEREIGN_WEB_STATE`.
 
 | Variable | Défaut dans le code | Effet |
@@ -188,9 +199,10 @@ sont celles du code ; `<état>` désigne la valeur de `SOVEREIGN_WEB_STATE`.
 | `SOVEREIGN_SETUP_TOKEN` | aucun (vide) | Secret de première configuration ; moins de 32 caractères arrête le démarrage. |
 | `SOVEREIGN_BOOTSTRAP_ENDPOINT` | `http://127.0.0.1:8080` | Runtime BOOTSTRAP ; boucle locale imposée par le client. |
 | `SOVEREIGN_CORE_TOKEN` | aucun (vide) | Moins de 32 caractères : CORE-700M reste indisponible. |
-| `SOVEREIGN_CORE_ENDPOINT` | adresse privée épinglée, non recopiée | Toute autre valeur fait échouer le démarrage si le jeton CORE est fourni. |
+| `SOVEREIGN_CORE_ENDPOINT` | aucun : l'épingle `core_inference` du fichier privé | Facultative ; lue seulement si le jeton CORE est fourni, et toute valeur différente de l'épingle fait échouer le démarrage. |
 | `SOVEREIGN_QWEN_TOKEN` | aucun (vide) | Moins de 32 caractères : `QWEN-CODER` non configuré, réponse 503. |
-| `SOVEREIGN_QWEN_ENDPOINT` | adresse privée épinglée, non recopiée | Toute autre valeur fait échouer le démarrage si le jeton Qwen est fourni. |
+| `SOVEREIGN_QWEN_ENDPOINT` | aucun : l'épingle `qwen_coder` du fichier privé | Facultative ; lue seulement si le jeton Qwen est fourni, et toute valeur différente de l'épingle fait échouer le démarrage. |
+| `SOVEREIGN_PRIVATE_ENDPOINTS_FILE` | aucun | Chemin absolu du fichier privé hors Git des points d'accès épinglés (D-036, `6a79309`) ; lu seulement si un jeton CORE ou Qwen est fourni. Absent ou invalide, la passerelle refuse de démarrer (code de sortie 78). |
 | `SOVEREIGN_EMBED_ENDPOINT` | `http://127.0.0.1:8082` | Runtime d'embeddings en boucle locale ; une valeur vide désactive le client et laisse la recherche lexicale. |
 | `SOVEREIGN_TOOLS_ENABLED` | `1` | Boucle d'outils et actions ; désactivée seulement par `0`, `false`, `no` ou une valeur vide, sensible à la casse. |
 | `SOVEREIGN_ACTIONS_ENABLED` | absente : actions désactivées | Interrupteur D-035, lu une fois au démarrage ; seule la valeur exacte `1` active `run_python` et `write_file`. |

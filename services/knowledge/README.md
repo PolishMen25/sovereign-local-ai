@@ -1,7 +1,7 @@
 # Knowledge interne
 
-> Mise à jour documentaire du 2026-09-27, contre `main` à `c0b169e` (code de
-> ce dossier inchangé depuis `db9414d`, registre jusqu'à D-042). Ce
+> Mise à jour documentaire du 2026-09-27, contre `main` à `eea75b5` (code de
+> ce dossier inchangé depuis `db9414d`, registre jusqu'à D-045). Ce
 > document décrit le code, pas l'état installé : le serveur de calcul est hors
 > ligne et le niveau de preuve de chaque capacité figure dans
 > [`docs/project/current-capabilities.md`](../../docs/project/current-capabilities.md).
@@ -54,9 +54,12 @@ n'ouvre aucun socket et n'accepte aucun chemin venant d'un client.
   idempotente, les vecteurs des passages qui n'en ont pas. **Code présent,
   déploiement non vérifié.** D-028 autorise
   un petit moteur d'embeddings pré-entraîné sous réserve de licence et
-  d'empreinte vérifiées, mais aucun lock de ce modèle n'est versionné dans
-  `configs/runtime/` et aucune entrée du registre ne le désigne : composant à
-  régulariser selon `AGENTS.md`, décision du propriétaire en attente.
+  d'empreinte vérifiées. Depuis `c7d1510`, un lock candidat
+  (`configs/runtime/qwen3-embedding-0.6b-q8_0.lock.candidate.json`, empreinte,
+  taille, révision et licence en attente de relecture RAW) et l'ADR-0007 au
+  statut PROPOSÉ existent, mais aucun service ne lit ce lock et aucune entrée
+  du registre ne ratifie ce modèle : composant à régulariser selon
+  `AGENTS.md`, décision du propriétaire en attente.
 
 ## Documents déposés
 

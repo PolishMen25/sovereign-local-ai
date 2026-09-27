@@ -1,9 +1,12 @@
 # État public du déploiement
 
 Dernière vérification en direct : 2026-09-09. Dernier relevé versionné :
-2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `c0b169e` :
-registre jusqu'à D-042, phase 1 (D-038), interrupteur D-035 et contrôleur de
-disponibilité du NAS ajoutés au code depuis `db9414d`.
+2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `eea75b5` :
+registre jusqu'à D-045, phase 1 (D-038) ; depuis `db9414d`, le code a reçu
+l'interrupteur D-035, le contrôleur de disponibilité du NAS, les points
+d'accès privés hors Git (D-036), la CI (D-037), le comparateur NUMA durci, des
+contrats et outils candidats hors ligne et la séparation par défaut entre E2
+et l'arène, sans relevé de déploiement.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md), qui donne pour
@@ -70,8 +73,10 @@ sans décision au registre ou au-delà de leur décision.
   couvre quatre documents internes versionnés ; la page des capacités en fait
   partie et sa révision du 2026-09-26 doit être réapprouvée par le propriétaire
   avant reconstruction. Le moteur d'embeddings Qwen3-Embedding-0.6B est présent
-  dans le code (`d7cc78c`), déploiement non vérifié, sans lock versionné. Le
-  moteur d'embeddings et le dépôt de documents sont à régulariser.
+  dans le code (`d7cc78c`), déploiement non vérifié ; depuis `c7d1510`, un lock
+  candidat attend la relecture RAW de son empreinte et de sa licence, et
+  l'ADR-0007 est PROPOSÉ. Le moteur d'embeddings et le dépôt de documents sont
+  à régulariser.
 - **Interface Web du projet : installée derrière le HTTPS privé au relevé du
   2026-09-09.** Argon2id, sessions, CSRF, mémoire SQLite locale, historique
   réouvrable, export, suppression et client llama.cpp loopback fonctionnaient.
@@ -90,11 +95,19 @@ sans décision au registre ou au-delà de leur décision.
   sable, en attente d'approbation ; un paquet approuvé peut devenir un
   incrément RAW puis être promu en VALIDATED depuis l'interface. Les commits
   rapportent des paquets réels, mais aucun relevé versionné ne les confirme.
-  L'arène et la boucle sont à régulariser, et la suite par défaut de l'arène
-  reste le benchmark E2 scellé. D-040 admet le code synthétique de l'arène
-  généré par Qwen2.5-Coder, sans recouvrement avec les jeux d'évaluation, dans
-  la limite de 20 % des tokens d'une version de corpus ; les validateurs de
-  `main` ne sont pas encore alignés sur cette règle.
+  L'arène et la boucle sont à régulariser. D-044 consigne que l'arène a joué
+  sur E2 le 2026-09-11, étiquette E2 « contaminée » et la remplace, pour
+  l'évaluation, par une suite E2-v2 scellée hors dépôt ; D-043 révoque
+  l'autorisation d'entraînement des incréments `0001` et `0002`. Depuis
+  `eea75b5`, le code de l'arène et du constructeur d'incréments prend par
+  défaut la suite d'entraînement et le constructeur refuse les tâches E2 ; la
+  suite jouée sur le serveur n'est pas consignée. D-040 admet le code
+  synthétique de l'arène généré par Qwen2.5-Coder, sans recouvrement avec les
+  jeux d'évaluation, dans la limite de 20 % des tokens d'une version de
+  corpus ; les validateurs de `main` ne sont pas encore alignés sur cette
+  règle. D-045 active l'approbation automatique réelle des paquets ; ni elle
+  ni le refus des incréments révoqués ne sont implémentés dans le code de
+  `main`.
 - **Orchestrateur et autorisations : préparation seulement.** Les validateurs
   fail-closed existent ; les outils du chat passent par la passerelle, pas par
   l'orchestrateur.
@@ -163,13 +176,16 @@ la topologie cible, ni un gate : G0 à G8 et A0 à A8 restent ouverts.
   checkpoint est repris une étape sans modifier sa source ;
 - sa preuve publique ne contient ni hostname, ni modèle ou liste CPU, ni
   commande ou chemin. Les deux paires A/B comparées sont de sens opposé et
-  non concluantes ; le comparateur ne vérifie pas que les deux contrats de
-  placement sont distincts, et aucune mesure mémoire ni série complète de
-  compteurs NUMA ne permet d'extrapoler une durée d'entraînement ;
+  non concluantes ; le comparateur employé pour elles ne vérifiait pas que
+  les deux contrats de placement étaient distincts. Depuis `654b730`, il
+  refuse deux preuves de même engagement et un vérificateur hors ligne établit
+  cette distinction à partir des contrats privés, sans exécution consignée sur
+  ces preuves. Aucune mesure mémoire ni série complète de compteurs NUMA ne
+  permet d'extrapoler une durée d'entraînement ;
 - tests : 198 tests passaient à la révision `8071843` ; les messages de commit
-  rapportent 470 tests verts à `dbca0c6` ; D-037 décide une intégration
-  continue Linux hébergée, pas encore versionnée, et aucune exécution Linux
-  n'est consignée pour `db9414d`.
+  rapportent 470 tests verts à `dbca0c6` ; l'intégration continue Linux
+  hébergée de D-037 est versionnée depuis `ad1ed68`, et aucune exécution sur
+  le nœud de calcul n'est consignée.
 
 ## Non revendiqué
 

@@ -84,8 +84,12 @@ runtime de référence. Ne pas retenir B pour la V1 sauf impossibilité démontr
   contraire un ratio A/B de 0,9497, soit B environ 5,3 % au-dessus de A, et la
   médiane de B se situe dans la plage observée de A. Le sens s'inverse entre
   les deux paires et les plages se recouvrent : l'observation est non
-  concluante et ne choisit aucun placement. Le comparateur ne vérifie pas non
-  plus que A et B reposent sur deux contrats de placement distincts.
+  concluante et ne choisit aucun placement. Le comparateur utilisé pour ces
+  paires ne vérifiait pas que A et B reposaient sur deux contrats de placement
+  distincts ; depuis `654b730`, il refuse deux preuves de même engagement, et
+  `tools/verify_core_mini_placement_distinctness.py` établit cette distinction
+  hors ligne à partir des contrats privés. Aucun des deux n'a été rejoué sur
+  ces preuves.
 
 Ces observations ne ferment pas le test d'absence de télémétrie à l'exécution,
 le benchmark NUMA complet avec répétitions et charges plus grandes, ni la

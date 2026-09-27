@@ -2,9 +2,10 @@
 
 - Statut : **PROPOSÉ**. Aucune étape n'a été exécutée : chacune est **à
   exécuter, non mesuré**.
-- Rédaction : 2026-09-26, mise à jour le 2026-09-27 contre `main` à `c0b169e`
-  (registre jusqu'à D-042, phase 1 selon D-038, interrupteur D-035 et
-  contrôleur de disponibilité du NAS sur `main`, non déployés), serveur de
+- Rédaction : 2026-09-26, mise à jour le 2026-09-27 contre `main` à `eea75b5`
+  (registre jusqu'à D-045, phase 1 selon D-038 ; interrupteur D-035,
+  contrôleur de disponibilité du NAS, points d'accès privés D-036, CI D-037 et
+  outils hors ligne du tri sur `main`, non déployés), serveur de
   calcul hors ligne depuis le 2026-09-14 environ. Dernier relevé en direct :
   2026-09-09 ; dernier relevé versionné : 2026-09-10.
 - Portée : ce document ordonne tous les travaux qui exigent le matériel réel,
@@ -22,8 +23,10 @@
 - **Ne rien détruire avant décision.** Une reconstruction de l'index approuvé
   efface les documents déposés et tous les embeddings ; elle vient après la
   décision sur les documents déposés et après une sauvegarde vérifiée.
-- **Auditer avant de produire.** L'arène joue par défaut le benchmark scellé
-  E2 ; ses paquets et incréments se comptent avant d'en créer d'autres.
+- **Auditer avant de produire.** D-044 consigne que l'arène a joué sur le
+  benchmark E2 le 2026-09-11 ; le code de `main` prend par défaut la suite
+  d'entraînement depuis `eea75b5`, mais la version installée reste à relever.
+  Paquets et incréments se comptent avant d'en créer d'autres.
 - **Mesurer au repos.** Les compteurs NUMA de l'hôte sont faussés par les
   charges voisines ; ils se valident sur un hôte au repos.
 
@@ -86,7 +89,10 @@ reste hors dépôt. **Décision du propriétaire** : les laisser reprendre, ou l
 garder arrêtés jusqu'à la fin des étapes 1 et 4. Proposition, **PROPOSÉ** et
 non décidée : garder arrêtés l'arène et la promotion périodique jusqu'au
 relevé, pour qu'il décrive l'état figé et qu'aucun paquet ne soit produit sur
-la suite par défaut avant l'audit.
+la suite par défaut avant l'audit. D-045 active l'approbation automatique
+réelle des paquets, mais son code n'est pas sur `main` au 2026-09-27 et ne
+peut donc pas être installé ; son articulation avec cette question reste au
+propriétaire.
 
 D-035 accepte que la passerelle installée garde son comportement actuel pour
 `run_python` et `write_file` jusqu'au déploiement de l'interrupteur
@@ -169,8 +175,8 @@ Prérequis :
 
 - étape 1, pour connaître le commit installé ;
 - correctif de la connexion SQLite non fermée de `tests/test_arena.py`
-  fusionné sur `main`. Sans lui, un échec connu de `test_train_core_mini`
-  apparaît sous Linux.
+  fusionné sur `main` : satisfait par `485fd72`. Sans lui, un échec connu de
+  `test_train_core_mini` apparaissait sous Linux.
 
 Actions : dans un invité Linux du nœud de calcul, sans réseau, depuis une
 extraction propre du commit visé, exécuter
@@ -182,8 +188,9 @@ leur cause) qui remplace les comptes tirés des messages de commit et les
 exécutions Windows non représentatives. Aucun fichier ne subsiste hors des
 dossiers temporaires.
 
-L'intégration continue hébergée décidée par D-037, pas encore versionnée,
-exécute la même suite sur un runner Linux générique ; elle ne remplace pas
+L'intégration continue hébergée décidée par D-037, versionnée depuis
+`ad1ed68`, exécute la même suite sur un runner Linux générique ; elle ne
+remplace pas
 cette étape, qui vérifie la suite sur le nœud de calcul avec `bwrap`, NumPy et
 le bundle PyTorch hors ligne réellement installés.
 
@@ -196,7 +203,7 @@ Prérequis :
 - étape 1, qui établit si le service d'embeddings est installé ;
 - ADR-0007 au statut PROPOSÉ et lock candidat
   `configs/runtime/qwen3-embedding-0.6b-q8_0.lock.candidate.json` avec son
-  test, fusionnés sur `main` (absents au 2026-09-26).
+  test, fusionnés sur `main` : satisfait par `c7d1510`.
 
 Actions : relire la taille et le SHA-256 du GGUF en RAW et dans le runtime,
 la révision amont et le texte de licence ; vérifier que le service n'écoute
@@ -216,7 +223,7 @@ Prérequis :
 
 - étape 1, pour la suite effective et les comptes ;
 - vérificateur statique `tools/check_evaluation_contamination.py` fusionné sur
-  `main` (absent au 2026-09-26) ;
+  `main` : satisfait par `eea75b5` ;
 - arène à l'arrêt, ou copie de sa base ouverte en lecture seule.
 
 Actions, en lecture seule :
@@ -231,9 +238,12 @@ Actions, en lecture seule :
   `configs/arena/practice-suite.v1.json`.
 
 Preuve attendue : un compte sans contenu, identifiants et empreintes
-seulement, des paquets et incréments concernés, versé au dossier de la
-**décision du propriétaire** sur la remédiation de E2. Aucune suppression,
-rétrogradation ni exclusion n'est faite à cette étape.
+seulement, des paquets et incréments concernés. D-043 (révocation des
+incréments `0001` et `0002`) et D-044 (E2 « contaminée », remplacée par E2-v2)
+tranchent déjà la remédiation de principe ; le compte sert à vérifier leur
+mise en œuvre, et toute mesure au-delà de ces décisions reste au
+propriétaire. Aucune suppression, rétrogradation ni exclusion n'est faite à
+cette étape.
 
 ### Étape 5 — Comparateur NUMA sur les preuves `0.2.0`
 
@@ -244,7 +254,8 @@ Prérequis :
 - fusionnés sur `main` : durcissement de
   `tools/compare_core_mini_numa_evidence.py` (refus d'un engagement de
   placement partagé, de moins de trois répétitions, d'octets non canoniques),
-  contrat de sortie v2, vérificateur de distinction des placements ;
+  contrat de sortie v2, vérificateur de distinction des placements :
+  satisfait par `654b730` ;
 - preuves et contrats privés disponibles hors Git.
 
 Actions : relancer le comparateur durci sur les deux paires consignées, celle
@@ -266,7 +277,8 @@ Prérequis :
 
 - étape 1, pour l'état de la bascule « chat rapide » ;
 - sections de métriques système du protocole G4, au statut PROVISOIRE,
-  fusionnées dans `docs/model/core-mini-numa-protocol.md` ;
+  fusionnées dans `docs/model/core-mini-numa-protocol.md` : satisfait par
+  `654b730` ;
 - hôte au repos : aucun calcul en cours, un calcul en cours étant laissé à sa
   fin (`AGENTS.md`, « Exploitation ») ; agent de programmation, moteur de
   chat et arène arrêtés, avec l'**accord du propriétaire** pour ces arrêts.
@@ -326,7 +338,7 @@ Prérequis :
   proposé (**PROPOSÉ**) de l'exécuter avant de rouvrir le relais HTTPS ou le
   collecteur ;
 - 8b : schéma et validateur de la matrice des flux fusionnés sur `main`
-  (absents au 2026-09-26), puis matrice réelle expurgée **approuvée par le
+  (satisfait par `48fc63f`), puis matrice réelle expurgée **approuvée par le
   propriétaire**.
 
 Actions :
@@ -392,7 +404,8 @@ Statut : **à exécuter, non mesuré**.
 Prérequis :
 
 - étape 2 ; `tools/evaluate_tokenizer.py` et
-  `docs/model/tokenizer-experiments-protocol.md` fusionnés sur `main` ;
+  `docs/model/tokenizer-experiments-protocol.md` fusionnés sur `main` :
+  satisfait par `48fc63f` ;
 - corpus final issu de l'étape 13 et de sa version autorisée selon D-039 ;
 - tokenizer réentraîné sur ce corpus, produit avant cette étape par un outil
   fusionné sur `main` : D-042 décide ce réentraînement, avec vocabulaire de
@@ -415,7 +428,7 @@ reste attachée à l'ancien tokenizer.
 Statut : **à exécuter, non mesuré**.
 
 Prérequis : étapes 3 et 7 ; `tools/evaluate_retrieval.py` fusionné sur
-`main` ; jeu d'or privé hors Git.
+`main` (satisfait par `48fc63f`) ; jeu d'or privé hors Git.
 
 Actions : latence p50 et p95, mémoire et rappel pour l'index SQLite
 exhaustif et ses alternatives, avec et sans reranker ; balayage de la
@@ -461,12 +474,16 @@ Prérequis :
 - étape 1, qui identifie le modèle réellement servi par l'emplacement
   BOOTSTRAP ;
 - étape 2 et bac à sable `bwrap` opérationnel ;
-- étape 4 et **décision du propriétaire** sur la remédiation de E2 ;
+- étape 4 ; D-044 remplace E2, étiquetée « contaminée », par une suite E2-v2
+  scellée hors dépôt, dont l'empreinte doit être versionnée et vérifiée avant
+  usage (absente au 2026-09-27) ;
 - suites candidates `configs/evaluation/v1-use-cases.candidate.json` et
-  `configs/evaluation/v1-safety.candidate.json` fusionnées sur `main`.
+  `configs/evaluation/v1-safety.candidate.json` fusionnées sur `main` :
+  satisfait par `eea75b5`.
 
-Actions : E0, E1, E2, cas d'usage et sûreté sur l'emplacement BOOTSTRAP,
-Qwen-Coder et le dernier checkpoint CORE-30M, dans `bwrap`.
+Actions : E0, E1, E2-v2, cas d'usage et sûreté sur l'emplacement BOOTSTRAP,
+Qwen-Coder et le dernier checkpoint CORE-30M, dans `bwrap`. Un score sur
+l'E2 historique, s'il est produit, reste rapporté à part.
 
 Preuve attendue : rapports sans contenu liés à leurs SHA-256, médianes et
 protocole consignés, liés depuis la grille d'évaluation V1. Aucun seuil n'est
@@ -496,8 +513,8 @@ Prérequis :
 - PR #17 fusionnée ;
 - **décision du propriétaire** sur la politique d'ingress : rejet ou
   signalement par catégorie de secret, et contrat des conversations ;
-- scanner de secrets fusionné, puis raccordé après cette décision en
-  coordination avec Codex ;
+- scanner de secrets fusionné (`30f5e8e`, non raccordé), puis raccordé après
+  cette décision en coordination avec Codex ;
 - si le code à déployer met en œuvre D-036, configuration privée hors Git
   installée et vérifiée avant le déploiement ; sans elle, le service doit
   refuser de démarrer.
@@ -514,9 +531,10 @@ conservée ; statut public mis à jour sans détail interne.
 Statut : **à exécuter, non mesuré**.
 
 Prérequis : étape 8b, avec les flux F0 et F1 dans la matrice approuvée ;
-ADR-0006 accepté par le propriétaire ; politique d'URL statique fusionnée sur
-`main` ; pour tout code déployé qui met en œuvre D-036, configuration privée
-hors Git installée avant lui.
+ADR-0006, PROPOSÉ depuis `c7d1510`, accepté par le propriétaire ; politique
+d'URL statique fusionnée sur `main` (satisfait par `30f5e8e`) ; pour tout code
+déployé qui met en œuvre D-036, configuration privée hors Git installée avant
+lui.
 
 Actions : pour le composant qui déréférence les URL, épinglage du résolveur,
 défense contre le rebinding DNS, politique de redirection, proxy de sortie et
@@ -531,8 +549,9 @@ T09 du modèle de menace.
 ## Déploiements décidés hors du tri
 
 Le code de D-035 (interrupteur `SOVEREIGN_ACTIONS_ENABLED`) est sur `main`
-depuis `c0b169e` ; celui de D-036 (configuration privée hors Git) ne l'est pas
-encore. Leur déploiement ne figure pas au tri et n'est pas ordonné ici. Il
+depuis `c0b169e`, celui de D-036 (configuration privée hors Git) depuis
+`6a79309`, avec sa procédure `docs/operations/private-endpoints-migration.md`.
+Leur déploiement ne figure pas au tri et n'est pas ordonné ici. Il
 suit les mêmes règles que les étapes 16 et 17 : après les étapes 1 et 2, par
 archive versionnée de l'arborescence complète, avec l'accord du propriétaire,
 et configuration privée installée avant le code qui l'exige. Pour D-035,
