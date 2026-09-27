@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).parents[1]
 class CliEntrypointTests(unittest.TestCase):
     def test_bounded_training_entrypoints_offer_help_when_run_as_files(self) -> None:
         scripts = (
+            "tools/compare_core_mini_numa_evidence.py",
             "tools/core_mini_numa_child.py",
             "tools/core_mini_numa_benchmark.py",
             "tools/summarize_training_metrics.py",
@@ -30,22 +31,48 @@ class CliEntrypointTests(unittest.TestCase):
                 self.assertEqual(completed.returncode, 0, completed.stderr)
                 self.assertIn("usage:", completed.stdout.lower())
 
-    def test_numa_benchmark_entrypoint_is_independent_of_working_directory(self) -> None:
+    def test_numa_entrypoints_are_independent_of_working_directory(self) -> None:
+        for name in ("core_mini_numa_benchmark.py", "compare_core_mini_numa_evidence.py"):
+            with self.subTest(script=name):
+                completed = subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        str(PROJECT_ROOT / "tools" / name),
+                        "--help",
+                    ],
+                    cwd=PROJECT_ROOT.parent,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertIn("usage:", completed.stdout.lower())
+
+    def test_numa_comparator_refuses_as_a_file_without_traceback_or_path(self) -> None:
+        marker = "private-marker-path-4c1d"
         completed = subprocess.run(
             [
                 sys.executable,
                 "-B",
-                str(PROJECT_ROOT / "tools" / "core_mini_numa_benchmark.py"),
-                "--help",
+                "tools/compare_core_mini_numa_evidence.py",
+                "--placement-a",
+                marker,
+                "--placement-b",
+                marker,
+                "--output",
+                marker,
             ],
-            cwd=PROJECT_ROOT.parent,
+            cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
             timeout=10,
             check=False,
         )
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("usage:", completed.stdout.lower())
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(completed.stdout, "")
+        self.assertEqual(completed.stderr, "CORE-MINI NUMA comparison refused\n")
 
 
 if __name__ == "__main__":
