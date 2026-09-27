@@ -1,0 +1,20 @@
+{"record_id":"fr-prose-001","language":"fr","content_type":"prose","text":"Le serveur de calcul reste isolé d'Internet : aucune route sortante n'est autorisée depuis le cœur du modèle."}
+{"record_id":"fr-prose-002","language":"fr","content_type":"prose","text":"Avant toute promotion, la quarantaine vérifie la licence, la provenance et l'empreinte SHA-256 de chaque paquet."}
+{"record_id":"fr-prose-003","language":"fr","content_type":"prose","text":"Les sauvegardes sont chiffrées, testées par une restauration complète et conservées hors du nœud d'entraînement."}
+{"record_id":"fr-prose-004-nfd","language":"fr","content_type":"prose","text":"Re\u0301sume\u0301 : l'e\u0301tape de normalisation NFC recompose les accents de\u0301compose\u0301s avant l'encodage, de\u0301ja\u0300 a\u0300 l'entre\u0301e."}
+{"record_id":"en-prose-001","language":"en","content_type":"prose","text":"The compute node never opens an outbound connection; every model artifact is verified offline before use."}
+{"record_id":"en-prose-002","language":"en","content_type":"prose","text":"A held-out split must never be used to train the tokenizer it evaluates, otherwise the metrics are biased."}
+{"record_id":"en-prose-003","language":"en","content_type":"prose","text":"Backups are encrypted, restored end to end on a schedule, and kept away from the training host."}
+{"record_id":"en-prose-004","language":"en","content_type":"prose","text":"Deterministic reports let two independent runs be compared byte for byte."}
+{"record_id":"fr-code-001","language":"fr","content_type":"code","text":"def moyenne(valeurs: list[float]) -> float:\n    \"\"\"Calcule la moyenne ; refuse une liste vide.\"\"\"\n    if not valeurs:\n        raise ValueError(\"liste vide refusée\")\n    return sum(valeurs) / len(valeurs)\n"}
+{"record_id":"fr-code-002","language":"fr","content_type":"code","text":"# Vérifie que l'empreinte correspond avant de charger l'artefact.\nif empreinte != attendue:\n    raise ValueError(\"empreinte différente\")\n"}
+{"record_id":"en-code-001","language":"en","content_type":"code","text":"def clamp(value: int, low: int, high: int) -> int:\n    \"\"\"Return value limited to the closed interval [low, high].\"\"\"\n    if low > high:\n        raise ValueError(\"empty interval\")\n    return max(low, min(high, value))\n"}
+{"record_id":"en-code-002","language":"en","content_type":"code","text":"class Counter:\n    def __init__(self) -> None:\n        self.total = 0\n\n    def add(self, amount: int = 1) -> int:\n        self.total += amount\n        return self.total\n"}
+{"record_id":"zxx-shell-001","language":"zxx","content_type":"shell","text":"python3 -B -m unittest discover -s tests -q\ngit status --short\nsha256sum report.json\n"}
+{"record_id":"zxx-shell-002","language":"zxx","content_type":"shell","text":"set -eu\nfor file in *.jsonl; do\n  wc -l \"$file\"\ndone\n"}
+{"record_id":"zxx-config-001","language":"zxx","content_type":"config","text":"[training]\nvocabulary_size = 32000\nnormalization = \"unicode-nfc-v1\"\ninternet = \"disabled\"\n"}
+{"record_id":"zxx-config-002","language":"zxx","content_type":"config","text":"{\"schema_version\": \"v1\", \"status\": \"experimental\", \"threads\": 8}\n"}
+{"record_id":"en-log-001","language":"en","content_type":"log","text":"2026-01-01T00:00:00Z INFO step=10 loss=3.2145 tokens_per_second=812\n2026-01-01T00:00:05Z WARN checkpoint delayed by 5 s\n"}
+{"record_id":"fr-log-001","language":"fr","content_type":"log","text":"2026-01-01T00:00:00Z INFO étape=10 perte=3,2145\n2026-01-01T00:00:07Z ERREUR sauvegarde refusée : empreinte différente\n"}
+{"record_id":"mul-prose-001","language":"mul","content_type":"prose","text":"Le build a échoué (build failed) : le test unitaire test_round_trip attend un aller-retour exact."}
+{"record_id":"und-prose-001","language":"und","content_type":"prose","text":"日本語のテキストと emoji 🙂 : couverture des octets hors latin."}

@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/network-flow-matrix/v1/schema.json",
+  "title": "Matrice des flux réseau interzones à refus par défaut",
+  "description": "PROPOSÉ — contrat de la matrice des flux autorisés entre zones de confiance abstraites (issue #4). Tout flux absent est refusé. La matrice ne contient aucune adresse, nom d'hôte, port, identifiant de conteneur, chemin, compte ni secret. Les règles de graphe (aucun chemin de données Internet/DMZ vers IA-CORE ou le stockage interne sans quarantaine, aucun chemin de données interne vers la DMZ ou Internet, aucun relais bidirectionnel par une zone de stockage ou le sas de transfert), l'unicité des identifiants et des identités ainsi que le filtrage des jetons d'infrastructure dans les textes libres ne sont pas exprimables ici : tools/validate_network_flow_matrix.py les applique. La frontière d'IA-CORE (R13 : IA-CORE n'ouvre de flux que vers storage-internal et n'accepte que l'appel d'inférence du sas d'interface, ADR-0004 point 4 et D-029) est exprimée ici et dans le validateur. Voir docs/security/network-flow-matrix.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "matrix_id",
+    "status",
+    "synthetic",
+    "default_policy",
+    "flows"
+  ],
+  "properties": {
+    "schema_version": { "const": "network-flow-matrix.v1" },
+    "matrix_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^[a-z]+(-[a-z0-9]+){0,7}$"
+    },
+    "status": {
+      "description": "proposed : brouillon soumis au propriétaire. approved : réservé au propriétaire après enregistrement d'une décision ; jamais posé par un agent.",
+      "enum": ["proposed", "approved"]
+    },
+    "synthetic": {
+      "description": "true pour un exemple ou un gabarit sans valeur opérationnelle ; un exemple synthétique ne peut jamais être approuvé.",
+      "type": "boolean"
+    },
+    "default_policy": { "const": "deny" },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/flow" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "synthetic": { "const": true } },
+        "required": ["synthetic"]
+      },
+      "then": {
+        "properties": {
+          "status": { "const": "proposed" },
+          "flows": {
+            "items": {
+              "properties": { "approval_ref": { "const": "pending-owner-approval" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "approved" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "synthetic": { "const": false },
+          "flows": {
+            "items": {
+              "properties": {
+                "approval_ref": { "pattern": "^(D-[0-9]{3}|ADR-[0-9]{4})$" }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "zone": {
+      "description": "Zones logiques abstraites ; leur réalisation physique (VLAN, pare-feu, hôtes) reste hors du dépôt public.",
+      "enum": [
+        "internet",
+        "dmz",
+        "quarantine",
+        "transfer-airlock",
+        "ia-core",
+        "interface-airlock",
+        "local-clients",
+        "admin",
+        "storage-raw",
+        "storage-internal",
+        "coding-agent"
+      ]
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flow_id",
+        "origin_zone",
+        "destination_zone",
+        "direction",
+        "identity",
+        "data_class",
+        "justification",
+        "approval_ref"
+      ],
+      "properties": {
+        "flow_id": { "type": "string", "pattern": "^NF-[0-9]{2,3}$" },
+        "origin_zone": {
+          "description": "Zone qui initie la connexion.",
+          "$ref": "#/$defs/zone"
+        },
+        "destination_zone": {
+          "description": "Zone qui accepte la connexion ; toujours distincte de l'origine (validateur).",
+          "$ref": "#/$defs/zone"
+        },
+        "direction": {
+          "description": "Sens du contenu. push : origine vers destination, le retour ne porte qu'un accusé technique sans contenu. pull : destination vers origine. bidirectional : contenu dans les deux sens.",
+          "enum": ["push", "pull", "bidirectional"]
+        },
+        "identity": {
+          "description": "Rôle logique dédié à ce seul flux ; jamais un compte, un hôte ou une instance.",
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 48,
+          "pattern": "^[a-z]+(-[a-z]+){0,5}$"
+        },
+        "data_class": {
+          "enum": [
+            "research-exchange",
+            "raw-package",
+            "conversation-export",
+            "promoted-derivative",
+            "local-session",
+            "inference-call",
+            "internal-knowledge",
+            "model-artifact",
+            "backup",
+            "management",
+            "name-resolution",
+            "time-sync",
+            "software-update"
+          ]
+        },
+        "justification": {
+          "description": "Raison du flux et référence documentaire, en texte libre expurgé (aucune adresse, nom d'hôte, URL, chemin, courriel ni identifiant de conteneur).",
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 400
+        },
+        "approval_ref": {
+          "description": "pending-owner-approval tant que le propriétaire n'a pas enregistré de décision ; sinon l'entrée du registre ou l'ADR approuvé qui autorise ce flux.",
+          "type": "string",
+          "pattern": "^(D-[0-9]{3}|ADR-[0-9]{4}|pending-owner-approval)$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "destination_zone": { "const": "storage-raw" } },
+            "required": ["destination_zone"]
+          },
+          "then": { "properties": { "direction": { "const": "push" } } }
+        },
+        {
+          "if": {
+            "properties": { "origin_zone": { "const": "internet" } },
+            "required": ["origin_zone"]
+          },
+          "then": { "properties": { "destination_zone": { "const": "dmz" } } }
+        },
+        {
+          "if": {
+            "properties": { "destination_zone": { "const": "internet" } },
+            "required": ["destination_zone"]
+          },
+          "then": { "properties": { "origin_zone": { "const": "dmz" } } }
+        },
+        {
+          "if": {
+            "properties": { "origin_zone": { "const": "ia-core" } },
+            "required": ["origin_zone"]
+          },
+          "then": { "properties": { "destination_zone": { "const": "storage-internal" } } }
+        },
+        {
+          "if": {
+            "properties": { "destination_zone": { "const": "ia-core" } },
+            "required": ["destination_zone"]
+          },
+          "then": {
+            "properties": {
+              "origin_zone": { "const": "interface-airlock" },
+              "data_class": { "const": "inference-call" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": "network-flow-matrix.v1",
+  "matrix_id": "synthetic-reference-example",
+  "status": "proposed",
+  "synthetic": true,
+  "default_policy": "deny",
+  "flows": [
+    {
+      "flow_id": "NF-01",
+      "origin_zone": "dmz",
+      "destination_zone": "internet",
+      "direction": "bidirectional",
+      "identity": "research-egress",
+      "data_class": "research-exchange",
+      "justification": "F0/F1 : la collecte externe interroge une destination allowlistée et reçoit la réponse ; existence et périmètre dépendent de l'ADR Research Gateway (issue #5).",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-02",
+      "origin_zone": "dmz",
+      "destination_zone": "quarantine",
+      "direction": "push",
+      "identity": "collector-deposit",
+      "data_class": "raw-package",
+      "justification": "F2 : le Collector dépose l'original et son manifeste en quarantaine, sans accès à l'index actif ni retour de contenu.",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-03",
+      "origin_zone": "dmz",
+      "destination_zone": "storage-raw",
+      "direction": "push",
+      "identity": "raw-archiver",
+      "data_class": "raw-package",
+      "justification": "F3 : archivage append-only du paquet accepté et de son reçu d'ingress dans le partage RAW isolé, sans aucune lecture depuis la DMZ.",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-04",
+      "origin_zone": "quarantine",
+      "destination_zone": "storage-internal",
+      "direction": "push",
+      "identity": "promotion-import-writer",
+      "data_class": "promoted-derivative",
+      "justification": "F4 illustré : dépôt en écriture seule du dérivé promu dans une zone d'import inactive ; mécanisme du sas encore ouvert, forme compatible avec ADR-0004 point 4.",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-05",
+      "origin_zone": "ia-core",
+      "destination_zone": "storage-internal",
+      "direction": "pull",
+      "identity": "core-knowledge-reader",
+      "data_class": "internal-knowledge",
+      "justification": "F7 lecture : IA-CORE lit les connaissances approuvées et la zone d'import ; seul accès sortant d'IA-CORE avec la réponse d'inférence (ADR-0004).",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-06",
+      "origin_zone": "ia-core",
+      "destination_zone": "storage-internal",
+      "direction": "push",
+      "identity": "core-checkpoint-writer",
+      "data_class": "model-artifact",
+      "justification": "F7 écriture : checkpoints et modèles retenus vers le stockage interne durable (D-023), identité distincte de la lecture.",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-07",
+      "origin_zone": "local-clients",
+      "destination_zone": "interface-airlock",
+      "direction": "bidirectional",
+      "identity": "owner-session",
+      "data_class": "local-session",
+      "justification": "F5/F6 : session HTTPS mono-utilisateur du propriétaire vers le sas d'interface sur LAN ou tailnet (D-030).",
+      "approval_ref": "pending-owner-approval"
+    },
+    {
+      "flow_id": "NF-08",
+      "origin_zone": "interface-airlock",
+      "destination_zone": "ia-core",
+      "direction": "bidirectional",
+      "identity": "interface-inference-caller",
+      "data_class": "inference-call",
+      "justification": "D-029 : IA-CORE n'accepte que l'appel d'inférence initié par le sas d'interface et renvoie la réponse.",
+      "approval_ref": "pending-owner-approval"
+    }
+  ]
+}
