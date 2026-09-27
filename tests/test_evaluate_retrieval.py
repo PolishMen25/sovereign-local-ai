@@ -96,6 +96,20 @@ class RecordingOpener:
         return FakeResponse(json.dumps(body).encode("utf-8"))
 
 
+class FixedBodyOpener:
+    """A loopback runtime that always sends one body, or is unreachable."""
+
+    def __init__(self, body: bytes | None) -> None:
+        self.body = body
+        self.calls = 0
+
+    def open(self, outgoing, timeout=None):
+        self.calls += 1
+        if self.body is None:
+            raise ConnectionRefusedError("runtime is down")
+        return FakeResponse(self.body)
+
+
 def gold_lines() -> list[dict]:
     return [json.loads(line) for line in GOLD_PATH.read_text(encoding="utf-8").splitlines()]
 
@@ -403,6 +417,34 @@ class LoopbackTests(RetrievalCase):
         self.assertEqual("loopback", report["embedder"]["kind"])
         self.assertEqual("measured", report["modes"]["hybrid"]["status"])
         tool.LoopbackEmbedder("http://[::1]:8082", opener=RecordingOpener())
+
+    def test_invalid_vector_from_the_loopback_runtime_is_refused_not_degraded(self) -> None:
+        bodies = {
+            "non-finite": b'{"data":[{"embedding":[NaN,1.0]}]}',
+            "zero": b'{"data":[{"embedding":[0.0,0.0]}]}',
+            "non-numeric": b'{"data":[{"embedding":["x",1.0]}]}',
+            "empty": b'{"data":[{"embedding":[]}]}',
+            "shape": b'{"data":[]}',
+            "not-json": b"<html>proxy error</html>",
+        }
+        for name, body in bodies.items():
+            opener = FixedBodyOpener(body)
+            embedder = tool.LoopbackEmbedder("http://127.0.0.1:8082", opener=opener)
+            with self.subTest(case=name), \
+                    self.assertRaisesRegex(tool.EvaluationRefused, "returned an invalid vector"):
+                self.evaluate(embedder=embedder, embedder_kind="loopback", embedder_label="qwen3-embedding")
+            self.assertEqual(1, opener.calls)
+        self.assertEqual([], list(self.work.iterdir()))
+
+    def test_unreachable_loopback_runtime_degrades_to_lexical(self) -> None:
+        opener = FixedBodyOpener(None)
+        embedder = tool.LoopbackEmbedder("http://127.0.0.1:8082", opener=opener)
+        report = self.evaluate(embedder=embedder, embedder_kind="loopback", embedder_label="qwen3-embedding")
+        self.assertEqual(1, opener.calls)
+        self.assertEqual(("loopback", "unavailable"), (report["embedder"]["kind"], report["embedder"]["state"]))
+        self.assertEqual("measured", report["modes"]["lexical"]["status"])
+        for mode in ("vector", "hybrid"):
+            self.assertEqual("embedder_unavailable", report["modes"][mode]["reason"])
 
     def test_evaluation_opens_no_socket(self) -> None:
         refused = AssertionError("network access attempted")

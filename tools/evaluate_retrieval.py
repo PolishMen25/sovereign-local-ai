@@ -13,7 +13,8 @@ in a private work directory, then:
 The embedder is injected. From the command line it is either absent (lexical
 only) or a loopback-only HTTP runtime reached through ``EmbedClient`` on a
 literal loopback address. An unavailable embedder degrades to a lexical-only
-report; an invalid vector is refused. The report is deterministic, carries
+report; an invalid vector is refused, including one the loopback runtime
+returns. The report is deterministic, carries
 the input digests, no query or document text and no path. It decides
 nothing: no threshold, no preferred weight.
 
@@ -393,7 +394,20 @@ class LoopbackEmbedder:
             raise EvaluationRefused(f"embedding endpoint refused: {error}") from None
 
     def embed(self, text: str, *, is_query: bool = False) -> list[float]:
-        return self._client.embed(text, is_query=is_query)
+        """Degrade only on a transport failure; refuse a response with a bad vector.
+
+        ``EmbedClient`` chains every transport failure (connection, HTTP
+        status, redirect) to its cause. A response it rejects on content
+        (size, shape, non-numeric, non-finite or zero vector) carries no
+        cause. Anything without a cause is refused, so a runtime that
+        answers with garbage is never reported as merely unavailable.
+        """
+        try:
+            return self._client.embed(text, is_query=is_query)
+        except RuntimeError as error:
+            if error.__cause__ is None:
+                raise EvaluationRefused("embedding runtime returned an invalid vector") from None
+            raise
 
 
 @contextmanager

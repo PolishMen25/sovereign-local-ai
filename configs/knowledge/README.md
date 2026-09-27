@@ -60,9 +60,10 @@ Options :
 - `--k` (répétable, de 1 à 20, 1/3/5/10 par défaut), `--gold-sha256` (empreinte
   épinglée) et `--work-dir` (répertoire parent existant pour l'index jetable).
 
-Un runtime d'embeddings indisponible dégrade le rapport en mode lexical seul.
+Un runtime d'embeddings injoignable dégrade le rapport en mode lexical seul.
 Un vecteur invalide est refusé : non fini, nul, non numérique ou de dimension
-variable. Le rapport est déterministe. Il porte les empreintes du jeu d'or, de
+variable. Une réponse mal formée du runtime de bouclage est aussi refusée ;
+elle n'est jamais présentée comme une simple indisponibilité. Le rapport est déterministe. Il porte les empreintes du jeu d'or, de
 `hybrid_index.py` et de l'outil, ainsi qu'une empreinte des vecteurs pour
 comparer deux exécutions. Il ne contient ni texte ni chemin et n'est jamais
 écrasé. `model_identity_verified` reste `false` : l'outil ne vérifie pas le
