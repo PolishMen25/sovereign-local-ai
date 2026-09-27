@@ -140,9 +140,9 @@
       "axis": 1,
       "title": "E2 — code vérifié de l'extérieur",
       "fixture": {
-        "status": "present",
+        "status": "partial",
         "paths": ["configs/evaluation/core-python-e2.candidate.json"],
-        "description": "50 tâches Python, dont 14 recouvrent la suite d'entraînement de l'arène : leurs solutions d'arène sont exclues de l'entraînement (D-040) ; le traitement d'E2 reste une décision OUVERTE."
+        "description": "Suite E2-v2 scellée hors du dépôt public, jamais exposée à l'arène ni à un entraînement (D-044) ; son empreinte n'est pas encore versionnée (MANQUANT). L'E2 historique listée ici (50 tâches, dont 14 recouvrent la suite d'entraînement de l'arène et sont exclues de l'entraînement par D-040) est étiquetée contaminée par D-044."
       },
       "procedure": {
         "description": "Génération en tir unique puis exécution isolée (bwrap, sans réseau, refus si le bac à sable manque). Métrique first_pass pour une lignée CORE, jamais le final_pass de la boucle agent.",
@@ -150,8 +150,8 @@
       },
       "threshold": {
         "status": "proposed",
-        "statement": "first_pass au moins égal à la baseline BOOTSTRAP en tir unique, même protocole. Tant que la contamination n'est pas tranchée, scores rapportés séparément sur les 36 tâches non recouvertes et sur les 14 recouvertes.",
-        "decisions": []
+        "statement": "first_pass sur E2-v2 au moins égal à la baseline BOOTSTRAP en tir unique, même protocole, après vérification de l'empreinte de E2-v2 (D-044). Les scores sur l'E2 historique, contaminée, ne comptent pas pour une promotion ; s'ils sont produits, ils restent rapportés séparément sur les 36 tâches non recouvertes et sur les 14 recouvertes.",
+        "decisions": ["D-044"]
       },
       "responsible": "project_owner",
       "g_gates": ["G6"],
@@ -238,8 +238,8 @@
       },
       "threshold": {
         "status": "proposed",
-        "statement": "Règle CONFIRMÉE (D-039, D-040) : séparation évaluation / entraînement bloquante, données d'arène admises seulement sans recouvrement avec les jeux d'évaluation. Seuils PROPOSÉS : 0 recouvrement exact ou normalisé avec une source approuvée ; tout recouvrement n-gramme signalé bloque la source jusqu'à revue du propriétaire. Les solutions des 14 tâches recouvrantes sont refusées par le constructeur d'incréments (D-040) ; le traitement d'E2 reste OUVERT.",
-        "decisions": ["D-039", "D-040"]
+        "statement": "Règle CONFIRMÉE (D-039, D-040) : séparation évaluation / entraînement bloquante, données d'arène admises seulement sans recouvrement avec les jeux d'évaluation. Seuils PROPOSÉS : 0 recouvrement exact ou normalisé avec une source approuvée ; tout recouvrement n-gramme signalé bloque la source jusqu'à revue du propriétaire. Les solutions des 14 tâches recouvrantes sont refusées par le constructeur d'incréments (D-040). D-044 remplace E2 par E2-v2 scellée hors dépôt, fournie au vérificateur à l'exécution (--e2).",
+        "decisions": ["D-039", "D-040", "D-044"]
       },
       "responsible": "project_owner",
       "g_gates": ["G3", "G6"],

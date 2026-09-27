@@ -16,11 +16,11 @@ SEALED_E2_PATH = REPO / "configs" / "evaluation" / "core-python-e2.candidate.jso
 # unseen by training.  These 14 E2 tasks share their function name with a
 # practice task whose prompt is a paraphrase.  They are listed, not accepted.
 # D-040 admits arena data only without overlap with the evaluation sets, so the
-# increment builder refuses any solution for these practice tasks.  How to
-# remediate E2 itself (retire, replace or label the 14 tasks) is PENDING AN
-# OWNER DECISION (see docs/model/v1-evaluation-grid.md).  Any overlap not listed
-# here fails.
-KNOWN_OVERLAPS_PENDING_OWNER_DECISION = {
+# increment builder refuses any solution for these practice tasks.  D-044
+# labels this E2 suite contaminated and replaces it, for evaluation, with a
+# sealed E2-v2 kept out of the public repository (see
+# docs/model/v1-evaluation-grid.md).  Any overlap not listed here fails.
+KNOWN_E2_FUNCTION_OVERLAPS = {
     "balanced_brackets": ("python-14-balanced-brackets", "arena-030-balanced-brackets"),
     "binary_search": ("python-30-binary-search", "arena-086-binary-search"),
     "clamp": ("python-02-clamp", "arena-017-clamp"),
@@ -79,7 +79,7 @@ class ArenaPracticeSuiteTests(unittest.TestCase):
             if sealed["function_name"] == practice["function_name"]
         }
         documented = {(name, e2_id, practice_id)
-                      for name, (e2_id, practice_id) in KNOWN_OVERLAPS_PENDING_OWNER_DECISION.items()}
+                      for name, (e2_id, practice_id) in KNOWN_E2_FUNCTION_OVERLAPS.items()}
         self.assertEqual(sorted(found - documented), [],
                          "new function shared by the sealed E2 benchmark and the practice suite")
         self.assertEqual(found, documented, "the documented overlap list is stale: update it with the owner's decision")
@@ -87,7 +87,7 @@ class ArenaPracticeSuiteTests(unittest.TestCase):
     def test_the_increment_builder_withholds_exactly_the_documented_overlaps(self) -> None:
         _, _, withheld = bridge.load_task_suite(SUITE_PATH)
         self.assertEqual(withheld, {practice_id: name
-                                    for name, (_, practice_id) in KNOWN_OVERLAPS_PENDING_OWNER_DECISION.items()})
+                                    for name, (_, practice_id) in KNOWN_E2_FUNCTION_OVERLAPS.items()})
 
     def test_no_normalized_prompt_overlap(self) -> None:
         sealed = {normalized_prompt(t["prompt"]) for t in sealed_tasks()}

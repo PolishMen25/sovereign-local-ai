@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tests.test_arena_practice_suite import KNOWN_OVERLAPS_PENDING_OWNER_DECISION
+from tests.test_arena_practice_suite import KNOWN_E2_FUNCTION_OVERLAPS
 from tools import check_evaluation_contamination as checker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -417,7 +417,7 @@ class ContaminationCheckTests(unittest.TestCase):
         code, out, _ = self.run_cli("arena-increment", str(directory), synthetic=False)
         self.assertEqual(code, checker.EXIT_OVERLAP)
         findings = json.loads(out)["findings"]
-        known_e2_ids = {e2_id for e2_id, _ in KNOWN_OVERLAPS_PENDING_OWNER_DECISION.values()}
+        known_e2_ids = {e2_id for e2_id, _ in KNOWN_E2_FUNCTION_OVERLAPS.values()}
         self.assertEqual({f["eval_id"] for f in findings if f["level"] == "function_definition"}, known_e2_ids)
         self.assertEqual([f for f in findings if f["level"] in {"exact_prompt", "normalized_prompt"}], [])
         self.assertLessEqual({f["eval_id"] for f in findings}, known_e2_ids)

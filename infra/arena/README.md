@@ -34,10 +34,11 @@ n'est jamais un défaut et ne se joue que par un choix explicite.
 Jusqu'au commit `db9414d` inclus, le runner et
 `tools/build_core_increment_from_arena.py` prenaient E2 par défaut, et ni
 l'unité `sovereign-arena.service` ni l'exemple `arena.env` ci-dessous ne fixent
-cette variable. L'arène n'est attestée en service que par `AGENTS.md` (composant
-sans décision au registre, D-038) et par des messages de commit ; rien n'a été
-revérifié. La suite qu'elle joue ne se déduit pas du dépôt : elle doit être
-relevée sur l'hôte avant toute conclusion.
+cette variable. Le registre consigne que l'arène a joué E2 le 2026-09-11 et que
+des solutions dérivées figurent dans les paquets (D-044) ; D-043 révoque
+l'autorisation d'entraînement des incréments `0001` et `0002`. La suite
+qu'elle joue aujourd'hui ne se déduit pas du dépôt : elle doit être relevée sur
+l'hôte avant toute conclusion (non revérifié).
 
 Le passage d'un paquet au corpus garde une seconde barrière.
 `tools/build_core_increment_from_arena.py` refuse une suite de schéma
@@ -49,8 +50,9 @@ fonction d'une tâche E2, avec un énoncé reformulé ; elles sont listées dans
 `tests/test_arena_practice_suite.py`. D-040 n'admet les données de l'arène que
 sans recouvrement avec les jeux d'évaluation : le constructeur refuse donc tout
 paquet contenant une solution pour l'une d'elles, en lisant les noms de fonction
-dans la suite E2 versionnée (illisible ⇒ refus). Le traitement d'E2 lui-même
-reste une décision ouverte du propriétaire, décrite dans la
+dans la suite E2 versionnée (illisible ⇒ refus). D-044 étiquette E2
+« contaminée » et la remplace, pour l'évaluation, par une suite E2-v2 scellée
+hors du dépôt public ; voir la
 [grille d'évaluation V1 proposée](../../docs/model/v1-evaluation-grid.md#séparation-évaluation--entraînement).
 Une paraphrase sous un autre nom de fonction échappe à ces contrôles ;
 `tools/check_evaluation_contamination.py` l'approche.

@@ -31,6 +31,7 @@ SYNTHETIC_REGISTER = """# Registre synthétique de test
 | D-029 | Deux invités. | Test. |
 | D-039 | Séparation évaluation / entraînement bloquante. | Test. |
 | D-040 | Arène sans recouvrement avec l'évaluation. | Test. |
+| D-044 | E2 remplacée par une suite E2-v2 scellée. | Test. |
 | D-090 | **SUPERSEDED par D-099.** Ancienne approbation. | Test. |
 | D-099 | Grille approuvée (synthétique), empreinte {digest}. | Test. |
 """

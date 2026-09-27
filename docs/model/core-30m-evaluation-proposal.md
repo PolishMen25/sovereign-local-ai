@@ -77,8 +77,9 @@ d'entraînement ni file d'apprentissage.
 Le socle candidat est versionné dans
 [`core-python-e2.candidate.json`](../../configs/evaluation/core-python-e2.candidate.json).
 Il contient 50 tâches Python statiques, dont 14 recouvrent par leur nom de
-fonction la suite d'entraînement de l'arène ; ce recouvrement et les options
-de remédiation sont décrits dans la
+fonction la suite d'entraînement de l'arène. D-044 l'étiquette « contaminée »
+et la remplace par une suite E2-v2 scellée, hors du dépôt public, dont seule
+l'empreinte est versionnée ; voir la
 [grille d'évaluation V1 proposée](v1-evaluation-grid.md#séparation-évaluation--entraînement).
 Le lanceur
 [`run_code_evaluation.py`](../../tools/run_code_evaluation.py) exige `bubblewrap`
