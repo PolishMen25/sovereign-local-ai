@@ -89,4 +89,4 @@ La sortie est un objet JSON canonique `{"algorithm", "hash_scope", "sha256"}`. U
 
 - Le câblage dans une route du Collector, qui dépend de l'ADR du Research Gateway et des décisions sur le contrat d'ingress.
 - La signature ou l'authentification des empreintes (HMAC, Ed25519) : le mécanisme du journal d'événements reste ouvert.
-- La vérification sémantique complète du paquet (ordre temporel, citations, URL) : spécifiée ailleurs dans l'issue #6.
+- La vérification sémantique complète du paquet (ordre temporel, citations, URL) : voir `docs/data/research-package-validation.md`, qui recalcule `integrity.package_sha256` avec ce module.

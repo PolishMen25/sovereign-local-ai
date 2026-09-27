@@ -106,7 +106,7 @@ Le Collector write-only ne déréférence aucune URL. Il peut appliquer ce contr
 ## Réutilisation et évolution
 
 - L'analyse de secrets candidate s'appuie sur `credential_reasons` pour détecter les URL signées dans du texte libre.
-- Le futur validateur sémantique de `research-package` pourra appliquer `evaluate_url` à chaque URL déclarée.
+- Le validateur candidat de `research-package` (`docs/data/research-package-validation.md`) applique `evaluate_url` à chaque URL déclarée.
 - Toute modification d'une table ou d'un code crée une nouvelle version du jeu de règles (`url-ssrf-policy-v2`, etc.). Elle ne modifie jamais silencieusement `v1`.
 
 ## Utilisation locale
