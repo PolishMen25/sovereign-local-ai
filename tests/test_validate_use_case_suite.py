@@ -419,8 +419,10 @@ class DevelopmentReferenceTestsTests(unittest.TestCase):
     def test_reference_runner_is_isolated_and_bounded(self) -> None:
         self.assertTrue(run_reference_tests("def f():\n    return 1\n", "assert module['f']() == 1\n"))
         self.assertFalse(run_reference_tests("def f():\n    return 2\n", "assert module['f']() == 1\n"))
+        # Nothing is inherited: only SYSTEMROOT (Windows) and the LC_CTYPE the
+        # interpreter sets itself when it coerces the C locale (PEP 538, Linux).
         self.assertTrue(run_reference_tests("import os\ndef f():\n    return sorted(os.environ)\n",
-                                            "assert module['f']() in ([], ['SYSTEMROOT'])\n"))
+                                            "assert set(module['f']()) <= {'SYSTEMROOT', 'LC_CTYPE'}\n"))
         with mock.patch(f"{__name__}.REFERENCE_TIMEOUT_SECONDS", 1), self.assertRaises(subprocess.TimeoutExpired):
             run_reference_tests("def f():\n    while True:\n        pass\n", "module['f']()\n")
 
