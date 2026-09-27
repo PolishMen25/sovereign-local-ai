@@ -629,6 +629,49 @@ class ActionSwitchGatewayTests(GatewayTestCase):
         self.assertEqual(self.executions, ["print(1)"])
         self.assertEqual(self.refusals(), [])
 
+    def test_enabled_host_failures_never_echo_a_server_path(self) -> None:
+        import services.web.code_sandbox as sandbox
+        import services.web.workspace as workspace_module
+
+        self.enable_actions()
+        handler = self.handler()
+        server_path = "/srv/example-gateway/workspace/note.md"  # placeholder, not a real host path
+
+        def failing_write(root: Any, relative: str, content: str) -> dict[str, Any]:
+            raise OSError(13, "Permission denied", server_path)
+
+        def failing_run(code: str) -> dict[str, Any]:
+            raise FileNotFoundError(2, "No such file or directory", server_path)
+
+        original_write = workspace_module.write_file
+        workspace_module.write_file = failing_write
+        self.addCleanup(setattr, workspace_module, "write_file", original_write)
+        sandbox.run_python = failing_run  # restored by setUp's cleanup
+        written = handler._run_action({"id": "w1", "name": "write_file", "arguments": '{"path": "note.md", "content": "X"}'})
+        ran = handler._run_action({"id": "a1", "name": "run_python", "arguments": '{"code": "print(1)"}'})
+        self.assertEqual(written, gateway.ACTION_WRITE_FAILED_RESULT)
+        self.assertEqual(ran, gateway.ACTION_EXECUTION_FAILED_RESULT)
+        for result in (written, ran):
+            self.assertNotIn(server_path, result)
+            self.assertNotIn("example-gateway", result)
+        self.assertEqual(handler.wfile.getvalue(), b"")  # no "file" event for a failed write
+        failures = [fields for event, fields in self.server.security_events if event == "action_failed"]
+        self.assertEqual(failures, [{"stage": "execute", "tool": "write_file", "error": "PermissionError"},
+                                    {"stage": "execute", "tool": "run_python", "error": "FileNotFoundError"}])
+        for fields in failures:
+            self.assertNotIn(server_path, " ".join(fields.values()))
+
+    def test_enabled_workspace_refusals_keep_their_path_free_message(self) -> None:
+        self.enable_actions()
+        handler = self.handler()
+        for relative in ("../evade.md", "a/b/c.md", "/abs.md"):
+            arguments = json.dumps({"path": relative, "content": "X"})
+            result = handler._run_action({"id": "w1", "name": "write_file", "arguments": arguments})
+            self.assertTrue(result.startswith("Écriture impossible : "), relative)
+            self.assertNotIn(str(self.workspace), result, relative)
+            self.assertNotIn(str(self.workspace.resolve()), result, relative)
+        self.assertEqual(list(self.workspace.iterdir()), [])
+
 
 class ArenaGatewayTests(GatewayTestCase):
     """The gateway reads the arena database read-only and writes approvals to its inbox."""

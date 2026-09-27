@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
+import io
+import os
+from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 from services.web import action_switch
+from services.web import app
 from services.web.action_switch import ActionSwitch, ENVIRONMENT_VARIABLE
 from services.web.app import WebState
 
@@ -81,6 +88,66 @@ class WebStateTests(unittest.TestCase):
     def test_a_truthy_non_boolean_does_not_enable_actions(self) -> None:
         state = WebState(None, None, None, None, None, "x" * 32, action_switch=ActionSwitch(enabled="1"))  # type: ignore[arg-type]
         self.assertFalse(state.actions_enabled)
+
+
+class _FakeServer:
+    """Stands in for ThreadingHTTPServer: binds nothing, serves nothing."""
+
+    instances: list["_FakeServer"] = []
+
+    def __init__(self, address: object, handler: object) -> None:
+        self.address = address
+        self.served = False
+        _FakeServer.instances.append(self)
+
+    def serve_forever(self) -> None:
+        self.served = True
+
+
+class MainWiringTests(unittest.TestCase):
+    """The real process environment must reach the gateway state through main()."""
+
+    def run_main(self, extra: dict[str, str]) -> tuple[WebState, str]:
+        directory = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        # Drop every inherited SOVEREIGN_* variable; keep the OS ones the runtime needs.
+        environ = {key: value for key, value in os.environ.items() if not key.upper().startswith("SOVEREIGN_")}
+        environ.update({
+            "SOVEREIGN_WEB_STATE": str(root / "state"),
+            "SOVEREIGN_SETUP_TOKEN": "s" * 32,
+            "SOVEREIGN_EMBED_ENDPOINT": "",
+            "SOVEREIGN_ARENA_DB": str(root / "arena.sqlite3"),
+            "SOVEREIGN_ARENA_INBOX": str(root / "arena-inbox"),
+            "SOVEREIGN_AGENT_REGISTRY": str(root / "absent-registry.json"),
+            **extra,
+        })
+        _FakeServer.instances.clear()
+        journal = io.StringIO()
+        with mock.patch.dict(os.environ, environ, clear=True), \
+                mock.patch.object(app, "ThreadingHTTPServer", _FakeServer), \
+                contextlib.redirect_stdout(journal):
+            self.assertEqual(app.main(), 0)
+        self.assertEqual(len(_FakeServer.instances), 1)
+        server = _FakeServer.instances[0]
+        self.assertTrue(server.served)
+        return server.state, journal.getvalue()  # type: ignore[attr-defined]
+
+    def test_exact_one_in_the_process_environment_enables_actions(self) -> None:
+        state, journal = self.run_main({ENVIRONMENT_VARIABLE: "1"})
+        self.assertIs(state.actions_enabled, True)
+        self.assertIn("web config actions_enabled=1", journal)
+
+    def test_absent_variable_leaves_actions_disabled(self) -> None:
+        state, journal = self.run_main({})
+        self.assertIs(state.actions_enabled, False)
+        self.assertIn("web config actions_enabled=0", journal)
+
+    def test_unrecognized_value_leaves_actions_disabled(self) -> None:
+        state, journal = self.run_main({ENVIRONMENT_VARIABLE: "true"})
+        self.assertIs(state.actions_enabled, False)
+        self.assertIn("warning", journal)
+        self.assertIn("web config actions_enabled=0", journal)
 
 
 if __name__ == "__main__":

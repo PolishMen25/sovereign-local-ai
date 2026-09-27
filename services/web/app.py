@@ -112,6 +112,11 @@ ACTIONS_DISABLED_CLAUSE = (
 TOOLS_SYSTEM_PROMPT = TOOLS_BASE_PROMPT + ACTIONS_CLAUSE
 TOOLS_SYSTEM_PROMPT_WITHOUT_ACTIONS = TOOLS_BASE_PROMPT + ACTIONS_DISABLED_CLAUSE
 ACTION_REFUSED_ANSWER = "Cette action n'est pas disponible sur cette installation. Rien n'a été exécuté ni écrit."
+# Fixed texts fed back to the model when an approved action fails on the host:
+# an OSError's text names absolute server paths, so it never reaches the model
+# (nor the conversation memory) and is journaled by class only.
+ACTION_EXECUTION_FAILED_RESULT = "Exécution impossible : erreur du bac à sable côté serveur."
+ACTION_WRITE_FAILED_RESULT = "Écriture impossible : chemin refusé ou erreur d'écriture côté serveur."
 STREAM_INTERRUPTED_ANSWER = "Le moteur local demandé est indisponible ou son flux a été interrompu."
 RUNTIME_REFUSED_ANSWER = "Le moteur local demandé est indisponible ou son checkpoint a été refusé."
 
@@ -510,6 +515,15 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             reason="actions_disabled" if not self.state.actions_enabled else "action_unavailable",
             stage=stage,
             tool=tool if tool in agent_tools.ACTION_TOOL_NAMES else "other",
+        )
+
+    def _log_action_failed(self, tool: str, failure: BaseException) -> None:
+        # The exception class only: its text may carry an absolute server path.
+        self.log_security_event(
+            "action_failed",
+            stage="execute",
+            tool=tool if tool in agent_tools.ACTION_TOOL_NAMES else "other",
+            error=type(failure).__name__,
         )
 
     def wants_event_stream(self) -> bool:
@@ -1095,8 +1109,11 @@ class LocalWebHandler(BaseHTTPRequestHandler):
             try:
                 outcome = code_sandbox.run_python(str(arguments.get("code", "")))
             except (ValueError, RuntimeError) as failure:
-                return f"Exécution impossible : {failure}"
-            header = ("Exécution réussie" if outcome["ok"]
+                return f"Exécution impossible : {failure}"  # curated sandbox messages, path-free
+            except OSError as failure:
+                self._log_action_failed(name, failure)
+                return ACTION_EXECUTION_FAILED_RESULT
+            header =("Exécution réussie" if outcome["ok"]
                       else "Délai dépassé" if outcome["timed_out"]
                       else f"Terminé avec le code {outcome['exit_code']}")
             return f"{header}. Sortie :\n{outcome['output']}"
@@ -1106,8 +1123,11 @@ class LocalWebHandler(BaseHTTPRequestHandler):
                 return "Écriture impossible : aucun dossier de travail configuré."
             try:
                 written = workspace.write_file(root, str(arguments.get("path", "")), str(arguments.get("content", "")))
-            except (workspace.WorkspaceError, OSError) as failure:
-                return f"Écriture impossible : {failure}"
+            except workspace.WorkspaceError as failure:
+                return f"Écriture impossible : {failure}"  # curated messages, never a server path
+            except OSError as failure:
+                self._log_action_failed(name, failure)
+                return ACTION_WRITE_FAILED_RESULT
             self.send_event("file", {"relative": written["relative"], "bytes": written["bytes"]})
             return (f"Fichier écrit : {written['relative']} ({written['bytes']} octets), "
                     "téléchargeable par l'utilisateur depuis le dossier de travail.")

@@ -62,6 +62,9 @@ actions_disabled`, y compris pour une action en attente ou un identifiant
 forgé) ou exécution est refusée et journalisée sans contenu. `GET /v1/session`
 et `GET /v1/health` exposent le booléen `actions_enabled`. Les outils en lecture
 seule (recherche, documents, heure, liste du dossier de travail) ne changent pas.
+Activées, une action approuvée qui échoue côté système (erreur d'écriture, bac à
+sable introuvable) renvoie au modèle un texte fixe, sans chemin du serveur ; le
+journal n'en garde que la classe d'erreur (`event=action_failed`).
 
 Déploiement : l'installation en service garde son comportement actuel tant que
 ce code n'est pas déployé. Une fois déployé, les actions sont coupées ; les
