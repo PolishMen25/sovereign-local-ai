@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/collector-receipt/0.1.0/schema.json",
+  "title": "Accusé de réception technique du Collector",
+  "description": "PROVISOIRE : contrat candidat, non câblé. Réponse synchrone de submit_research_package. Le reçu ne contient aucun extrait du paquet, aucun état interne ultérieur (PENDING, VALIDATED, etc.), aucun résultat d'indexation et aucun motif de refus détaillé. L'empreinte d'ingress porte sur les octets exactement reçus (portée ingress-payload-bytes, voir docs/data/canonical-hashing.md) et ne figure jamais dans le paquet qu'elle couvre.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "submission_id",
+    "received_at",
+    "ingress_payload_sha256",
+    "status"
+  ],
+  "properties": {
+    "submission_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Identifiant attribué par le Collector à cette soumission ; il ne permet aucune lecture ni aucun suivi différé."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Horodatage RFC 3339 de réception par le Collector, avec décalage explicite."
+    },
+    "ingress_payload_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 en hexadécimal minuscule des octets du corps HTTP exactement reçus, sans décodage de Content-Encoding ni normalisation."
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "rejected"
+      ],
+      "description": "Résultat d'acceptation technique uniquement ; jamais une décision de validation de connaissance."
+    }
+  }
+}
