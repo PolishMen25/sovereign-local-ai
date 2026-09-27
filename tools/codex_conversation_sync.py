@@ -367,7 +367,10 @@ def _load_queued_conversation(path: Path) -> tuple[bytes, dict[str, Any]]:
         context="queued conversation",
     )
     document = _strict_json_object(payload, context="queued conversation")
-    _validate_conversation_document(document, expected_conversation_id=path.stem)
+    conversation_id, separator, filename_digest = path.stem.partition(".")
+    if separator and LOWERCASE_SHA256.fullmatch(filename_digest) is None:
+        raise ValueError("queued conversation filename digest is invalid")
+    _validate_conversation_document(document, expected_conversation_id=conversation_id)
     canonical_payload = json.dumps(
         document,
         ensure_ascii=False,
@@ -376,6 +379,8 @@ def _load_queued_conversation(path: Path) -> tuple[bytes, dict[str, Any]]:
     ).encode("utf-8")
     if payload != canonical_payload:
         raise ValueError("queued conversation is not canonically encoded")
+    if separator and filename_digest != hashlib.sha256(payload).hexdigest():
+        raise ValueError("queued conversation filename digest does not match payload")
     return payload, document
 
 
@@ -434,6 +439,22 @@ def _local_receipt_matches(path: Path, *, payload: bytes, conversation_id: str) 
     return True
 
 
+def _snapshot_path(directory: Path, conversation_id: str, payload: bytes) -> Path:
+    digest = hashlib.sha256(payload).hexdigest()
+    return directory / f"{conversation_id}.{digest}.json"
+
+
+def _any_local_receipt_matches(home: Path, *, payload: bytes, conversation_id: str) -> bool:
+    """Recognize both per-snapshot receipts and receipts from the original relay."""
+    return any(
+        _local_receipt_matches(path, payload=payload, conversation_id=conversation_id)
+        for path in (
+            _snapshot_path(home / "receipts", conversation_id, payload),
+            home / "receipts" / f"{conversation_id}.json",
+        )
+    )
+
+
 def _validate_response_content_type(response: Any) -> None:
     headers = getattr(response, "headers", None)
     if headers is None:
@@ -481,6 +502,45 @@ def _atomic_write(path: Path, data: bytes) -> None:
             pass
 
 
+def _queue_once(path: Path, data: bytes) -> bool:
+    """Publish a complete queued revision without replacing a pending snapshot."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise ValueError("queued conversation target is a symlink")
+    if path.exists():
+        current = _read_bounded_regular_file(
+            path, MAX_COLLECTOR_BODY_BYTES, context="queued conversation"
+        )
+        if current != data:
+            raise ValueError("queued conversation snapshot already exists with different content")
+        return False
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent, prefix=".incoming-", suffix=".tmp"
+    )
+    temporary = Path(temporary_name)
+    try:
+        staged_file = os.fdopen(descriptor, "wb")
+        descriptor = -1
+        with staged_file as staged:
+            staged.write(data)
+            staged.flush()
+            os.fsync(staged.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            current = _read_bounded_regular_file(
+                path, MAX_COLLECTOR_BODY_BYTES, context="queued conversation"
+            )
+            if current != data:
+                raise ValueError("queued conversation snapshot already exists with different content")
+            return False
+        return True
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
+
+
 def queue_transcript(path: Path, supplied_session_id: str | None = None) -> int:
     embedded_session_id, captured_at, messages = read_transcript(path)
     session_id = supplied_session_id or embedded_session_id
@@ -494,15 +554,21 @@ def queue_transcript(path: Path, supplied_session_id: str | None = None) -> int:
         if not 1 <= len(payload) <= MAX_COLLECTOR_BODY_BYTES:
             raise ValueError("sanitized conversation chunk exceeds collector limit")
         _validate_conversation_document(document, expected_conversation_id=conversation_id)
-        receipt_path = home / "receipts" / f"{conversation_id}.json"
-        if _local_receipt_matches(
-            receipt_path,
-            payload=payload,
-            conversation_id=conversation_id,
+        if _any_local_receipt_matches(
+            home, payload=payload, conversation_id=conversation_id
         ):
             continue
-        _atomic_write(home / "queue" / f"{conversation_id}.json", payload)
-        queued += 1
+        legacy_queue = home / "queue" / f"{conversation_id}.json"
+        if legacy_queue.exists() or legacy_queue.is_symlink():
+            try:
+                legacy_payload, _ = _load_queued_conversation(legacy_queue)
+            except ValueError:
+                pass
+            else:
+                if legacy_payload == payload:
+                    continue
+        if _queue_once(_snapshot_path(home / "queue", conversation_id, payload), payload):
+            queued += 1
     return queued
 
 
@@ -512,6 +578,14 @@ def _log(event: str) -> None:
     stamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     with (home / "sync.log").open("a", encoding="utf-8") as log:
         log.write(f"{stamp} {event}\n")
+
+
+def _queue_sort_key(path: Path) -> tuple[int, str]:
+    try:
+        modified = path.lstat().st_mtime_ns
+    except OSError:
+        modified = 2**63 - 1
+    return modified, path.name
 
 
 def flush_queue() -> int:
@@ -537,15 +611,23 @@ def flush_queue() -> int:
         _RejectRedirectHandler(),
     )
     failures = 0
-    for queued_path in sorted((home / "queue").glob("*.json")) if (home / "queue").exists() else []:
+    # Preserve the order snapshots were queued. A newer transcript must not
+    # become the primary RAW snapshot solely because its digest sorts first.
+    queued_files = (
+        sorted(
+            (home / "queue").glob("*.json"),
+            key=_queue_sort_key,
+        )
+        if (home / "queue").exists()
+        else []
+    )
+    for queued_path in queued_files:
         try:
             payload, document = _load_queued_conversation(queued_path)
             conversation_id = document["conversation_id"]
-            receipt_path = home / "receipts" / f"{conversation_id}.json"
-            if _local_receipt_matches(
-                receipt_path,
-                payload=payload,
-                conversation_id=conversation_id,
+            receipt_path = home / "receipts" / queued_path.name
+            if _any_local_receipt_matches(
+                home, payload=payload, conversation_id=conversation_id
             ):
                 queued_path.unlink()
                 _log(f"queue_reconciled conversation={conversation_id}")

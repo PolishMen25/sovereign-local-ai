@@ -244,6 +244,154 @@ class CodexConversationSyncTests(unittest.TestCase):
         second = MODULE.build_documents("stable-session", "2026-08-31T12:00:00Z", messages)
         self.assertEqual(first, second)
 
+    def test_two_pending_revisions_are_preserved_and_receipted(self) -> None:
+        transcript = self.temp_root / "rollout-revisions.jsonl"
+        first_row = {
+            "type": "response_item",
+            "payload": {
+                "type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": "bonjour"}],
+            },
+        }
+        later_row = {
+            "type": "response_item",
+            "payload": {
+                "type": "message", "role": "assistant",
+                "content": [{"type": "output_text", "text": "salut"}],
+            },
+        }
+        transcript.write_text(json.dumps(first_row), encoding="utf-8")
+        sync_home = self.temp_root / "sync"
+        self._write_local_endpoint_config(
+            {
+                "collector_url": "https://collector.example.test/v1/conversations",
+                "allowed_host": "collector.example.test",
+            }
+        )
+        (sync_home / "collector.token").write_text("x" * 32, encoding="utf-8")
+
+        with mock.patch.object(MODULE, "sync_home", return_value=sync_home):
+            self.assertEqual(1, MODULE.queue_transcript(transcript, "stable-session"))
+            first_path = next((sync_home / "queue").glob("*.json"))
+            first_payload = first_path.read_bytes()
+            os.utime(first_path, ns=(1_000_000_000, 1_000_000_000))
+            transcript.write_text("\n".join((json.dumps(first_row), json.dumps(later_row))), encoding="utf-8")
+            self.assertEqual(1, MODULE.queue_transcript(transcript, "stable-session"))
+            pending = sorted((sync_home / "queue").glob("*.json"))
+            self.assertEqual(2, len(pending))
+            self.assertEqual(first_payload, first_path.read_bytes())
+            self.assertEqual(0, MODULE.queue_transcript(transcript, "stable-session"))
+
+            submitted: list[bytes] = []
+
+            def accepted(upload: object, timeout: int) -> object:
+                payload = upload.data
+                submitted.append(payload)
+                document = json.loads(payload)
+                return self._response(
+                    json.dumps(
+                        {
+                            "state": "raw_imported",
+                            "conversation_id": document["conversation_id"],
+                            "sha256": hashlib.sha256(payload).hexdigest(),
+                        }
+                    ).encode("utf-8")
+                )
+
+            opener = mock.MagicMock()
+            opener.open.side_effect = accepted
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with mock.patch.object(
+                    MODULE.request, "build_opener", return_value=opener
+                ):
+                    self.assertEqual(0, MODULE.flush_queue())
+
+        self.assertEqual([], list((sync_home / "queue").glob("*.json")))
+        self.assertEqual(2, opener.open.call_count)
+        self.assertEqual(first_payload, submitted[0])
+        self.assertEqual(3, len(json.loads(submitted[1])["messages"]))
+        self.assertEqual(
+            {path.name for path in pending},
+            {path.name for path in (sync_home / "receipts").glob("*.json")},
+        )
+
+    def test_legacy_pending_snapshot_is_not_replaced_by_later_revision(self) -> None:
+        transcript = self.temp_root / "rollout-legacy.jsonl"
+        first_row = {
+            "type": "response_item",
+            "payload": {
+                "type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": "bonjour"}],
+            },
+        }
+        later_row = {
+            "type": "response_item",
+            "payload": {
+                "type": "message", "role": "assistant",
+                "content": [{"type": "output_text", "text": "salut"}],
+            },
+        }
+        transcript.write_text(json.dumps(first_row), encoding="utf-8")
+        sync_home = self.temp_root / "sync"
+        with mock.patch.object(MODULE, "sync_home", return_value=sync_home):
+            self.assertEqual(1, MODULE.queue_transcript(transcript, "stable-session"))
+            first_path = next((sync_home / "queue").glob("*.json"))
+            first_payload, first_document = MODULE._load_queued_conversation(first_path)
+            legacy_path = sync_home / "queue" / f"{first_document['conversation_id']}.json"
+            first_path.rename(legacy_path)
+            self.assertEqual(0, MODULE.queue_transcript(transcript, "stable-session"))
+            transcript.write_text("\n".join((json.dumps(first_row), json.dumps(later_row))), encoding="utf-8")
+            self.assertEqual(1, MODULE.queue_transcript(transcript, "stable-session"))
+
+        self.assertEqual(first_payload, legacy_path.read_bytes())
+        self.assertEqual(2, len(list((sync_home / "queue").glob("*.json"))))
+
+    def test_legacy_receipt_matches_new_queue_format(self) -> None:
+        transcript = self.temp_root / "rollout-receipt.jsonl"
+        transcript.write_text(
+            json.dumps(
+                {
+                    "type": "response_item",
+                    "payload": {
+                        "type": "message", "role": "user",
+                        "content": [{"type": "input_text", "text": "bonjour"}],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        sync_home = self.temp_root / "sync"
+        with mock.patch.object(MODULE, "sync_home", return_value=sync_home):
+            self.assertEqual(1, MODULE.queue_transcript(transcript, "stable-session"))
+            queued = next((sync_home / "queue").glob("*.json"))
+            payload, document = MODULE._load_queued_conversation(queued)
+            legacy_receipt = sync_home / "receipts" / f"{document['conversation_id']}.json"
+            MODULE._atomic_write(
+                legacy_receipt,
+                json.dumps(
+                    {
+                        "received_at": "2026-08-31T12:00:00Z",
+                        "state": "raw_imported",
+                        "conversation_id": document["conversation_id"],
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                ).encode("utf-8"),
+            )
+            self.assertEqual(0, MODULE.queue_transcript(transcript, "stable-session"))
+
+    def test_versioned_filename_digest_is_verified_before_network(self) -> None:
+        sync_home, _, _, document = self._prepare_queued_conversation()
+        legacy_path = sync_home / "queue" / f"{document['conversation_id']}.json"
+        legacy_path.rename(sync_home / "queue" / f"{document['conversation_id']}.{'0' * 64}.json")
+        opener = mock.MagicMock()
+        with mock.patch.object(MODULE, "sync_home", return_value=sync_home):
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with mock.patch.object(
+                    MODULE.request, "build_opener", return_value=opener
+                ):
+                    self.assertEqual(1, MODULE.flush_queue())
+        opener.open.assert_not_called()
+
     def test_queue_is_idempotent_only_after_valid_receipt(self) -> None:
         transcript = self.temp_root / "rollout.jsonl"
         transcript.write_text(
@@ -263,7 +411,9 @@ class CodexConversationSyncTests(unittest.TestCase):
                     {
                         "received_at": "2026-08-31T12:00:00Z",
                         "state": "raw_imported",
-                        "conversation_id": queued.stem,
+                        "conversation_id": MODULE._load_queued_conversation(queued)[1][
+                            "conversation_id"
+                        ],
                         "sha256": hashlib.sha256(payload).hexdigest(),
                     },
                     separators=(",", ":"),
