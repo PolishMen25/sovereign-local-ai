@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.local-ai.invalid/evaluation-grid/v1/schema.json",
   "title": "Grille d'évaluation V1 lisible par machine",
-  "description": "Contrat structurel de la grille candidate. Le validateur tools/validate_evaluation_grid.py applique en plus les règles que ce schéma ne peut pas exprimer : existence des chemins dans le dépôt, décisions présentes et non remplacées dans le registre, date d'approbation non future, empreinte SHA-256 de la grille recalculée, cohérence des gates avec gate_links et couverture des huit axes. Ce contrat n'approuve aucun seuil.",
+  "description": "Contrat structurel de la grille candidate. Le validateur tools/validate_evaluation_grid.py applique en plus les règles que ce schéma ne peut pas exprimer : existence des chemins dans le dépôt, décisions présentes et non remplacées dans le registre, date d'approbation non future, empreinte SHA-256 de la grille recalculée (entrées de la grille et octets des fichiers de fixture, fins de ligne CRLF lues comme LF) et consignée dans la ligne du registre de la décision d'approbation, chemins de fixture limités à des fichiers réguliers, cohérence des gates avec gate_links et couverture des huit axes. Ce contrat n'approuve aucun seuil.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "grid_id", "status", "source_document", "axes", "metrics", "gate_links"],
@@ -114,11 +114,12 @@
     "approval": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decision_id", "approved_on", "grid_sha256"],
+      "required": ["decision_id", "approved_on", "grid_sha256", "previous_status"],
       "properties": {
         "decision_id": { "$ref": "#/$defs/decisionId" },
         "approved_on": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
-        "grid_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "grid_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "previous_status": { "enum": ["proposed", "pending_measurement", "confirmed"] }
       }
     },
     "threshold": {

@@ -46,7 +46,8 @@ def load_candidate_suite(path: Path) -> dict[str, Any]:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError("evaluation suite is unavailable or invalid") from error
-    validate_suite(document)
+    # The CORE-30M E1 contract, pinned explicitly: 50 balanced prompts.
+    validate_suite(document, model_name="CORE-30M", prompt_count=50)
     return document
 
 

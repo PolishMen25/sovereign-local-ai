@@ -9,20 +9,28 @@ least one G gate and one A gate.  The validator refuses:
 - a missing, extra or malformed field;
 - an unknown axis, gate id or threshold status;
 - a fixture or procedure path that does not exist in the repository (a fixture
-  that does not exist yet must be declared ``missing``, never pointed at);
+  that does not exist yet must be declared ``missing``, never pointed at), and
+  a fixture path that is not a regular file;
 - a cited decision absent from, or superseded in, the decision register;
-- an ``approved`` threshold without a decision id, an approval date and the
-  grid SHA-256, or whose SHA-256 does not match the grid content.
+- an ``approved`` threshold without a decision id, an approval date, its
+  pre-approval status and the grid SHA-256; whose SHA-256 does not match the
+  grid content; or whose decision row in the register does not record that
+  SHA-256.
 
-The grid SHA-256 covers the canonical JSON of the grid with every threshold's
-``status`` and ``approval`` removed.  Approving a threshold therefore leaves
-the digest unchanged, while editing any threshold, fixture, procedure or gate
-after approval breaks it: a threshold cannot be tuned after the fact without a
-new decision.  ``--print-digest`` prints that digest for the owner to pin in a
-decision entry.
+The grid SHA-256 covers the canonical JSON of the grid entries (every
+threshold with its status, an approved one counted with the status recorded in
+``approval.previous_status``, and without its ``approval`` object) together
+with the SHA-256 of the bytes of every fixture file the grid points at.
+Approving a threshold therefore leaves the digest unchanged, while editing any
+threshold, status, fixture entry, fixture file, procedure entry or gate after
+approval breaks it: a threshold or an evaluation set cannot be tuned after the
+fact without a new decision.  The files listed as procedure paths (tools,
+documents) are not hashed: their changes go through review, not through this
+pin.  ``--print-digest`` prints that digest for the owner to record in the
+decision entry that approves the thresholds.
 
-The validator reads the grid, the decision register and path metadata only.
-It writes nothing and makes no network call.
+The validator reads the grid, the decision register, the fixture files and
+path metadata only.  It writes nothing and makes no network call.
 
 Exit codes: 0 valid, 1 invalid grid, 2 usage error.
 """
@@ -52,13 +60,14 @@ METRIC_KEYS = frozenset({"id", "axis", "title", "fixture", "procedure", "thresho
 FIXTURE_KEYS = frozenset({"status", "paths", "description"})
 PROCEDURE_KEYS = frozenset({"description", "paths"})
 THRESHOLD_KEYS = frozenset({"status", "statement", "decisions"})
-APPROVAL_KEYS = frozenset({"decision_id", "approved_on", "grid_sha256"})
+APPROVAL_KEYS = frozenset({"decision_id", "approved_on", "grid_sha256", "previous_status"})
 
 AXIS_IDS = tuple(range(1, 9))
 G_GATES = tuple(f"G{index}" for index in range(9))
 A_GATES = tuple(f"A{index}" for index in range(9))
 FIXTURE_STATUSES = ("present", "partial", "missing", "runtime_artifact")
 THRESHOLD_STATUSES = ("proposed", "pending_measurement", "confirmed", "approved")
+PRE_APPROVAL_STATUSES = ("proposed", "pending_measurement", "confirmed")
 LINK_LEVELS = ("required", "partial", "none")
 RESPONSIBLE_ROLES = ("project_owner",)
 
@@ -69,9 +78,11 @@ SHA256 = re.compile(r"^[0-9a-f]{64}$")
 ISO_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 SAFE_PATH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$")
 REGISTER_ROW = re.compile(r"^\|\s*(D-[0-9]{3})\s*\|\s*(.*)$")
+SAFE_JSON_KEY = re.compile(r"^[a-z_][a-z0-9_]{0,63}$")
 
 MAX_GRID_BYTES = 1024 * 1024
 MAX_REGISTER_BYTES = 1024 * 1024
+MAX_FIXTURE_BYTES = 16 * 1024 * 1024
 MAX_METRICS = 200
 MAX_PATHS = 16
 MAX_DECISIONS = 8
@@ -87,7 +98,8 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise GridInvalid(f"duplicate JSON key: {key}")
+            # Echo a key only when it looks like a schema field, never raw input.
+            raise GridInvalid(f"duplicate JSON key: {key}" if SAFE_JSON_KEY.fullmatch(key) else "duplicate JSON key")
         result[key] = value
     return result
 
@@ -110,6 +122,8 @@ def load_grid(path: Path) -> dict[str, Any]:
         raise GridInvalid("grid must be UTF-8") from error
     except json.JSONDecodeError as error:
         raise GridInvalid(f"grid is not valid JSON (line {error.lineno})") from error
+    except RecursionError as error:
+        raise GridInvalid("grid nesting is too deep") from error
     if not isinstance(document, dict):
         raise GridInvalid("grid must be a JSON object")
     return document
@@ -119,8 +133,42 @@ def canonical_json(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
 
 
-def grid_sha256(document: dict[str, Any]) -> str:
-    """Digest of the grid content, independent of threshold approval state."""
+def _fixture_file_sha256(root: Path, value: Any, context: str) -> str:
+    _require_repository_path(value, root, context)
+    target = root.joinpath(*PurePosixPath(value).parts)
+    if not target.is_file():
+        raise GridInvalid(f"{context} must be a regular file: {value}")
+    payload = target.read_bytes()
+    if len(payload) > MAX_FIXTURE_BYTES:
+        raise GridInvalid(f"{context} is larger than the bounded fixture size: {value}")
+    # Canonical bytes: CRLF read as LF, so a Windows checkout (autocrlf) and a
+    # Linux one pin the same digest.
+    return hashlib.sha256(payload.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def fixture_digests(document: dict[str, Any], root: Path = PROJECT_ROOT) -> dict[str, str]:
+    """SHA-256 of the bytes of every fixture file the grid points at, by repository path."""
+
+    digests: dict[str, str] = {}
+    metrics = document.get("metrics") if isinstance(document, dict) else None
+    for metric in metrics if isinstance(metrics, list) else []:
+        fixture = metric.get("fixture") if isinstance(metric, dict) else None
+        paths = fixture.get("paths") if isinstance(fixture, dict) else None
+        for value in paths if isinstance(paths, list) else []:
+            if isinstance(value, str) and value not in digests:
+                digests[value] = _fixture_file_sha256(root, value, "fixture path")
+            elif not isinstance(value, str):
+                raise GridInvalid("fixture path is not a safe relative path")
+    return dict(sorted(digests.items()))
+
+
+def grid_sha256(document: dict[str, Any], root: Path = PROJECT_ROOT) -> str:
+    """Digest of the grid entries and fixture files, independent of approvals.
+
+    An approved threshold counts with the status recorded in
+    ``approval.previous_status``: approving leaves the digest unchanged, any
+    other status change (``proposed`` to ``confirmed``, say) breaks it.
+    """
 
     content = copy.deepcopy(document)
     metrics = content.get("metrics")
@@ -128,13 +176,15 @@ def grid_sha256(document: dict[str, Any]) -> str:
         for metric in metrics:
             threshold = metric.get("threshold") if isinstance(metric, dict) else None
             if isinstance(threshold, dict):
-                threshold.pop("status", None)
-                threshold.pop("approval", None)
-    return hashlib.sha256(canonical_json(content)).hexdigest()
+                approval = threshold.pop("approval", None)
+                if threshold.get("status") == "approved":
+                    threshold["status"] = approval.get("previous_status") if isinstance(approval, dict) else None
+    payload = {"grid": content, "fixture_sha256": fixture_digests(document, root)}
+    return hashlib.sha256(canonical_json(payload)).hexdigest()
 
 
-def load_decision_register(path: Path) -> dict[str, bool]:
-    """Map every ``D-xxx`` row of the register to whether it is superseded."""
+def load_decision_register(path: Path) -> dict[str, str]:
+    """Map every ``D-xxx`` row of the register to the rest of its row text."""
 
     if path.is_symlink() or not path.is_file():
         raise GridInvalid("decision register is unavailable")
@@ -145,14 +195,18 @@ def load_decision_register(path: Path) -> dict[str, bool]:
         text = payload.decode("utf-8")
     except UnicodeDecodeError as error:
         raise GridInvalid("decision register must be UTF-8") from error
-    register: dict[str, bool] = {}
+    register: dict[str, str] = {}
     for line in text.splitlines():
         match = REGISTER_ROW.match(line.strip())
         if match is not None:
-            register[match.group(1)] = match.group(2).lstrip().startswith("**SUPERSEDED")
+            register[match.group(1)] = match.group(2).strip()
     if not register:
         raise GridInvalid("decision register contains no decision")
     return register
+
+
+def is_superseded(row: str) -> bool:
+    return row.startswith("**SUPERSEDED")
 
 
 def _require_text(value: Any, context: str, bounds: tuple[int, int] = TEXT_RANGE) -> str:
@@ -201,12 +255,12 @@ def _require_gates(value: Any, known: tuple[str, ...], context: str) -> list[str
     return value
 
 
-def _require_decision(value: Any, register: dict[str, bool], context: str) -> str:
+def _require_decision(value: Any, register: dict[str, str], context: str) -> str:
     if not isinstance(value, str) or DECISION_ID.fullmatch(value) is None:
         raise GridInvalid(f"{context} must be a decision id D-xxx")
     if value not in register:
         raise GridInvalid(f"{context} {value} is not in the decision register")
-    if register[value]:
+    if is_superseded(register[value]):
         raise GridInvalid(f"{context} {value} is superseded in the decision register")
     return value
 
@@ -222,10 +276,16 @@ def _validate_fixture(value: Any, root: Path, context: str) -> str:
         raise GridInvalid(f"{context} is {status} but lists no path")
     if status in {"missing", "runtime_artifact"} and paths:
         raise GridInvalid(f"{context} is {status} and must not point at a path")
+    for value in paths:  # fixture bytes enter the grid digest: files only
+        if not root.joinpath(*PurePosixPath(value).parts).is_file():
+            raise GridInvalid(f"{context} path must be a regular file: {value}")
     return status
 
 
-def _validate_threshold(value: Any, register: dict[str, bool], digest: str, today: date, context: str) -> str:
+def _validate_threshold(value: Any, register: dict[str, str], today: date,
+                        context: str) -> tuple[str, dict[str, Any] | None]:
+    """Validate one threshold; return its status and, when approved, its approval to pin."""
+
     threshold = _require_keys(value, THRESHOLD_KEYS, context, optional=frozenset({"approval"}))
     status = threshold["status"]
     if status not in THRESHOLD_STATUSES:
@@ -241,11 +301,15 @@ def _validate_threshold(value: Any, register: dict[str, bool], digest: str, toda
     if status != "approved":
         if "approval" in threshold:
             raise GridInvalid(f"{context} carries an approval but is not approved")
-        return status
+        return status, None
     if "approval" not in threshold:
         raise GridInvalid(f"{context} is approved without an approval record")
     approval = _require_keys(threshold["approval"], APPROVAL_KEYS, f"{context} approval")
     _require_decision(approval["decision_id"], register, f"{context} approval decision")
+    if approval["previous_status"] not in PRE_APPROVAL_STATUSES:
+        raise GridInvalid(f"{context} approval previous_status must be one of {', '.join(PRE_APPROVAL_STATUSES)}")
+    if approval["previous_status"] == "confirmed" and not decisions:
+        raise GridInvalid(f"{context} was confirmed but cites no decision")
     approved_on = approval["approved_on"]
     if not isinstance(approved_on, str) or ISO_DATE.fullmatch(approved_on) is None:
         raise GridInvalid(f"{context} approval date must be YYYY-MM-DD")
@@ -258,9 +322,16 @@ def _validate_threshold(value: Any, register: dict[str, bool], digest: str, toda
     pinned = approval["grid_sha256"]
     if not isinstance(pinned, str) or SHA256.fullmatch(pinned) is None:
         raise GridInvalid(f"{context} approval grid_sha256 must be a lowercase SHA-256")
-    if pinned != digest:
+    return status, approval
+
+
+def _check_pin(approval: dict[str, Any], register: dict[str, str], digest: str, context: str) -> None:
+    """The pinned digest must be the grid's and be recorded in the approving decision row."""
+
+    if approval["grid_sha256"] != digest:
         raise GridInvalid(f"{context} approval grid_sha256 does not match the grid content")
-    return status
+    if digest not in register[approval["decision_id"]]:
+        raise GridInvalid(f"{context} approval decision {approval['decision_id']} does not record the pinned grid_sha256")
 
 
 def _validate_gate_links(value: Any) -> dict[str, dict[str, str]]:
@@ -287,7 +358,6 @@ def validate(document: Any, *, root: Path = PROJECT_ROOT, decisions_path: Path |
     _require_repository_path(grid["source_document"], root, "source_document")
     register = load_decision_register(decisions_path or root.joinpath(*DECISIONS_RELATIVE.parts))
     today = today or datetime.now(timezone.utc).date()
-    digest = grid_sha256(grid)
 
     axes = grid["axes"]
     if not isinstance(axes, list) or len(axes) != len(AXIS_IDS):
@@ -307,8 +377,10 @@ def validate(document: Any, *, root: Path = PROJECT_ROOT, decisions_path: Path |
     covered_axes: set[int] = set()
     fixtures: dict[str, int] = {status: 0 for status in FIXTURE_STATUSES}
     thresholds: dict[str, int] = {status: 0 for status in THRESHOLD_STATUSES}
+    approvals: list[tuple[str, dict[str, Any]]] = []
     for position, metric in enumerate(metrics):
-        label = metric.get("id") if isinstance(metric, dict) and isinstance(metric.get("id"), str) else f"#{position}"
+        identifier = metric.get("id") if isinstance(metric, dict) else None
+        label = identifier if isinstance(identifier, str) and METRIC_ID.fullmatch(identifier) else f"#{position}"
         context = f"metric {label}"
         _require_keys(metric, METRIC_KEYS, context)
         match = METRIC_ID.fullmatch(metric["id"]) if isinstance(metric["id"], str) else None
@@ -323,7 +395,10 @@ def validate(document: Any, *, root: Path = PROJECT_ROOT, decisions_path: Path |
         procedure = _require_keys(metric["procedure"], PROCEDURE_KEYS, f"{context} procedure")
         _require_text(procedure["description"], f"{context} procedure description")
         _require_paths(procedure["paths"], root, f"{context} procedure paths")
-        thresholds[_validate_threshold(metric["threshold"], register, digest, today, f"{context} threshold")] += 1
+        status, approval = _validate_threshold(metric["threshold"], register, today, f"{context} threshold")
+        thresholds[status] += 1
+        if approval is not None:
+            approvals.append((f"{context} threshold", approval))
         if metric["responsible"] not in RESPONSIBLE_ROLES:
             raise GridInvalid(f"{context} responsible role is unknown")
         g_gates = _require_gates(metric["g_gates"], G_GATES, f"{context} g_gates")
@@ -334,6 +409,9 @@ def validate(document: Any, *, root: Path = PROJECT_ROOT, decisions_path: Path |
     missing_axes = sorted(set(AXIS_IDS) - covered_axes)
     if missing_axes:
         raise GridInvalid(f"grid axes without metric: {', '.join(map(str, missing_axes))}")
+    digest = grid_sha256(grid, root)
+    for context, approval in approvals:
+        _check_pin(approval, register, digest, context)
     return {
         "schema_version": SCHEMA_VERSION,
         "grid_id": grid["grid_id"],
@@ -352,7 +430,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", type=Path, default=PROJECT_ROOT,
                         help="repository root used to resolve fixture, procedure and register paths")
     parser.add_argument("--print-digest", action="store_true",
-                        help="print only the grid SHA-256 to pin in a decision entry (the grid must be valid)")
+                        help="print only the grid SHA-256 (grid entries and fixture files) to record in the "
+                             "approving decision entry (the grid must be valid)")
     return parser
 
 
@@ -360,8 +439,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         summary = validate(load_grid(args.grid), root=args.root)
-    except (GridInvalid, OSError) as error:
+    except GridInvalid as error:
         print(f"invalid evaluation grid: {error}", file=sys.stderr)
+        return 1
+    except OSError as error:  # never echo the path: it may name internal storage
+        print(f"invalid evaluation grid: input unreadable: {error.strerror or 'I/O error'}", file=sys.stderr)
         return 1
     if args.print_digest:
         print(summary["grid_sha256"])

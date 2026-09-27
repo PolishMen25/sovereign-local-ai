@@ -129,17 +129,58 @@ class BuildIncrementTests(unittest.TestCase):
             bridge.build(packet, self.suite, self.raw)
         self.assertFalse(self.raw.exists())
 
+    def test_refuses_a_packet_holding_a_solution_for_an_e2_overlapping_task(self) -> None:
+        overlapping = {"id": "arena-017-clamp", "function_name": "clamp",
+                       "prompt": "Write clamp(x, lo, hi) bounding x.", "test_source": "assert True\n"}
+        self.suite.write_text(json.dumps(dict(SUITE, tasks=SUITE["tasks"] + [overlapping])), encoding="utf-8")
+        packet = self.write_packet("arena-p11", [
+            self.solution("arena-001-double", "def double(x):\n    return 2 * x"),
+            self.solution("arena-017-clamp", "def clamp(x, lo, hi):\n    return max(lo, min(hi, x))"),
+        ])
+        with self.assertRaisesRegex(bridge.IncrementRefused, "arena-017-clamp refused: function clamp .*D-040"):
+            bridge.build(packet, self.suite, self.raw)
+        self.assertFalse(self.raw.exists())
+        clean = self.write_packet("arena-p12", [self.solution("arena-001-double", "def double(x):\n    return 2 * x")])
+        self.assertEqual(1, bridge.build(clean, self.suite, self.raw)["record_count"])
+
+    def test_refuses_everything_when_the_sealed_suite_cannot_be_read(self) -> None:
+        packet = self.write_packet("arena-p13", [self.solution("arena-001-double", "def double(x):\n    return 2 * x")])
+        broken = self.root / "e2.json"
+        for name, payload in (("missing", None), ("not json", b"{not json"), ("nested", b"[" * 100_000),
+                              ("no function name", json.dumps({"schema_version": bridge.SEALED_SUITE_SCHEMA,
+                                                                "tasks": [{"id": "python-01-x"}]}).encode("utf-8")),
+                              ("wrong schema", json.dumps({"schema_version": "other",
+                                                           "tasks": [{"function_name": "x"}]}).encode("utf-8"))):
+            with self.subTest(name=name):
+                if payload is None:
+                    broken.unlink(missing_ok=True)
+                else:
+                    broken.write_bytes(payload)
+                with self.assertRaisesRegex(bridge.IncrementRefused, "D-040 overlap cannot be checked"):
+                    bridge.build(packet, self.suite, self.raw, sealed_path=broken)
+                self.assertFalse(self.raw.exists())
+
+    def test_default_practice_suite_withholds_every_e2_overlapping_task(self) -> None:
+        _, _, withheld = bridge.load_task_suite(PRACTICE_SUITE)
+        sealed = {task["function_name"] for task in json.loads(SEALED_E2_SUITE.read_text(encoding="utf-8"))["tasks"]}
+        practice = json.loads(PRACTICE_SUITE.read_text(encoding="utf-8"))["tasks"]
+        self.assertEqual(withheld, {task["id"]: task["function_name"] for task in practice if task["function_name"] in sealed})
+        self.assertEqual("clamp", withheld["arena-017-clamp"])
+        self.assertEqual(14, len(withheld))
+
     def test_refuses_a_malformed_suite(self) -> None:
-        for document in ([], {"tasks": []}, {"tasks": [{"id": "arena-001-double"}]}, {"tasks": [{"id": 7, "prompt": "x"}]}):
+        for document in ([], {"tasks": []}, {"tasks": [{"id": "arena-001-double"}]}, {"tasks": [{"id": 7, "prompt": "x"}]},
+                         {"tasks": [{"id": "arena-001-double", "prompt": "x"}]},
+                         {"tasks": [{"id": "arena-001-double", "prompt": "x", "function_name": "not a name"}]}):
             with self.subTest(document=document):
                 self.suite.write_text(json.dumps(document), encoding="utf-8")
-                with self.assertRaisesRegex(bridge.IncrementRefused, "empty or malformed"):
+                with self.assertRaisesRegex(bridge.IncrementRefused, "malformed"):
                     bridge.load_task_suite(self.suite)
 
     def test_default_suite_is_the_practice_suite(self) -> None:
         self.assertEqual(bridge.build_parser().parse_args(["packet"]).suite, Path("configs/arena/practice-suite.v1.json"))
         self.assertEqual(REPO / bridge.DEFAULT_SUITE, PRACTICE_SUITE)
-        prompts, digest = bridge.load_task_suite(PRACTICE_SUITE)
+        prompts, digest, _ = bridge.load_task_suite(PRACTICE_SUITE)
         self.assertGreaterEqual(len(prompts), 50)
         self.assertTrue(all(task_id.startswith("arena-") for task_id in prompts))
         self.assertEqual(digest, hashlib.sha256(PRACTICE_SUITE.read_bytes()).hexdigest())

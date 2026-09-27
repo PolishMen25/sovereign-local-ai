@@ -2,10 +2,14 @@ import contextlib
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from tools import validate_use_case_suite as use_cases
 from tools.validate_use_case_suite import SuiteInvalid
@@ -73,12 +77,36 @@ def code_of(item: dict) -> str:
     return next(source["content"] for source in item["sources"] if source["id"] == item["code_task"]["source_id"])
 
 
-def run_reference_tests(source: str, tests: str) -> None:
-    """Run one committed, validator-checked, import-free code task in-process."""
+REFERENCE_RUNNER = (
+    "import json, sys\n"
+    "payload = json.loads(sys.stdin.read())\n"
+    "module = {}\n"
+    "exec(compile(payload['source'], 'candidate.py', 'exec'), module)\n"
+    "exec(compile(payload['tests'], 'tests.py', 'exec'), {'module': module})\n"
+)
+REFERENCE_TIMEOUT_SECONDS = 10
 
-    module: dict = {}
-    exec(compile(source, "candidate.py", "exec"), module)  # noqa: S102 - fixed in-repo fixture only
-    exec(compile(tests, "tests.py", "exec"), {"module": module})  # noqa: S102
+
+def run_reference_tests(source: str, tests: str) -> bool:
+    """Run one committed, validator-checked code task; True when its hidden tests pass.
+
+    This is the repository's static self-check of its own fixtures, never the
+    evaluation of a model (that one belongs to the code-evaluation sandbox).
+    It still stays out of the test process: a separate isolated interpreter
+    (-I -S), an empty environment, a temporary working directory and a
+    timeout, so a looping or hostile fixture edit cannot hang or touch the run.
+    """
+
+    environment = {"SYSTEMROOT": os.environ["SYSTEMROOT"]} if os.name == "nt" and "SYSTEMROOT" in os.environ else {}
+    payload = json.dumps({"source": source, "tests": tests}, ensure_ascii=True).encode("ascii")
+    with tempfile.TemporaryDirectory() as directory:
+        completed = subprocess.run(
+            [sys.executable, "-I", "-S", "-c", REFERENCE_RUNNER], input=payload, capture_output=True,
+            timeout=REFERENCE_TIMEOUT_SECONDS, cwd=directory, env=environment, check=False,
+        )
+    if completed.returncode not in (0, 1):
+        raise RuntimeError(f"reference test runner ended abnormally (exit {completed.returncode})")
+    return completed.returncode == 0
 
 
 class UseCaseSuiteValidationTests(unittest.TestCase):
@@ -348,6 +376,20 @@ class UseCaseSuiteValidationTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as caught:
                 use_cases.main(["--unknown"])
         self.assertEqual(2, caught.exception.code)
+        hidden = "/srv/internal-share/suite.json"
+        with mock.patch.object(use_cases, "load_suite", side_effect=PermissionError(13, "Permission denied", hidden)), \
+                contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertEqual(1, use_cases.main([str(SUITE_PATH)]))
+        self.assertIn("Permission denied", error.getvalue())
+        self.assertNotIn("internal-share", error.getvalue())
+
+    def test_refusal_never_echoes_a_malformed_scenario_id(self) -> None:
+        odd = "Ceci n'est pas un identifiant de scénario"
+        changed = copy.deepcopy(self.document)
+        changed["scenarios"][3]["id"] = odd
+        with self.assertRaisesRegex(SuiteInvalid, "scenario #3 ") as caught:
+            use_cases.validate(changed)
+        self.assertNotIn(odd, str(caught.exception))
 
 
 class DevelopmentReferenceTestsTests(unittest.TestCase):
@@ -364,8 +406,7 @@ class DevelopmentReferenceTestsTests(unittest.TestCase):
     def test_reference_tests_catch_the_seeded_defect(self) -> None:
         for item in self.tasks:
             with self.subTest(scenario=item["id"]):
-                with self.assertRaises(Exception):
-                    run_reference_tests(code_of(item), item["code_task"]["test_source"])
+                self.assertFalse(run_reference_tests(code_of(item), item["code_task"]["test_source"]))
 
     def test_reference_tests_accept_a_minimal_fix(self) -> None:
         for item in self.tasks:
@@ -373,7 +414,15 @@ class DevelopmentReferenceTestsTests(unittest.TestCase):
             source = code_of(item)
             with self.subTest(scenario=item["id"]):
                 self.assertEqual(1, source.count(old))
-                run_reference_tests(source.replace(old, new), item["code_task"]["test_source"])
+                self.assertTrue(run_reference_tests(source.replace(old, new), item["code_task"]["test_source"]))
+
+    def test_reference_runner_is_isolated_and_bounded(self) -> None:
+        self.assertTrue(run_reference_tests("def f():\n    return 1\n", "assert module['f']() == 1\n"))
+        self.assertFalse(run_reference_tests("def f():\n    return 2\n", "assert module['f']() == 1\n"))
+        self.assertTrue(run_reference_tests("import os\ndef f():\n    return sorted(os.environ)\n",
+                                            "assert module['f']() in ([], ['SYSTEMROOT'])\n"))
+        with mock.patch(f"{__name__}.REFERENCE_TIMEOUT_SECONDS", 1), self.assertRaises(subprocess.TimeoutExpired):
+            run_reference_tests("def f():\n    while True:\n        pass\n", "module['f']()\n")
 
     def test_function_names_stay_apart_from_existing_benchmarks(self) -> None:
         names = {item["code_task"]["function_name"] for item in self.tasks}

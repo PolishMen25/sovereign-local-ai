@@ -21,7 +21,8 @@ Overlap levels, strongest first:
 These are heuristics: a paraphrase sharing few n-grams stays invisible.
 
 Exit codes: 0 no overlap, 1 overlap found (report printed), 2 input refused
-(nothing printed on standard output).
+(nothing printed on standard output).  Any unexpected failure is a refusal
+too: it never exits 1.  A refusal message never names a file path.
 """
 
 from __future__ import annotations
@@ -120,6 +121,8 @@ def read_json_object(path: Path, *, context: str) -> tuple[dict[str, Any], bytes
         raise CheckRefused(f"{context} must be UTF-8") from error
     except json.JSONDecodeError as error:
         raise CheckRefused(f"{context} is not valid JSON (line {error.lineno})") from error
+    except (ValueError, RecursionError) as error:
+        raise CheckRefused(f"{context} is not valid JSON") from error
     if not isinstance(document, dict):
         raise CheckRefused(f"{context} must be a JSON object")
     return document, payload
@@ -350,7 +353,7 @@ def scan_records(path: Path, *, context: str, check: RecordCheck, visit: Callabl
                 raise CheckRefused(f"{context} line {line_number} is blank")
             try:
                 record = json.loads(line.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            except (ValueError, RecursionError) as error:  # includes UnicodeDecodeError and JSONDecodeError
                 raise CheckRefused(f"{context} line {line_number} is not valid UTF-8 JSON") from error
             if not isinstance(record, dict):
                 raise CheckRefused(f"{context} line {line_number} is not a JSON object")
@@ -538,8 +541,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         report = check(args.source_kind, paths, e1_path=args.e1, e2_path=args.e2, ngram_size=args.ngram_size,
                        ngram_threshold=args.ngram_threshold, max_records_per_finding=args.max_records_per_finding)
-    except (CheckRefused, OSError) as error:
+    except CheckRefused as error:
         print(f"evaluation contamination check refused: {error}", file=sys.stderr)
+        return EXIT_REFUSED
+    except OSError as error:  # never echo the path: it may name internal storage
+        print(f"evaluation contamination check refused: source unreadable: {error.strerror or 'I/O error'}",
+              file=sys.stderr)
+        return EXIT_REFUSED
+    except Exception:  # fail closed: an unexpected failure is a refusal, never exit 1 ("overlap found")
+        print("evaluation contamination check refused: unexpected failure while reading the input", file=sys.stderr)
         return EXIT_REFUSED
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return EXIT_OVERLAP if report["summary"]["contaminated"] else EXIT_CLEAN

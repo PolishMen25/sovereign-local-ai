@@ -14,9 +14,12 @@ SEALED_E2_PATH = REPO / "configs" / "evaluation" / "core-python-e2.candidate.jso
 
 # The practice suite feeds CORE corpus increments; the E2 benchmark must stay
 # unseen by training.  These 14 E2 tasks share their function name with a
-# practice task whose prompt is a paraphrase.  They are listed, not accepted:
-# retiring, replacing or labelling them is PENDING AN OWNER DECISION (see
-# docs/model/v1-evaluation-grid.md).  Any overlap not listed here fails.
+# practice task whose prompt is a paraphrase.  They are listed, not accepted.
+# D-040 admits arena data only without overlap with the evaluation sets, so the
+# increment builder refuses any solution for these practice tasks.  How to
+# remediate E2 itself (retire, replace or label the 14 tasks) is PENDING AN
+# OWNER DECISION (see docs/model/v1-evaluation-grid.md).  Any overlap not listed
+# here fails.
 KNOWN_OVERLAPS_PENDING_OWNER_DECISION = {
     "balanced_brackets": ("python-14-balanced-brackets", "arena-030-balanced-brackets"),
     "binary_search": ("python-30-binary-search", "arena-086-binary-search"),
@@ -67,13 +70,24 @@ class ArenaPracticeSuiteTests(unittest.TestCase):
         self.assertEqual(bench_ids & practice_ids, set())
 
     def test_function_name_overlaps_are_only_the_documented_ones(self) -> None:
-        sealed = {t["function_name"]: t["id"] for t in sealed_tasks()}
-        practice = {t["function_name"]: t["id"] for t in load_suite(SUITE_PATH)}
-        found = {name: (sealed[name], practice[name]) for name in sealed.keys() & practice.keys()}
-        undocumented = sorted(found.keys() - KNOWN_OVERLAPS_PENDING_OWNER_DECISION.keys())
-        self.assertEqual(undocumented, [], "new function shared by the sealed E2 benchmark and the practice suite")
-        self.assertEqual(found, KNOWN_OVERLAPS_PENDING_OWNER_DECISION,
-                         "the documented overlap list is stale: update it with the owner's decision")
+        # Every (function, E2 task, practice task) triple, so that a second task
+        # reusing an overlapping name cannot hide behind the first one.
+        found = {
+            (sealed["function_name"], sealed["id"], practice["id"])
+            for sealed in sealed_tasks()
+            for practice in json.loads(SUITE_PATH.read_text(encoding="utf-8"))["tasks"]
+            if sealed["function_name"] == practice["function_name"]
+        }
+        documented = {(name, e2_id, practice_id)
+                      for name, (e2_id, practice_id) in KNOWN_OVERLAPS_PENDING_OWNER_DECISION.items()}
+        self.assertEqual(sorted(found - documented), [],
+                         "new function shared by the sealed E2 benchmark and the practice suite")
+        self.assertEqual(found, documented, "the documented overlap list is stale: update it with the owner's decision")
+
+    def test_the_increment_builder_withholds_exactly_the_documented_overlaps(self) -> None:
+        _, _, withheld = bridge.load_task_suite(SUITE_PATH)
+        self.assertEqual(withheld, {practice_id: name
+                                    for name, (_, practice_id) in KNOWN_OVERLAPS_PENDING_OWNER_DECISION.items()})
 
     def test_no_normalized_prompt_overlap(self) -> None:
         sealed = {normalized_prompt(t["prompt"]) for t in sealed_tasks()}

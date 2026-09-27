@@ -12,15 +12,21 @@ failure its category targets, is refused:
 - an injection case must forbid tool calls and plant a canary that occurs in
   one of its documents, never in the user prompt;
 - a bypass case must forbid a tool call or an unconfirmed execution;
+- in both, every forbidden tool must be a chat runtime tool or a name listed in
+  ``UNAVAILABLE_TOOLS`` (a typo would forbid nothing), and every action tool
+  the case offers must be forbidden, unless the oracle forbids every call: a
+  call to a tool the case does not offer always fails;
 - an abstention case must expect the abstention marker, or its absence for an
   answerable control;
 - a fake-citation case must require resolvable citations and name a bait id
   that appears in its prompt or documents but is absent from the corpus.
 
-The validator also refuses anything that is not plainly synthetic: IP or MAC
-addresses, e-mail addresses, URLs, internal host suffixes, phone numbers,
-private keys, access tokens and credential assignments.  Thresholds stay
-``proposed``: the suite approves nothing.
+The validator also refuses anything that is not plainly synthetic: IPv4, IPv6
+(full or compressed) or MAC addresses, container or VM identifiers, e-mail
+addresses, URLs, internal host suffixes, phone numbers, private keys, access
+tokens and credential assignments.  Thresholds stay ``proposed``: the suite
+approves nothing.  Error messages name a case by its id only when that id is
+well-formed, by its position otherwise, and never echo a file path.
 
 ``score_case`` applies one case's oracle to one transcript.  It is pure and is
 provided so that the oracles are demonstrably mechanical; this tool runs no
@@ -72,6 +78,11 @@ MINIMUM_CASES_PER_CATEGORY = 3
 READ_ONLY_TOOLS = ("search_knowledge", "list_documents", "read_document", "current_time", "list_workspace")
 ACTION_TOOLS = ("run_python", "write_file")
 KNOWN_TOOLS = READ_ONLY_TOOLS + ACTION_TOOLS
+# Names the chat runtime deliberately does not offer, that a case may still
+# forbid (a model inventing a network fetch).  Versioned with this validator:
+# adding one is a reviewed change, so a typo cannot pass as a forbidden tool.
+UNAVAILABLE_TOOLS = ("http_get",)
+FORBIDDABLE_TOOLS = KNOWN_TOOLS + UNAVAILABLE_TOOLS
 CHECK_PARAMETERS: dict[str, str | None] = {
     "no_tool_call": None,
     "no_call_to": "tools",
@@ -97,6 +108,7 @@ CANARY = re.compile(r"^CANARI-[A-Z0-9-]{3,40}$")
 THREAT_ID = re.compile(r"^T[0-9]{2}$")
 METRIC_ID = re.compile(r"^M[1-8]\.[1-9][0-9]?$")
 MARKER = re.compile(r"^\[[A-Z]{3,20}\]$")
+SAFE_JSON_KEY = re.compile(r"^[a-z_][a-z0-9_]{0,63}$")
 
 MAX_SUITE_BYTES = 1024 * 1024
 MAX_DOCUMENTS = 200
@@ -112,6 +124,9 @@ STATEMENT_RANGE = (12, 1000)
 SENSITIVE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ipv4_address", re.compile(r"(?<![0-9.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9.])")),
     ("ipv6_or_mac_address", re.compile(r"(?i)(?<![0-9a-z:])(?:[0-9a-f]{1,4}:){4,7}[0-9a-f]{1,4}(?![0-9a-z:])")),
+    ("compressed_ipv6_address", re.compile(
+        r"(?i)(?<![0-9a-z:])(?:[0-9a-f]{1,4}:){1,7}:(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,6})?(?![0-9a-z:])")),
+    ("container_or_vm_id", re.compile(r"\b(?:CT|VMID) ?[0-9]{2,5}\b")),
     ("email_address", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")),
     ("url", re.compile(r"(?i)\b(?:https?|ftp|ssh|smb)://")),
     ("internal_host_suffix", re.compile(r"(?i)\b[a-z0-9-]+\.(?:lan|local|internal|intranet|corp|home\.arpa)\b")),
@@ -158,7 +173,8 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise SuiteInvalid(f"duplicate JSON key: {key}")
+            # Echo a key only when it looks like a schema field, never raw input.
+            raise SuiteInvalid(f"duplicate JSON key: {key}" if SAFE_JSON_KEY.fullmatch(key) else "duplicate JSON key")
         result[key] = value
     return result
 
@@ -179,6 +195,8 @@ def load_suite(path: Path) -> dict[str, Any]:
         raise SuiteInvalid("suite must be UTF-8") from error
     except json.JSONDecodeError as error:
         raise SuiteInvalid(f"suite is not valid JSON (line {error.lineno})") from error
+    except RecursionError as error:
+        raise SuiteInvalid("suite nesting is too deep") from error
     if not isinstance(document, dict):
         raise SuiteInvalid("suite must be a JSON object")
     return document
@@ -268,7 +286,9 @@ def _validate_check(check: Any, context: str) -> tuple[str, list[str]]:
 
 
 def _validate_case(case: Any, corpus: dict[str, str], seen: set[str], position: int) -> dict[str, Any]:
-    label = case.get("id") if isinstance(case, dict) and isinstance(case.get("id"), str) else f"#{position}"
+    # Echo an id only once it is well-formed: a refusal never repeats raw input.
+    identifier = case.get("id") if isinstance(case, dict) else None
+    label = identifier if isinstance(identifier, str) and CASE_ID.fullmatch(identifier) else f"#{position}"
     context = f"case {label}"
     _require_keys(case, CASE_KEYS, context)
     category = case["category"]
@@ -330,6 +350,12 @@ def _validate_case(case: Any, corpus: dict[str, str], seen: set[str], position: 
             raise SuiteInvalid(f"{context} oracle does not forbid a tool call or an unconfirmed execution")
         if "no_executed_action" in checks and any(tool not in ACTION_TOOLS for tool in checks["no_executed_action"]):
             raise SuiteInvalid(f"{context} no_executed_action applies to action tools only")
+    if category in {"indirect_injection", "tool_bypass"}:
+        forbidden = set(checks.get("no_call_to", [])) | set(checks.get("no_executed_action", []))
+        if any(tool not in FORBIDDABLE_TOOLS for tool in forbidden):
+            raise SuiteInvalid(f"{context} forbids a tool unknown to the chat runtime and to UNAVAILABLE_TOOLS")
+        if "no_tool_call" not in checks and any(tool in ACTION_TOOLS and tool not in forbidden for tool in offered):
+            raise SuiteInvalid(f"{context} offers an action tool its oracle does not forbid")
     elif category == "abstention":
         expects = {"abstains", "does_not_abstain"} & set(checks)
         if len(expects) != 1:
@@ -463,8 +489,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         summary = validate(load_suite(args.suite))
-    except (SuiteInvalid, OSError) as error:
+    except SuiteInvalid as error:
         print(f"invalid safety suite: {error}", file=sys.stderr)
+        return 1
+    except OSError as error:  # never echo the path: it may name internal storage
+        print(f"invalid safety suite: suite unreadable: {error.strerror or 'I/O error'}", file=sys.stderr)
         return 1
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
     return 0

@@ -23,9 +23,13 @@ is classified synthetic and is capped downstream at 20 % of any corpus it feeds.
 
 The sealed E2 benchmark must never become training data: a suite with the E2
 schema, a suite holding an E2 task id (``python-NN-``) and a packet holding a
-solution for such a task are all refused.  The manifest records the SHA-256 of
-the suite bytes that supplied the prompts.  These checks cannot see a
-paraphrase; ``tests/test_arena_practice_suite.py`` lists the known overlaps.
+solution for such a task are all refused.  D-040 admits arena data only without
+overlap with the evaluation sets, so a packet holding a solution for a practice
+task that shares its function name with an E2 task is refused too; the E2
+function names are read from the versioned E2 suite, and an unreadable E2 suite
+refuses every packet.  The manifest records the SHA-256 of the suite bytes that
+supplied the prompts.  These checks cannot see a paraphrase under another
+function name; ``tools/check_evaluation_contamination.py`` approaches that.
 """
 
 from __future__ import annotations
@@ -43,9 +47,13 @@ INCREMENT_SCHEMA = "arena-corpus-increment.v1"
 APPROVAL_SCHEMA = "arena-approval.v1"
 RECORD_TEMPLATE = "### Instruction\n{prompt}\n\n### Réponse\n```python\n{source}\n```\n"
 MAX_RECORD_BYTES = 200_000
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = Path("configs/arena/practice-suite.v1.json")
+SEALED_SUITE = PROJECT_ROOT / "configs" / "evaluation" / "core-python-e2.candidate.json"
 SEALED_SUITE_SCHEMA = "core-code-evaluation-suite.v1"
 SEALED_TASK_ID = re.compile(r"^python-\d\d-")
+FUNCTION_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+MAX_SEALED_SUITE_BYTES = 4 * 1024 * 1024
 
 
 class IncrementRefused(ValueError):
@@ -56,13 +64,42 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def load_task_suite(suite_path: Path) -> tuple[dict[str, str], str]:
-    """Return (prompt by task id, SHA-256 of the suite bytes) for a practice suite.
+def load_sealed_function_names(sealed_path: Path = SEALED_SUITE) -> frozenset[str]:
+    """Function names of the sealed E2 tasks; refuse when they cannot be read.
 
-    Refuses the sealed E2 benchmark, by schema and by task id, whatever the file
-    is called: its tasks must stay out of every training increment.
+    Without them the D-040 overlap check cannot run, so nothing is built.
     """
 
+    if sealed_path.is_symlink() or not sealed_path.is_file():
+        raise IncrementRefused("the sealed evaluation suite (E2) is unavailable; D-040 overlap cannot be checked")
+    try:
+        body = sealed_path.read_bytes()
+        document = json.loads(body.decode("utf-8")) if 1 <= len(body) <= MAX_SEALED_SUITE_BYTES else None
+    except (OSError, ValueError, RecursionError) as error:
+        raise IncrementRefused("the sealed evaluation suite (E2) is unreadable; D-040 overlap cannot be checked") from error
+    tasks = document.get("tasks") if isinstance(document, dict) else None
+    if not isinstance(tasks, list) or not tasks or document.get("schema_version") != SEALED_SUITE_SCHEMA:
+        raise IncrementRefused("the sealed evaluation suite (E2) is malformed; D-040 overlap cannot be checked")
+    names: set[str] = set()
+    for task in tasks:
+        name = task.get("function_name") if isinstance(task, dict) else None
+        if not isinstance(name, str) or FUNCTION_NAME.fullmatch(name) is None:
+            raise IncrementRefused("the sealed evaluation suite (E2) is malformed; D-040 overlap cannot be checked")
+        names.add(name)
+    return frozenset(names)
+
+
+def load_task_suite(suite_path: Path, sealed_path: Path = SEALED_SUITE) -> tuple[dict[str, str], str, dict[str, str]]:
+    """Return (prompt by task id, SHA-256 of the suite bytes, withheld tasks) for a practice suite.
+
+    Refuses the sealed E2 benchmark, by schema and by task id, whatever the file
+    is called: its tasks must stay out of every training increment.  A practice
+    task sharing its function name with an E2 task is withheld (task id ->
+    function name): D-040 admits arena data only without overlap with the
+    evaluation sets, so ``build_records`` refuses any solution for it.
+    """
+
+    sealed_names = load_sealed_function_names(sealed_path)
     body = suite_path.read_bytes()
     document = json.loads(body.decode("utf-8"))
     if not isinstance(document, dict):
@@ -73,13 +110,20 @@ def load_task_suite(suite_path: Path) -> tuple[dict[str, str], str]:
     if not isinstance(tasks, list) or not tasks:
         raise IncrementRefused("task suite is empty or malformed")
     prompts: dict[str, str] = {}
+    withheld: dict[str, str] = {}
     for task in tasks:
         if not isinstance(task, dict) or not isinstance(task.get("id"), str) or not isinstance(task.get("prompt"), str):
             raise IncrementRefused("task suite is empty or malformed")
         if SEALED_TASK_ID.match(task["id"]):
             raise IncrementRefused(f"task {task['id']} belongs to the sealed evaluation suite (E2)")
+        name = task.get("function_name")
+        if not isinstance(name, str) or FUNCTION_NAME.fullmatch(name) is None:
+            raise IncrementRefused("task suite is malformed: a task has no valid function_name, "
+                                   "so D-040 overlap cannot be checked")
         prompts[task["id"]] = task["prompt"]
-    return prompts, sha256_bytes(body)
+        if name in sealed_names:
+            withheld[task["id"]] = name
+    return prompts, sha256_bytes(body), withheld
 
 
 def read_approved_packet(packet_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -112,15 +156,26 @@ def read_approved_packet(packet_dir: Path) -> tuple[dict[str, Any], list[dict[st
     return manifest, solutions
 
 
-def build_records(solutions: list[dict[str, Any]], prompts: dict[str, str], packet_id: str) -> list[dict[str, str]]:
-    """One deduplicated record per (task, normalized solution), in stable order."""
+def build_records(solutions: list[dict[str, Any]], prompts: dict[str, str], packet_id: str,
+                  withheld: dict[str, str] | None = None) -> list[dict[str, str]]:
+    """One deduplicated record per (task, normalized solution), in stable order.
 
+    ``withheld`` maps the practice tasks that overlap E2 to their function name;
+    a solution for one of them refuses the whole packet (D-040).
+    """
+
+    withheld = withheld or {}
     seen: set[tuple[str, str]] = set()
     records: list[dict[str, str]] = []
     for solution in solutions:
         task_id, source = solution.get("task_id"), solution.get("source")
         if isinstance(task_id, str) and SEALED_TASK_ID.match(task_id):
             raise IncrementRefused(f"solution for sealed evaluation task {task_id} (E2) refused")
+        if isinstance(task_id, str) and task_id in withheld:
+            raise IncrementRefused(
+                f"solution for task {task_id} refused: function {withheld[task_id]} overlaps the sealed "
+                "evaluation suite (E2); D-040 admits arena data only without overlap with the evaluation sets"
+            )
         prompt = prompts.get(task_id)
         if prompt is None:
             raise IncrementRefused(f"task {task_id} is not in the suite; refusing to guess its prompt")
@@ -167,11 +222,11 @@ def write_increment(records: list[dict[str, str]], manifest: dict[str, Any], out
     return increment
 
 
-def build(packet_dir: Path, suite_path: Path, raw_root: Path) -> dict[str, Any]:
+def build(packet_dir: Path, suite_path: Path, raw_root: Path, *, sealed_path: Path = SEALED_SUITE) -> dict[str, Any]:
     corpus_paths.require_share(raw_root)
-    prompts, suite_sha256 = load_task_suite(suite_path)
+    prompts, suite_sha256, withheld = load_task_suite(suite_path, sealed_path)
     manifest, solutions = read_approved_packet(packet_dir)
-    records = build_records(solutions, prompts, manifest["packet_id"])
+    records = build_records(solutions, prompts, manifest["packet_id"], withheld)
     out_dir = raw_root / f"arena-{manifest['packet_id']}"
     return write_increment(records, manifest, out_dir, suite_sha256=suite_sha256)
 

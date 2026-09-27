@@ -128,6 +128,8 @@ MIN_REFERENCE_ASSERTS = 2
 SUITE_ID = re.compile(r"^[a-z][a-z0-9-]{2,62}$")
 SOURCE_REFERENCE = re.compile(r"\bS[0-9]{1,2}\b")
 FUNCTION_NAME = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
+SCENARIO_ID = re.compile(r"^uc-(?:org|dev|infra)-[0-9]{2}$")
+SAFE_JSON_KEY = re.compile(r"^[a-z_][a-z0-9_]{0,63}$")
 
 MAX_SUITE_BYTES = 1024 * 1024
 TITLE_RANGE = (3, 120)
@@ -188,7 +190,8 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise SuiteInvalid(f"duplicate JSON key: {key}")
+            # Echo a key only when it looks like a schema field, never raw input.
+            raise SuiteInvalid(f"duplicate JSON key: {key}" if SAFE_JSON_KEY.fullmatch(key) else "duplicate JSON key")
         result[key] = value
     return result
 
@@ -209,6 +212,8 @@ def load_suite(path: Path) -> dict[str, Any]:
         raise SuiteInvalid("suite must be UTF-8") from error
     except json.JSONDecodeError as error:
         raise SuiteInvalid(f"suite is not valid JSON (line {error.lineno})") from error
+    except RecursionError as error:
+        raise SuiteInvalid("suite nesting is too deep") from error
     if not isinstance(document, dict):
         raise SuiteInvalid("suite must be a JSON object")
     return document
@@ -352,7 +357,9 @@ def _validate_code_task(value: Any, sources: dict[str, dict[str, Any]], visible:
 
 
 def _validate_scenario(scenario: Any, position: int, expected_id: str, use_case_ids: tuple[str, ...]) -> dict[str, Any]:
-    label = scenario.get("id") if isinstance(scenario, dict) and isinstance(scenario.get("id"), str) else f"#{position}"
+    # Echo an id only once it is well-formed: a refusal never repeats raw input.
+    identifier = scenario.get("id") if isinstance(scenario, dict) else None
+    label = identifier if isinstance(identifier, str) and SCENARIO_ID.fullmatch(identifier) else f"#{position}"
     context = f"scenario {label}"
     if not isinstance(scenario, dict):
         raise SuiteInvalid(f"{context} must be an object")
@@ -470,8 +477,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         summary = validate(load_suite(args.suite), root=args.root)
-    except (SuiteInvalid, OSError) as error:
+    except SuiteInvalid as error:
         print(f"invalid use-case suite: {error}", file=sys.stderr)
+        return 1
+    except OSError as error:  # never echo the path: it may name internal storage
+        print(f"invalid use-case suite: suite unreadable: {error.strerror or 'I/O error'}", file=sys.stderr)
         return 1
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
     return 0

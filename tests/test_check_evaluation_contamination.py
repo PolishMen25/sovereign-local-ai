@@ -326,6 +326,30 @@ class ContaminationCheckTests(unittest.TestCase):
                 with self.assertRaises(checker.CheckRefused):
                     self.check("arena-increment", directory)
 
+    def test_deeply_nested_input_is_a_refusal_never_an_overlap(self) -> None:
+        nested = b"[" * 200_000 + b"\n"
+        directory = self.arena_increment(["x"], name="nested-record", body=nested)
+        with self.assertRaisesRegex(checker.CheckRefused, "not valid UTF-8 JSON"):
+            self.check("arena-increment", directory)
+        code, out, err = self.run_cli("arena-increment", str(directory))
+        self.assertEqual((code, out), (checker.EXIT_REFUSED, ""))
+        self.assertIn("refused", err)
+        nested_e1 = self.root / "nested-e1.json"
+        nested_e1.write_bytes(b"[" * 200_000)
+        code, out, _ = self.run_cli("--e1", str(nested_e1), "arena-increment", str(directory), synthetic=False)
+        self.assertEqual((code, out), (checker.EXIT_REFUSED, ""))
+
+    def test_unreadable_or_unexpected_failures_are_refusals_without_a_path(self) -> None:
+        directory = self.arena_increment(CLEAN_TEXTS)
+        secret_path = "/srv/internal-share/corpus/records.jsonl"
+        for failure, expected in ((PermissionError(13, "Permission denied", secret_path), "Permission denied"),
+                                  (RuntimeError(f"boom at {secret_path}"), "unexpected failure")):
+            with self.subTest(failure=type(failure).__name__), mock.patch.object(checker, "check", side_effect=failure):
+                code, out, err = self.run_cli("arena-increment", str(directory))
+                self.assertEqual((code, out), (checker.EXIT_REFUSED, ""))
+                self.assertIn(expected, err)
+                self.assertNotIn("internal-share", err)
+
     def test_empty_or_unknown_arena_sources_are_refused(self) -> None:
         directory = self.arena_increment(["x"], name="unknown-schema", schema="arena-packet.v1")
         with self.assertRaisesRegex(checker.CheckRefused, "unknown schema"):

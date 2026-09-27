@@ -124,9 +124,10 @@ class AgentEvalSuiteGateTests(unittest.TestCase):
         (self.suite_dir / f"{self.profile['eval_suite']}.json").write_text(text, encoding="utf-8")
 
     def test_every_non_draft_profile_of_the_registry_has_a_suite(self) -> None:
+        # The gate is the violation list; moving a profile out of draft with a
+        # conforming suite must not break this test.
         self.assertEqual([], eval_suite_violations(self.registry, EVAL_SUITE_DIR))
-        drafts = [profile for profile in self.registry["profiles"] if profile["status"] == "draft"]
-        self.assertEqual(60, len(drafts))
+        self.assertEqual(60, len(self.registry["profiles"]))
 
     def test_non_draft_profile_without_a_suite_is_refused(self) -> None:
         for status in ("enabled", "disabled", "retired", "active", None):

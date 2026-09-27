@@ -34,20 +34,26 @@ n'est jamais un défaut et ne se joue que par un choix explicite.
 Jusqu'au commit `db9414d` inclus, le runner et
 `tools/build_core_increment_from_arena.py` prenaient E2 par défaut, et ni
 l'unité `sovereign-arena.service` ni l'exemple `arena.env` ci-dessous ne fixent
-cette variable. La suite réellement jouée par une arène déjà déployée ne se
-déduit donc pas du dépôt : elle doit être relevée sur l'hôte avant toute
-conclusion.
+cette variable. L'arène n'est attestée en service que par `AGENTS.md` (composant
+sans décision au registre, D-038) et par des messages de commit ; rien n'a été
+revérifié. La suite qu'elle joue ne se déduit pas du dépôt : elle doit être
+relevée sur l'hôte avant toute conclusion.
 
 Le passage d'un paquet au corpus garde une seconde barrière.
 `tools/build_core_increment_from_arena.py` refuse une suite de schéma
 `core-code-evaluation-suite.v1`, une suite contenant un identifiant de tâche
 `python-NN-` et un paquet contenant une solution pour une telle tâche ; il
 inscrit l'empreinte SHA-256 de la suite utilisée dans le manifeste d'incrément
-(`task_suite_sha256`). Ces contrôles ne voient pas une paraphrase : 14 tâches de
-la suite d'entraînement reprennent le nom de fonction d'une tâche E2. Elles sont
-listées dans `tests/test_arena_practice_suite.py`, en attente d'une décision du
-propriétaire décrite dans la
+(`task_suite_sha256`). 14 tâches de la suite d'entraînement reprennent le nom de
+fonction d'une tâche E2, avec un énoncé reformulé ; elles sont listées dans
+`tests/test_arena_practice_suite.py`. D-040 n'admet les données de l'arène que
+sans recouvrement avec les jeux d'évaluation : le constructeur refuse donc tout
+paquet contenant une solution pour l'une d'elles, en lisant les noms de fonction
+dans la suite E2 versionnée (illisible ⇒ refus). Le traitement d'E2 lui-même
+reste une décision ouverte du propriétaire, décrite dans la
 [grille d'évaluation V1 proposée](../../docs/model/v1-evaluation-grid.md#séparation-évaluation--entraînement).
+Une paraphrase sous un autre nom de fonction échappe à ces contrôles ;
+`tools/check_evaluation_contamination.py` l'approche.
 
 ## Séparation des droits
 

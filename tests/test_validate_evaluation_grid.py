@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 import re
+import shutil
 import tempfile
 import unittest
 
@@ -28,8 +29,10 @@ SYNTHETIC_REGISTER = """# Registre synthétique de test
 | D-022 | Aucune découverte réseau. | Test. |
 | D-007 | Aucun accès Internet. | Test. |
 | D-029 | Deux invités. | Test. |
+| D-039 | Séparation évaluation / entraînement bloquante. | Test. |
+| D-040 | Arène sans recouvrement avec l'évaluation. | Test. |
 | D-090 | **SUPERSEDED par D-099.** Ancienne approbation. | Test. |
-| D-099 | Grille approuvée (synthétique). | Test. |
+| D-099 | Grille approuvée (synthétique), empreinte {digest}. | Test. |
 """
 
 
@@ -42,28 +45,50 @@ class EvaluationGridTests(unittest.TestCase):
         self.document = grid_tool.load_grid(GRID_PATH)
         self.directory = tempfile.TemporaryDirectory()
         self.register = Path(self.directory.name) / "decisions.md"
-        self.register.write_text(SYNTHETIC_REGISTER, encoding="utf-8")
+        self.record_digest("0" * 64)
 
     def tearDown(self) -> None:
         self.directory.cleanup()
 
-    def check(self, document: dict) -> dict:
-        return grid_tool.validate(document, root=PROJECT_ROOT, decisions_path=self.register, today=TODAY)
+    def record_digest(self, digest: str) -> None:
+        """The synthetic approving decision D-099 records this grid digest."""
 
-    def refused(self, document: dict, pattern: str) -> None:
+        self.register.write_text(SYNTHETIC_REGISTER.format(digest=digest), encoding="utf-8")
+
+    def check(self, document: dict, root: Path = PROJECT_ROOT) -> dict:
+        return grid_tool.validate(document, root=root, decisions_path=self.register, today=TODAY)
+
+    def refused(self, document: dict, pattern: str, root: Path = PROJECT_ROOT) -> None:
         with self.assertRaisesRegex(GridInvalid, pattern):
-            self.check(document)
+            self.check(document, root)
 
-    def approve(self, document: dict, metric_id: str, **overrides: str) -> dict:
+    def approve(self, document: dict, metric_id: str, root: Path = PROJECT_ROOT, **overrides: str) -> dict:
         threshold = metric(document, metric_id)["threshold"]
-        threshold["status"] = "approved"
+        digest = grid_tool.grid_sha256(document, root)
+        self.record_digest(digest)
         threshold["approval"] = {
             "decision_id": "D-099",
             "approved_on": "2026-09-20",
-            "grid_sha256": grid_tool.grid_sha256(document),
+            "grid_sha256": digest,
+            "previous_status": threshold["status"],
         }
+        threshold["status"] = "approved"
         threshold["approval"].update(overrides)
         return document
+
+    def copy_repository_subset(self, document: dict) -> Path:
+        """A throwaway root holding every path the grid points at, to edit fixtures safely."""
+
+        root = Path(self.directory.name) / "root"
+        paths = {document["source_document"]}
+        for item in document["metrics"]:
+            paths.update(item["fixture"]["paths"])
+            paths.update(item["procedure"]["paths"])
+        for value in paths:
+            target = root / value
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(PROJECT_ROOT / value, target)
+        return root
 
     def test_candidate_grid_is_valid_against_the_real_register(self) -> None:
         summary = grid_tool.validate(self.document)
@@ -172,10 +197,55 @@ class EvaluationGridTests(unittest.TestCase):
             ({"approved_on": "2026-09-27"}, "future"),
             ({"approved_on": "2026-02-30"}, "calendar date"),
             ({"approved_on": "26/09/2026"}, "YYYY-MM-DD"),
+            ({"previous_status": "approved"}, "previous_status must be one of"),
+            ({"previous_status": "confirmed"}, "was confirmed but cites no decision"),
         )
         for overrides, pattern in cases:
             with self.subTest(overrides=overrides):
                 self.refused(self.approve(copy.deepcopy(self.document), "M1.5", **overrides), pattern)
+        # M1.1 cites D-020: recording "confirmed" instead of its real "proposed" changes the digest.
+        self.refused(self.approve(copy.deepcopy(self.document), "M1.1", previous_status="confirmed"),
+                     "does not match the grid content")
+
+    def test_approval_must_cite_the_decision_that_records_the_digest(self) -> None:
+        # D-020 exists and is live, but its row does not record this grid digest.
+        for decision_id in ("D-020", "D-007"):
+            with self.subTest(decision_id=decision_id):
+                self.refused(self.approve(copy.deepcopy(self.document), "M1.1", decision_id=decision_id),
+                             f"decision {decision_id} does not record the pinned grid_sha256")
+        approved = self.approve(copy.deepcopy(self.document), "M1.1")
+        self.record_digest("f" * 64)
+        self.refused(approved, "D-099 does not record the pinned grid_sha256")
+
+    def test_status_flip_after_approval_breaks_the_pinned_hash(self) -> None:
+        approved = self.approve(copy.deepcopy(self.document), "M1.5")
+        self.assertEqual("proposed", metric(approved, "M1.1")["threshold"]["status"])
+        metric(approved, "M1.1")["threshold"]["status"] = "confirmed"  # cites D-020, so formally allowed
+        self.refused(approved, "does not match the grid content")
+
+    def test_fixture_file_edited_after_approval_breaks_the_pinned_hash(self) -> None:
+        root = self.copy_repository_subset(self.document)
+        approved = self.approve(copy.deepcopy(self.document), "M1.5", root=root)
+        self.assertEqual(1, self.check(approved, root)["thresholds_by_status"]["approved"])
+        fixture = root / "configs" / "evaluation" / "v1-safety.candidate.json"
+        fixture.write_bytes(fixture.read_bytes().replace(b"CANARI-INJ-01", b"CANARI-INJ-0X", 1))
+        self.refused(approved, "does not match the grid content", root)
+
+    def test_fixture_digest_ignores_line_endings_only(self) -> None:
+        root = self.copy_repository_subset(self.document)
+        fixture = root / "configs" / "evaluation" / "core-30m-e1.candidate.json"
+        lf = fixture.read_bytes().replace(b"\r\n", b"\n")
+        fixture.write_bytes(lf)
+        digest = grid_tool.grid_sha256(self.document, root)
+        fixture.write_bytes(lf.replace(b"\n", b"\r\n"))
+        self.assertEqual(digest, grid_tool.grid_sha256(self.document, root))
+        fixture.write_bytes(lf + b" ")
+        self.assertNotEqual(digest, grid_tool.grid_sha256(self.document, root))
+
+    def test_fixture_path_must_be_a_file(self) -> None:
+        changed = copy.deepcopy(self.document)
+        metric(changed, "M1.5")["fixture"]["paths"] = ["configs/evaluation"]
+        self.refused(changed, "must be a regular file")
 
     def test_threshold_tuned_after_approval_breaks_the_pinned_hash(self) -> None:
         approved = self.approve(copy.deepcopy(self.document), "M1.5")
