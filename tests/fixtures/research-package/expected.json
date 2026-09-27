@@ -1,0 +1,413 @@
+{
+  "fixture_set": "research-package-fixtures-v1",
+  "policy_id": "research-package-contract-v1",
+  "placeholders": [
+    "{{bearer_value}}",
+    "{{credential_param}}",
+    "{{signed_param}}"
+  ],
+  "cases": [
+    {
+      "file": "valid-minimal.json",
+      "findings": []
+    },
+    {
+      "file": "valid-full.json",
+      "findings": []
+    },
+    {
+      "file": "valid-full.json",
+      "max_bytes": 1024,
+      "findings": [
+        {
+          "code": "JSON_SIZE_EXCEEDED",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "invalid-lifecycle-validated.json",
+      "findings": [
+        {
+          "code": "PKG_CONST_MISMATCH",
+          "pointer": "/lifecycle_state"
+        },
+        {
+          "code": "PKG_LIFECYCLE_STATE_NOT_RAW",
+          "pointer": "/lifecycle_state"
+        }
+      ]
+    },
+    {
+      "file": "invalid-timestamps-reversed.json",
+      "findings": [
+        {
+          "code": "PKG_TIMESTAMP_ORDER",
+          "pointer": "/timestamps/response_completed_at"
+        }
+      ]
+    },
+    {
+      "file": "invalid-duplicate-source-id.json",
+      "findings": [
+        {
+          "code": "PKG_DUPLICATE_ID",
+          "pointer": "/sources/1/source_id"
+        }
+      ]
+    },
+    {
+      "file": "invalid-citation-dangling.json",
+      "findings": [
+        {
+          "code": "PKG_CITATION_SOURCE_UNKNOWN",
+          "pointer": "/citations/2/source_id"
+        }
+      ]
+    },
+    {
+      "file": "invalid-citation-offset-order.json",
+      "findings": [
+        {
+          "code": "PKG_CITATION_OFFSET_ORDER",
+          "pointer": "/citations/0/response_start"
+        }
+      ]
+    },
+    {
+      "file": "invalid-citation-offset-range.json",
+      "findings": [
+        {
+          "code": "PKG_CITATION_OFFSET_RANGE",
+          "pointer": "/citations/1/response_end"
+        }
+      ]
+    },
+    {
+      "file": "invalid-usage-cached-exceeds-input.json",
+      "findings": [
+        {
+          "code": "PKG_USAGE_CACHED_EXCEEDS_INPUT",
+          "pointer": "/usage/cached_input_tokens"
+        }
+      ]
+    },
+    {
+      "file": "invalid-usage-reasoning-exceeds-output.json",
+      "findings": [
+        {
+          "code": "PKG_USAGE_REASONING_EXCEEDS_OUTPUT",
+          "pointer": "/usage/reasoning_tokens"
+        }
+      ]
+    },
+    {
+      "file": "invalid-usage-total-below-sum.json",
+      "findings": [
+        {
+          "code": "PKG_USAGE_TOTAL_BELOW_SUM",
+          "pointer": "/usage/total_tokens"
+        }
+      ]
+    },
+    {
+      "file": "invalid-system-prompt-digest.json",
+      "findings": [
+        {
+          "code": "PKG_SYSTEM_PROMPT_SHA256_MISMATCH",
+          "pointer": "/request/controlled_system_prompt/sha256"
+        }
+      ]
+    },
+    {
+      "file": "invalid-integrity-mismatch.json",
+      "findings": [
+        {
+          "code": "PKG_INTEGRITY_MISMATCH",
+          "pointer": "/integrity/package_sha256"
+        }
+      ]
+    },
+    {
+      "file": "invalid-unknown-field.json",
+      "findings": [
+        {
+          "code": "PKG_FIELD_UNKNOWN",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "invalid-missing-field.json",
+      "findings": [
+        {
+          "code": "PKG_FIELD_MISSING",
+          "pointer": "/security"
+        }
+      ]
+    },
+    {
+      "file": "invalid-integer-as-float.json",
+      "findings": [
+        {
+          "code": "PKG_TYPE_MISMATCH",
+          "pointer": "/usage/input_tokens"
+        }
+      ]
+    },
+    {
+      "file": "invalid-schema-version.json",
+      "findings": [
+        {
+          "code": "PKG_CONST_MISMATCH",
+          "pointer": "/schema_version"
+        }
+      ]
+    },
+    {
+      "file": "invalid-source-kind.json",
+      "findings": [
+        {
+          "code": "PKG_ENUM_MISMATCH",
+          "pointer": "/sources/0/kind"
+        }
+      ]
+    },
+    {
+      "file": "invalid-empty-provider.json",
+      "findings": [
+        {
+          "code": "PKG_STRING_TOO_SHORT",
+          "pointer": "/producer/provider"
+        }
+      ]
+    },
+    {
+      "file": "invalid-oversize-field.json",
+      "findings": [
+        {
+          "code": "PKG_STRING_TOO_LONG",
+          "pointer": "/producer/provider"
+        }
+      ]
+    },
+    {
+      "file": "invalid-oversize-array.json",
+      "findings": [
+        {
+          "code": "PKG_ARRAY_TOO_LONG",
+          "pointer": "/sources/0/authors"
+        }
+      ]
+    },
+    {
+      "file": "invalid-uppercase-sha.json",
+      "findings": [
+        {
+          "code": "PKG_PATTERN_MISMATCH",
+          "pointer": "/sources/0/content_sha256"
+        }
+      ]
+    },
+    {
+      "file": "invalid-parameter-name.json",
+      "findings": [
+        {
+          "code": "PKG_PATTERN_MISMATCH",
+          "pointer": "/generation_parameters/0/name"
+        }
+      ]
+    },
+    {
+      "file": "invalid-package-id.json",
+      "findings": [
+        {
+          "code": "PKG_UUID_INVALID",
+          "pointer": "/package_id"
+        }
+      ]
+    },
+    {
+      "file": "invalid-timestamp-format.json",
+      "findings": [
+        {
+          "code": "PKG_TIMESTAMP_INVALID",
+          "pointer": "/security/scanned_at"
+        }
+      ]
+    },
+    {
+      "file": "invalid-negative-tokens.json",
+      "findings": [
+        {
+          "code": "PKG_NUMBER_BELOW_MINIMUM",
+          "pointer": "/usage/input_tokens"
+        }
+      ]
+    },
+    {
+      "file": "invalid-attachment-too-large.json",
+      "findings": [
+        {
+          "code": "PKG_NUMBER_ABOVE_MAXIMUM",
+          "pointer": "/attachments/0/byte_size"
+        }
+      ]
+    },
+    {
+      "file": "invalid-duplicate-redacted-category.json",
+      "findings": [
+        {
+          "code": "PKG_ARRAY_DUPLICATE_ITEM",
+          "pointer": "/security/redacted_categories/1"
+        }
+      ]
+    },
+    {
+      "file": "invalid-cost-without-currency.json",
+      "findings": [
+        {
+          "code": "PKG_FIELD_DEPENDENCY_MISSING",
+          "pointer": "/cost/currency"
+        }
+      ]
+    },
+    {
+      "file": "invalid-generation-value-nested.json",
+      "findings": [
+        {
+          "code": "PKG_ONE_OF_MISMATCH",
+          "pointer": "/generation_parameters/0/value"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-http.json",
+      "findings": [
+        {
+          "code": "PKG_PATTERN_MISMATCH",
+          "pointer": "/sources/0/url"
+        },
+        {
+          "code": "URL_SCHEME_NOT_HTTPS",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-userinfo.json",
+      "findings": [
+        {
+          "code": "URL_USERINFO",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-port.json",
+      "findings": [
+        {
+          "code": "URL_PORT_NOT_DEFAULT",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-special-use-host.json",
+      "findings": [
+        {
+          "code": "URL_HOST_SPECIAL_USE",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-ipv4-literal.json",
+      "findings": [
+        {
+          "code": "URL_IP_RESERVED",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-ipv6-literal.json",
+      "findings": [
+        {
+          "code": "URL_IP_RESERVED",
+          "pointer": "/attachments/0/source_url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-signed-param.template.json",
+      "findings": [
+        {
+          "code": "URL_PARAM_SIGNED",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-url-credential-param.template.json",
+      "findings": [
+        {
+          "code": "URL_PARAM_CREDENTIAL",
+          "pointer": "/sources/0/url"
+        }
+      ]
+    },
+    {
+      "file": "invalid-json-duplicate-key.json",
+      "findings": [
+        {
+          "code": "JSON_DUPLICATE_KEY",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "invalid-json-nan.json",
+      "findings": [
+        {
+          "code": "JSON_NON_FINITE_NUMBER",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "invalid-json-integer-out-of-range.json",
+      "findings": [
+        {
+          "code": "JSON_INTEGER_OUT_OF_RANGE",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "invalid-json-lone-surrogate.json",
+      "findings": [
+        {
+          "code": "JSON_LONE_SURROGATE",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "invalid-json-truncated.json",
+      "findings": [
+        {
+          "code": "JSON_MALFORMED_JSON",
+          "pointer": ""
+        }
+      ]
+    },
+    {
+      "file": "flagged-secret-in-text.template.json",
+      "findings": [],
+      "secret_scan": [
+        "SECRET_BEARER_TOKEN"
+      ]
+    }
+  ]
+}

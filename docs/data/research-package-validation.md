@@ -88,6 +88,10 @@ Chaque `sources[].url` et `attachments[].source_url` passe par `url_policy.evalu
 - **Câblage.** Aucune route `submit_research_package` n'existe ; elle dépend de l'ADR du Research Gateway.
 - **Horloge.** Aucune comparaison avec l'heure de réception : `received_at` appartient au reçu et au journal.
 
+## Exemples synthétiques
+
+`tests/fixtures/research-package/` contient des paquets synthétiques valides et au moins un paquet invalide par règle sémantique et par code structurel atteignable, avec les refus exacts attendus dans `expected.json`. Les fragments en forme de secret n'y figurent que comme espaces réservés, développés à l'exécution par `tests/test_contract_fixtures.py`.
+
 ## Utilisation locale
 
 ```text

@@ -1,0 +1,257 @@
+{
+  "schema_version": "0.1.0",
+  "package_id": "3f1c2a9e-6b1d-4c1e-9a52-0d4b8e7f1a20",
+  "lifecycle_state": "RAW",
+  "producer": {
+    "provider": "synthetic-provider",
+    "model": "synthetic-model-large",
+    "provider_request_id": "req-0001",
+    "gateway_version": "0.1.0"
+  },
+  "timestamps": {
+    "request_started_at": "2026-09-01T10:00:00Z",
+    "response_completed_at": "2026-09-01T10:00:05.250Z",
+    "collected_at": "2026-09-01T12:00:06+02:00",
+    "created_at": "2026-09-01T10:00:07.000000001Z"
+  },
+  "request": {
+    "question": "Quelles sources publiques décrivent un sas de quarantaine ?",
+    "controlled_system_prompt": {
+      "text": "Réponds en français et cite tes sources.",
+      "controlled_by": "local_operator",
+      "template_id": "template-fr-1",
+      "sha256": "a786c74bc1efd1f0b14eb34631be2268d6fcdca45d30ad36b267aa151e66c5f8"
+    },
+    "conversation_id": "conv-0001"
+  },
+  "response": {
+    "text": "Réponse synthétique : deux sources publiques d'exemple sont citées. 😀 Fin.",
+    "language": "fr-FR",
+    "finish_reason": "stop",
+    "provider_status": "completed"
+  },
+  "sources": [
+    {
+      "source_id": "src-1",
+      "kind": "web",
+      "url": "https://example.com/articles/quarantaine",
+      "title": "Article d'exemple",
+      "publisher": "Éditeur d'exemple",
+      "authors": [
+        "Autrice 0",
+        "Autrice 1",
+        "Autrice 2",
+        "Autrice 3",
+        "Autrice 4",
+        "Autrice 5",
+        "Autrice 6",
+        "Autrice 7",
+        "Autrice 8",
+        "Autrice 9",
+        "Autrice 10",
+        "Autrice 11",
+        "Autrice 12",
+        "Autrice 13",
+        "Autrice 14",
+        "Autrice 15",
+        "Autrice 16",
+        "Autrice 17",
+        "Autrice 18",
+        "Autrice 19",
+        "Autrice 20",
+        "Autrice 21",
+        "Autrice 22",
+        "Autrice 23",
+        "Autrice 24",
+        "Autrice 25",
+        "Autrice 26",
+        "Autrice 27",
+        "Autrice 28",
+        "Autrice 29",
+        "Autrice 30",
+        "Autrice 31",
+        "Autrice 32",
+        "Autrice 33",
+        "Autrice 34",
+        "Autrice 35",
+        "Autrice 36",
+        "Autrice 37",
+        "Autrice 38",
+        "Autrice 39",
+        "Autrice 40",
+        "Autrice 41",
+        "Autrice 42",
+        "Autrice 43",
+        "Autrice 44",
+        "Autrice 45",
+        "Autrice 46",
+        "Autrice 47",
+        "Autrice 48",
+        "Autrice 49",
+        "Autrice 50",
+        "Autrice 51",
+        "Autrice 52",
+        "Autrice 53",
+        "Autrice 54",
+        "Autrice 55",
+        "Autrice 56",
+        "Autrice 57",
+        "Autrice 58",
+        "Autrice 59",
+        "Autrice 60",
+        "Autrice 61",
+        "Autrice 62",
+        "Autrice 63",
+        "Autrice 64",
+        "Autrice 65",
+        "Autrice 66",
+        "Autrice 67",
+        "Autrice 68",
+        "Autrice 69",
+        "Autrice 70",
+        "Autrice 71",
+        "Autrice 72",
+        "Autrice 73",
+        "Autrice 74",
+        "Autrice 75",
+        "Autrice 76",
+        "Autrice 77",
+        "Autrice 78",
+        "Autrice 79",
+        "Autrice 80",
+        "Autrice 81",
+        "Autrice 82",
+        "Autrice 83",
+        "Autrice 84",
+        "Autrice 85",
+        "Autrice 86",
+        "Autrice 87",
+        "Autrice 88",
+        "Autrice 89",
+        "Autrice 90",
+        "Autrice 91",
+        "Autrice 92",
+        "Autrice 93",
+        "Autrice 94",
+        "Autrice 95",
+        "Autrice 96",
+        "Autrice 97",
+        "Autrice 98",
+        "Autrice 99",
+        "Autrice 100"
+      ],
+      "published_at": "2026-08-01T00:00:00Z",
+      "retrieved_at": "2026-09-01T10:00:02Z",
+      "content_sha256": "ffa6a744d78d28386438b4a8e8ee32f56718633735057b1b5ddfb5d224d45d98",
+      "media_type": "text/html"
+    },
+    {
+      "source_id": "src-2",
+      "kind": "document",
+      "url": "https://www.example.org/rapport.pdf",
+      "retrieved_at": "2026-09-01T10:00:03Z",
+      "media_type": "application/pdf"
+    }
+  ],
+  "citations": [
+    {
+      "citation_id": "cit-1",
+      "source_id": "src-1",
+      "response_start": 0,
+      "response_end": 10,
+      "locator": "section 2",
+      "quoted_text_sha256": "1fa570a6e95b98451fc0849e29c457e3621df99b3d3f85368bc7b4bd1962dff2"
+    },
+    {
+      "citation_id": "cit-2",
+      "source_id": "src-2",
+      "response_start": 10,
+      "response_end": 74
+    },
+    {
+      "citation_id": "cit-3",
+      "source_id": "src-1"
+    }
+  ],
+  "attachments": [
+    {
+      "attachment_id": "att-1",
+      "filename": "rapport.pdf",
+      "media_type": "application/pdf",
+      "byte_size": 2048,
+      "content_sha256": "6b9af93708359b3140cbedbdecb4622d937c5e13be6248a13fc166cbdf5d74a5",
+      "source_url": "https://www.example.org/rapport.pdf",
+      "created_at": "2026-09-01T10:00:03Z"
+    }
+  ],
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 80,
+    "total_tokens": 200,
+    "cached_input_tokens": 20,
+    "reasoning_tokens": 30
+  },
+  "cost": {
+    "amount": 0.0125,
+    "currency": "EUR",
+    "estimated": true
+  },
+  "generation_parameters": [
+    {
+      "name": "temperature",
+      "value": 0.2
+    },
+    {
+      "name": "max_output_tokens",
+      "value": 1024
+    },
+    {
+      "name": "stop",
+      "value": [
+        "###",
+        null,
+        1,
+        true
+      ]
+    },
+    {
+      "name": "seed",
+      "value": null
+    },
+    {
+      "name": "stream",
+      "value": false
+    },
+    {
+      "name": "reasoning.effort",
+      "value": "medium"
+    }
+  ],
+  "errors": [
+    {
+      "code": "PROVIDER_RETRY",
+      "phase": "provider",
+      "message": "Nouvelle tentative après délai.",
+      "retryable": true,
+      "occurred_at": "2026-09-01T10:00:01Z",
+      "provider_http_status": 429,
+      "provider_error_type": "rate_limit"
+    }
+  ],
+  "security": {
+    "producer_secret_scan_status": "passed",
+    "redaction_policy_version": "producer-redaction-v1",
+    "scanned_at": "2026-09-01T10:00:06Z",
+    "redactions_count": 1,
+    "redacted_categories": [
+      "personal_data"
+    ]
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "RFC8785",
+    "hash_scope": "canonical-package-excluding-integrity",
+    "package_sha256": "c3437f2b5c1dd792c0116f75667090584adc0b5033a22b3106ed36344ea7e656",
+    "provider_raw_response_sha256": "346655856d77deb365c0933f9a79c9dd0f1bee5b6955ce5c0beb4af176d68b49"
+  }
+}

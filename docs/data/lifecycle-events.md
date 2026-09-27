@@ -148,6 +148,10 @@ Codes de relecture :
 - **Chemins de promotion existants.** `tools/promote_arena_increment.py` et `tools/materialize_training_corpus.py` écrivent déjà `VALIDATED` dans des manifestes sans journal. Le schéma pourra les couvrir, mais leur raccordement n'est pas traité ici.
 - **Politiques.** La politique de refus ou de signalement par catégorie de secret et la matrice de promotion automatique ou humaine restent des décisions du propriétaire.
 
+## Exemples synthétiques
+
+`tests/fixtures/lifecycle-events/` contient des journaux JSONL synthétiques : des journaux cohérents avec leur état final attendu, et au moins un journal invalide par code de règle ou de relecture, avec ses codes et l'indice de l'événement fautif dans `expected.json`.
+
 ## Utilisation locale
 
 ```text
