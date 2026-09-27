@@ -141,7 +141,7 @@ class EvaluationGridTests(unittest.TestCase):
         metric(changed, "M1.5")["fixture"]["status"] = "missing"
         self.refused(changed, "must not point at a path")
         changed = copy.deepcopy(self.document)
-        metric(changed, "M1.1")["fixture"]["status"] = "present"
+        metric(changed, "M1.1")["fixture"]["paths"] = []
         self.refused(changed, "lists no path")
         changed = copy.deepcopy(self.document)
         metric(changed, "M1.1")["fixture"]["status"] = "planned"

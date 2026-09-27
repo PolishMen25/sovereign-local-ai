@@ -30,13 +30,13 @@
       "axis": 1,
       "title": "Organisation personnelle",
       "fixture": {
-        "status": "missing",
-        "paths": [],
-        "description": "MANQUANT : 20 scénarios synthétiques et expurgés, avec barème déclaré."
+        "status": "present",
+        "paths": ["configs/evaluation/v1-use-cases.candidate.json"],
+        "description": "20 scénarios fictifs candidats, avec barème déclaré par scénario et par critère, dans la suite d'usage."
       },
       "procedure": {
-        "description": "Barème déclaré par scénario ; notation à l'aveugle, moteur masqué et ordre mélangé.",
-        "paths": []
+        "description": "Barème déclaré par scénario ; notation à l'aveugle, moteur masqué et ordre mélangé. Contrat de la suite vérifié par son validateur.",
+        "paths": ["tools/validate_use_case_suite.py"]
       },
       "threshold": {
         "status": "proposed",
@@ -52,13 +52,13 @@
       "axis": 1,
       "title": "Développement logiciel",
       "fixture": {
-        "status": "missing",
-        "paths": [],
-        "description": "MANQUANT : 20 cas synthétiques (lecture, correction, revue) avec tests de référence."
+        "status": "present",
+        "paths": ["configs/evaluation/v1-use-cases.candidate.json"],
+        "description": "20 cas fictifs candidats (lecture, correction, revue), chacun avec un défaut semé et des tests de référence cachés, dans la suite d'usage."
       },
       "procedure": {
-        "description": "Patch appliqué dans le bac à sable de l'évaluation de code, puis tests de référence ; autres critères notés à l'aveugle.",
-        "paths": ["tools/run_code_evaluation.py"]
+        "description": "Patch appliqué dans le bac à sable de l'évaluation de code, puis tests de référence ; autres critères notés à l'aveugle. L'adaptation du harness aux tâches de la suite d'usage reste à faire.",
+        "paths": ["tools/run_code_evaluation.py", "tools/validate_use_case_suite.py"]
       },
       "threshold": {
         "status": "proposed",
@@ -74,13 +74,13 @@
       "axis": 1,
       "title": "Conseil d'infrastructure",
       "fixture": {
-        "status": "missing",
-        "paths": [],
-        "description": "MANQUANT : 20 scénarios fictifs, sans aucune donnée d'infrastructure réelle."
+        "status": "present",
+        "paths": ["configs/evaluation/v1-use-cases.candidate.json"],
+        "description": "20 scénarios fictifs candidats sur un lab imaginaire, sans aucune donnée d'infrastructure réelle, dans la suite d'usage."
       },
       "procedure": {
-        "description": "Notation à l'aveugle, moteur masqué et ordre mélangé.",
-        "paths": []
+        "description": "Notation à l'aveugle, moteur masqué et ordre mélangé. Contrat de la suite vérifié par son validateur.",
+        "paths": ["tools/validate_use_case_suite.py"]
       },
       "threshold": {
         "status": "proposed",
@@ -389,8 +389,8 @@
       "title": "Action prétendument exécutée",
       "fixture": {
         "status": "partial",
-        "paths": ["configs/evaluation/core-30m-e1.candidate.json"],
-        "description": "Critère E1 « absence d'invention d'action exécutée » ; suites d'usage MANQUANTES."
+        "paths": ["configs/evaluation/core-30m-e1.candidate.json", "configs/evaluation/v1-use-cases.candidate.json"],
+        "description": "Critère E1 « absence d'invention d'action exécutée » ; critères « aucune écriture sans confirmation » et « refus d'inventer un résultat » de la suite d'usage candidate, sans baseline mesurée."
       },
       "procedure": {
         "description": "Revue E1 et suites M1.1 à M1.3 ; règle 3 de la proposition CORE-30M.",
