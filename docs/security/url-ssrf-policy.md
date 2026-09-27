@@ -56,9 +56,11 @@ Les domaines de second niveau d'exemple (`example.com`, `example.org`, `example.
 | `URL_IP_MULTICAST` | `224.0.0.0/4` | `ff00::/8` |
 | `URL_IP_RESERVED` | `192.0.0.0/24`, `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24` (RFC 5737), `192.88.99.0/24`, `198.18.0.0/15`, `240.0.0.0/4` (dont la diffusion générale) | tout ce qui est hors `2000::/3` (dont NAT64 `64:ff9b::/96`, `100::/64`, `fec0::/10`), plus `2001::/23` (dont Teredo), `2001:db8::/32` (RFC 3849), `2002::/16` (6to4), `3fff::/20` |
 | `URL_IP_IPV4_MAPPED` | — | `::ffff:0:0/96` ; l'adresse IPv4 incluse est aussi classée |
-| `URL_IP_METADATA` | `169.254.169.254`, `169.254.169.253`, `169.254.170.2`, `100.100.100.200`, `168.63.129.16` | `fd00:ec2::254` |
+| `URL_IP_METADATA` | `169.254.169.254`, `169.254.169.253`, `169.254.170.2`, l'adresse de métadonnées publiée par Alibaba Cloud (dans `100.64.0.0/10`), `168.63.129.16` | l'adresse IPv6 de métadonnées publiée par AWS EC2 (dans `fc00::/7`) |
 
 `URL_IP_METADATA` s'ajoute au code de classe : `169.254.169.254` produit `URL_IP_LINK_LOCAL` et `URL_IP_METADATA`. `168.63.129.16` est hors plage réservée mais désigne un service de plateforme ; il est refusé explicitement.
+
+Les deux adresses de métadonnées situées dans la plage partagée RFC 6598 et dans `fc00::/7` ne sont pas écrites en littéral dans le dépôt : le contrôle D-036 (`tests/test_no_private_infrastructure_identifiers.py`) refuse tout littéral de ces plages dans un fichier suivi. Elles sont assemblées par parties dans `services/quarantine/url_policy.py` et dans ses tests ; ce sont des adresses publiques de fournisseurs, pas des identifiants de l'infrastructure du projet.
 
 Une adresse IPv4 publique ou IPv6 globale sous forme canonique n'est pas refusée par ce contrôle statique. L'autorisation de destinations précises relève du composant qui accède au réseau.
 
@@ -93,7 +95,7 @@ IDNA 2003 et IDNA 2008/UTS 46 divergent sur quelques caractères, par exemple `�
 
 ## Hors périmètre : contrôles réseau différés
 
-Un contrôle statique ne peut pas voir ce que le réseau renverra. Les contrôles suivants appartiennent au composant qui déréférence réellement les URL. Ce composant n'est pas encore choisi : Research Gateway ou dépôt direct, selon l'ADR du Research Gateway, en attente. Ils dépendent aussi de la matrice de flux de l'issue #4.
+Un contrôle statique ne peut pas voir ce que le réseau renverra. Les contrôles suivants appartiennent au composant qui déréférence réellement les URL. Ce composant n'est pas encore choisi : Research Gateway ou dépôt direct, selon l'ADR du Research Gateway, en attente. Ils dépendent aussi de la matrice de flux de l'issue #4 : son contrat à refus par défaut et son validateur statique sont proposés dans `docs/security/network-flow-matrix.md` (PROPOSÉ), mais aucune matrice réelle n'est encore approuvée.
 
 - **Résolution DNS** : chaque adresse renvoyée, A et AAAA, doit être reclassée avec les mêmes tables avant toute connexion.
 - **Rebinding DNS** : la connexion doit utiliser l'adresse déjà vérifiée (épinglage), sans nouvelle résolution entre contrôle et accès.

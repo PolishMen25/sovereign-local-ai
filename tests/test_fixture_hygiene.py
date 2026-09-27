@@ -42,6 +42,20 @@ DOCUMENTATION_NETWORKS = tuple(
     ipaddress.ip_network(network) for network in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24", "2001:db8::/32")
 )
 
+# Explicit exceptions, each pinned to one fixture file and one check code, with
+# its reason and the exact number of lines that trigger it: a new hit in the
+# same file (or a fixed one) fails until a reviewer updates the pin.  Only the
+# scanner's low-precision heuristic SECRET_MIXED_TOKEN (its outcome policy is
+# an owner decision) may be excepted.
+KNOWN_FALSE_POSITIVES = {
+    ("tokenizer_eval_synthetic.jsonl", SCAN.MIXED_TOKEN): (
+        "Échantillon synthétique d'évaluation du tokenizer : dans deux journaux fictifs, l'échappement "
+        "JSON de saut de ligne accolé à un horodatage ISO 8601 déclenche l'heuristique de faible "
+        "précision ; aucun secret.",
+        2,
+    ),
+}
+
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 _URL_AUTHORITY = re.compile(r"(?i)\b[a-z][a-z0-9+.-]{1,15}://([^\s/?#\"'<>\\]+)")
 _IPV4 = re.compile(r"(?<![0-9.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9])")
@@ -115,8 +129,19 @@ def scan_tree(root: Path) -> tuple[int, list[tuple[str, str]]]:
 class FixtureHygieneTests(unittest.TestCase):
     def test_committed_fixtures_are_clean(self) -> None:
         count, findings = scan_tree(FIXTURES)
-        self.assertEqual([], findings)
+        self.assertEqual([], [finding for finding in findings if finding not in KNOWN_FALSE_POSITIVES])
         self.assertGreaterEqual(count, 50)
+
+    def test_known_false_positives_are_pinned_and_not_stale(self) -> None:
+        _count, findings = scan_tree(FIXTURES)
+        for (relative, code), (reason, lines) in KNOWN_FALSE_POSITIVES.items():
+            with self.subTest(path=relative, code=code):
+                self.assertEqual(SCAN.MIXED_TOKEN, code, "only the low-precision heuristic may be excepted")
+                self.assertGreaterEqual(len(reason.split()), 8, "each exception needs a real reason")
+                self.assertIn((relative, code), findings, "stale exception: remove it")
+                text = (FIXTURES / relative).read_bytes().decode("utf-8", errors="replace")
+                hits = sum(1 for line in text.split("\n") if code in SCAN.scan_text(line).categories)
+                self.assertEqual(lines, hits, "the excepted hits changed; review them before updating the pin")
 
     def test_every_fixture_file_is_scanned(self) -> None:
         files = [path for path in FIXTURES.rglob("*") if path.is_file() and "__pycache__" not in path.parts]

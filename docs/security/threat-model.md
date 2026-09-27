@@ -18,7 +18,7 @@ Le risque est évalué qualitativement. Une cotation chiffrée utile exigera l'i
 - le Synology RS3617xs+ fournit du stockage, avec rôles exacts et politiques encore à valider ;
 - le DL380p Gen8 ne participe pas à la V1.
 
-> Point de cohérence signalé (OUVERT) : la ligne précédente reprend D-006, que le registre `docs/project/decisions.md` marque désormais comme remplacée par D-034. Elle est laissée inchangée : sa reformulation, comme celle de la règle équivalente d'`AGENTS.md`, revient au propriétaire, et ce modèle de menaces devra alors être réapprouvé.
+> Point de cohérence signalé (OUVERT) : la ligne précédente reprend D-006, que le registre `docs/project/decisions.md` marque désormais comme remplacée par D-034. Elle est laissée inchangée : `AGENTS.md` a depuis été reformulé (« aucune fonction CORE ni aucun entraînement », D-006 remplacée par D-034), mais la reformulation de ce modèle de menaces revient au propriétaire, qui devra alors le réapprouver.
 
 Orientation provisoire : un Research Gateway est l'option B recommandée pour l'étude, mais pas encore la décision finale. Les hypothèses confirmées sont des invariants de conception ; si l'une change, le modèle de menaces doit être réapprouvé.
 

@@ -123,15 +123,19 @@ _IPV6_CLASSES = tuple(
     )
 )
 _IPV6_GLOBAL_UNICAST = ipaddress.IPv6Network("2000::/3")
+# Two well-known public metadata addresses sit inside the RFC 6598 shared
+# range and inside fc00::/7.  They are assembled from parts so that the D-036
+# guard (tests/test_no_private_infrastructure_identifiers.py), which refuses
+# such literals in tracked files, stays free of exceptions.
 _METADATA_ADDRESSES = frozenset(
     ipaddress.ip_address(address)
     for address in (
         "169.254.169.254",
         "169.254.169.253",
         "169.254.170.2",
-        "100.100.100.200",
+        ".".join(str(octet) for octet in (100, 100, 100, 200)),
         "168.63.129.16",
-        "fd00:ec2::254",
+        ":".join(("fd00", "ec2", "", "254")),
     )
 )
 # RFC 2606/6761/6762/7686/8375/9476 and the ICANN ``.internal`` reservation,

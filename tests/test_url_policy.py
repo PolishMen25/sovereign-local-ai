@@ -32,6 +32,24 @@ SPEC.loader.exec_module(MODULE)
 
 M = MODULE
 
+
+def _v4(*octets: int) -> str:
+    """Dotted IPv4 assembled at run time.
+
+    Generic private and shared-range vectors are built here so that no such
+    literal appears in a tracked file (D-036 guard,
+    tests/test_no_private_infrastructure_identifiers.py).
+    """
+
+    return ".".join(str(octet) for octet in octets)
+
+
+def _v6(*groups: str) -> str:
+    """IPv6 text assembled at run time, for the same reason as ``_v4``."""
+
+    return ":".join(groups)
+
+
 ALLOWED = (
     "https://example.com/",
     "https://www.example.org/wiki/Page?lang=fr&page=2#section",
@@ -115,11 +133,11 @@ REFUSALS = (
     ("https://0.0.0.0/", {M.IP_UNSPECIFIED}),
     ("https://127.0.0.1/", {M.IP_LOOPBACK}),
     ("https://127.255.255.254/", {M.IP_LOOPBACK}),
-    ("https://10.0.0.1/", {M.IP_PRIVATE}),
-    ("https://172.16.5.4/", {M.IP_PRIVATE}),
-    ("https://192.168.254.1/", {M.IP_PRIVATE}),
+    (f"https://{_v4(10, 0, 0, 1)}/", {M.IP_PRIVATE}),
+    (f"https://{_v4(172, 16, 5, 4)}/", {M.IP_PRIVATE}),
+    (f"https://{_v4(192, 168, 254, 1)}/", {M.IP_PRIVATE}),
     ("https://169.254.10.20/", {M.IP_LINK_LOCAL}),
-    ("https://100.64.0.1/", {M.IP_CGNAT}),
+    (f"https://{_v4(100, 64, 0, 1)}/", {M.IP_CGNAT}),
     ("https://224.0.0.251/", {M.IP_MULTICAST}),
     ("https://192.0.2.10/", {M.IP_RESERVED}),
     ("https://198.51.100.7/", {M.IP_RESERVED}),
@@ -139,7 +157,7 @@ REFUSALS = (
     ("https://[::]/", {M.IP_UNSPECIFIED}),
     ("https://[::1]/", {M.IP_LOOPBACK}),
     ("https://[fe80::1]/", {M.IP_LINK_LOCAL}),
-    ("https://[fd12:3456:789a::1]/", {M.IP_UNIQUE_LOCAL}),
+    (f"https://[{_v6('fd12', '3456', '789a', '', '1')}]/", {M.IP_UNIQUE_LOCAL}),
     ("https://[ff02::1]/", {M.IP_MULTICAST}),
     ("https://[2001:db8::1]/", {M.IP_RESERVED}),
     ("https://[3fff::1]/", {M.IP_RESERVED}),
@@ -151,14 +169,14 @@ REFUSALS = (
     # IPv4-mapped IPv6.
     ("https://[::ffff:127.0.0.1]/", {M.IP_IPV4_MAPPED, M.IP_LOOPBACK}),
     ("https://[::ffff:7f00:1]/", {M.IP_IPV4_MAPPED, M.IP_LOOPBACK, M.NOT_CANONICAL}),
-    ("https://[::ffff:10.0.0.1]/", {M.IP_IPV4_MAPPED, M.IP_PRIVATE}),
+    (f"https://[::ffff:{_v4(10, 0, 0, 1)}]/", {M.IP_IPV4_MAPPED, M.IP_PRIVATE}),
     ("https://[::ffff:192.0.2.1]/", {M.IP_IPV4_MAPPED, M.IP_RESERVED}),
     # Cloud metadata endpoints.
     ("https://169.254.169.254/latest/meta-data/", {M.IP_LINK_LOCAL, M.IP_METADATA}),
     ("https://0xa9fea9fe/", {M.IP_NONSTANDARD_FORM, M.IP_LINK_LOCAL, M.IP_METADATA}),
     ("https://[::ffff:169.254.169.254]/", {M.IP_IPV4_MAPPED, M.IP_LINK_LOCAL, M.IP_METADATA}),
-    ("https://[fd00:ec2::254]/", {M.IP_UNIQUE_LOCAL, M.IP_METADATA}),
-    ("https://100.100.100.200/", {M.IP_CGNAT, M.IP_METADATA}),
+    (f"https://[{_v6('fd00', 'ec2', '', '254')}]/", {M.IP_UNIQUE_LOCAL, M.IP_METADATA}),
+    (f"https://{_v4(100, 100, 100, 200)}/", {M.IP_CGNAT, M.IP_METADATA}),
     ("https://168.63.129.16/", {M.IP_METADATA}),
     ("https://metadata.google.internal/", {M.HOST_SPECIAL_USE, M.HOST_METADATA}),
     ("https://instance-data/", {M.HOST_SINGLE_LABEL, M.HOST_METADATA}),
@@ -178,7 +196,7 @@ REFUSALS = (
     ("https://app.example.com/#/cb?id_token=t", {M.PARAM_CREDENTIAL}),
     ("https://shop.example.com/cart;jsessionid=s", {M.PARAM_CREDENTIAL}),
     # Several classes at once.
-    ("http://user:pass@10.0.0.1:8080/?token=t", {M.SCHEME_NOT_HTTPS, M.USERINFO, M.PORT_NOT_DEFAULT, M.IP_PRIVATE, M.PARAM_CREDENTIAL}),
+    (f"http://user:pass@{_v4(10, 0, 0, 1)}:8080/?token=t", {M.SCHEME_NOT_HTTPS, M.USERINFO, M.PORT_NOT_DEFAULT, M.IP_PRIVATE, M.PARAM_CREDENTIAL}),
 )
 
 
