@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Compare two closed CORE-MINI NUMA proofs without exposing host details."""
+"""Compare two closed CORE-MINI NUMA proofs without exposing host details.
+
+The output follows schemas/core-mini-numa-comparison.schema.json
+(core-mini-numa-comparison.v2). It is descriptive only: it never names a
+winning placement and always carries gate_status "g4-open".
+"""
 
 from __future__ import annotations
 
@@ -50,10 +55,58 @@ PROOF_ID_PATTERN = re.compile(
 CREATED_AT_PATTERN = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"
 )
+# Workload fields are echoed in the public comparison, so each one is held to
+# the evidence 0.2.0 contract (and the runner's own bounds) before use.
+WORKLOAD_DIGEST_KEYS = (
+    "source_archive_sha256", "source_tree_manifest_sha256",
+    "offline_runtime_lock_sha256", "numpy_runtime_lock_sha256",
+    "runtime_observation_sha256", "environment_contract_sha256",
+    "model_config_sha256",
+)
+WORKLOAD_INTEGER_BOUNDS = {
+    "repetitions": (benchmark.MINIMUM_REPETITIONS, benchmark.MAXIMUM_REPETITIONS),
+    "steps": (benchmark.MINIMUM_STEPS, benchmark.MAXIMUM_STEPS),
+    "batch_size": (1, 64),
+    "sequence_length": (2, 512),
+    "seed": (-(2**63), (2**63) - 1),
+    "threads": (1, 256),
+}
+EVIDENCE_SCHEMA_VERSION = "0.2.0"
+COMPARISON_SCHEMA_VERSION = "core-mini-numa-comparison.v2"
+LABEL_A, LABEL_B = benchmark.PLACEMENT_IDS
 
 
 def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and SHA256_PATTERN.fullmatch(value) is not None
+
+
+def _validate_workload(workload: dict[str, Any]) -> None:
+    def refuse(key: str) -> None:
+        raise benchmark.BenchmarkRefused(f"NUMA workload field is incompatible: {key}")
+
+    if workload["model_name"] != "CORE-MINI-1M":
+        refuse("model_name")
+    if workload["data_mode"] != "synthetic":
+        refuse("data_mode")
+    revision = workload["source_revision"]
+    if (
+        not isinstance(revision, str)
+        or benchmark.SOURCE_COMMIT_PATTERN.fullmatch(revision) is None
+    ):
+        refuse("source_revision")
+    for key in WORKLOAD_DIGEST_KEYS:
+        if not _is_sha256(workload[key]):
+            refuse(key)
+    for key, (minimum, maximum) in WORKLOAD_INTEGER_BOUNDS.items():
+        value = workload[key]
+        if type(value) is not int or not minimum <= value <= maximum:
+            refuse(key)
+    warmup = workload["warmup_steps"]
+    if type(warmup) is not int or not 1 <= warmup <= workload["steps"] - 3:
+        refuse("warmup_steps")
+    rate = workload["learning_rate"]
+    if type(rate) is not float or not math.isfinite(rate) or not 0.0 < rate <= 1.0:
+        refuse("learning_rate")
 
 
 def _read_evidence(path: Path) -> tuple[dict[str, Any], str]:
@@ -73,7 +126,7 @@ def _read_evidence(path: Path) -> tuple[dict[str, Any], str]:
     if benchmark._canonical_json_bytes(document) + b"\n" != payload:
         raise benchmark.BenchmarkRefused("NUMA evidence bytes are not canonical")
     if (
-        document["schema_version"] != "0.2.0"
+        document["schema_version"] != EVIDENCE_SCHEMA_VERSION
         or document["artifact_type"] != benchmark.EVIDENCE_TYPE
         or document["canonicalization"] != "canonical-json-v1"
         or document["evidence_scope"] != "repeated-single-placement-only"
@@ -97,11 +150,13 @@ def _read_evidence(path: Path) -> tuple[dict[str, Any], str]:
         or set(document["workload"]) != WORKLOAD_KEYS
         or not isinstance(document["aggregate"], dict)
         or set(document["aggregate"]) != {"repetitions_completed", "tokens_per_second"}
+        or type(document["aggregate"]["repetitions_completed"]) is not int
         or document["aggregate"]["repetitions_completed"] != document["workload"]["repetitions"]
         or not isinstance(document["aggregate"]["tokens_per_second"], dict)
         or set(document["aggregate"]["tokens_per_second"]) != DISTRIBUTION_KEYS
     ):
         raise benchmark.BenchmarkRefused("NUMA evidence is incompatible")
+    _validate_workload(document["workload"])
     if hashlib.sha256(benchmark._canonical_json_bytes(document["workload"])).hexdigest() != document["workload_contract_sha256"]:
         raise benchmark.BenchmarkRefused("NUMA workload digest is incompatible")
     repetitions = document["repetitions"]
@@ -150,20 +205,23 @@ def _read_evidence(path: Path) -> tuple[dict[str, Any], str]:
     return document, hashlib.sha256(payload).hexdigest()
 
 
-def compare(placement_a: Path, placement_b: Path) -> dict[str, Any]:
-    a, a_sha256 = _read_evidence(placement_a)
-    b, b_sha256 = _read_evidence(placement_b)
+def _require_comparable(
+    a: dict[str, Any], a_sha256: str, b: dict[str, Any], b_sha256: str
+) -> None:
+    # Refusal messages name fixed fields only, never a path or a value.
     if a_sha256 == b_sha256:
         raise benchmark.BenchmarkRefused("NUMA comparison needs two distinct proof files")
-    if (
-        a["placement"]["label"] != "placement-a"
-        or b["placement"]["label"] != "placement-b"
-        or a["proof_id"] == b["proof_id"]
-        or a["benchmark_session_id"] != b["benchmark_session_id"]
-        or a["workload"] != b["workload"]
-        or a["workload_contract_sha256"] != b["workload_contract_sha256"]
-    ):
-        raise benchmark.BenchmarkRefused("NUMA proofs are not comparable")
+    if a["placement"]["label"] != LABEL_A or b["placement"]["label"] != LABEL_B:
+        raise benchmark.BenchmarkRefused("NUMA comparison needs placement-a then placement-b")
+    if a["proof_id"] == b["proof_id"]:
+        raise benchmark.BenchmarkRefused("NUMA comparison needs two distinct proof_id values")
+    if a["benchmark_session_id"] != b["benchmark_session_id"]:
+        raise benchmark.BenchmarkRefused("NUMA proofs differ on benchmark_session_id")
+    for key in sorted(WORKLOAD_KEYS):
+        if a["workload"][key] != b["workload"][key]:
+            raise benchmark.BenchmarkRefused(f"NUMA proofs differ on workload field: {key}")
+    if a["workload_contract_sha256"] != b["workload_contract_sha256"]:
+        raise benchmark.BenchmarkRefused("NUMA proofs differ on workload_contract_sha256")
     # The protocol requires two distinct private placement contracts. Salted
     # commitments differ between runs, so equality means the same run (or a
     # copied commitment) is presented twice. Inequality alone does not prove
@@ -173,19 +231,73 @@ def compare(placement_a: Path, placement_b: Path) -> dict[str, Any]:
         == b["placement"]["contract_commitment_sha256"]
     ):
         raise benchmark.BenchmarkRefused("NUMA proofs share one placement contract")
-    a_median = a["aggregate"]["tokens_per_second"]["median"]
-    b_median = b["aggregate"]["tokens_per_second"]["median"]
+
+
+def _ratio(numerator: float, denominator: float) -> float:
+    value = numerator / denominator
+    if not math.isfinite(value) or value <= 0.0:
+        raise benchmark.BenchmarkRefused("NUMA descriptive ratio is not finite")
+    return value
+
+
+def _placement_summary(document: dict[str, Any], proof_file_sha256: str) -> dict[str, Any]:
     return {
-        "schema_version": "core-mini-numa-comparison.v1",
+        "proof_id": document["proof_id"],
+        "proof_file_sha256": proof_file_sha256,
+        "contract_commitment_sha256": document["placement"]["contract_commitment_sha256"],
+        "repetitions_completed": document["aggregate"]["repetitions_completed"],
+        "tokens_per_second": dict(document["aggregate"]["tokens_per_second"]),
+    }
+
+
+def compare(placement_a: Path, placement_b: Path) -> dict[str, Any]:
+    a, a_sha256 = _read_evidence(placement_a)
+    b, b_sha256 = _read_evidence(placement_b)
+    _require_comparable(a, a_sha256, b, b_sha256)
+    first = a["aggregate"]["tokens_per_second"]
+    second = b["aggregate"]["tokens_per_second"]
+    # Three to ten repetitions cannot support a significance claim. The
+    # artifact reports whether the observed [minimum, maximum] ranges overlap
+    # and stops there; a higher median is described, never declared a winner.
+    overlap = (
+        first["minimum"] <= second["maximum"]
+        and second["minimum"] <= first["maximum"]
+    )
+    if first["median"] > second["median"]:
+        higher_median_label = LABEL_A
+    elif second["median"] > first["median"]:
+        higher_median_label = LABEL_B
+    else:
+        higher_median_label = "tied"
+    return {
+        "schema_version": COMPARISON_SCHEMA_VERSION,
         "artifact_type": "descriptive-two-placement-comparison",
+        "canonicalization": "canonical-json-v1",
+        "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,
         "benchmark_session_id": a["benchmark_session_id"],
-        "workload_contract_sha256": a["workload_contract_sha256"],
-        "evidence": {
-            "placement_a": {"proof_id": a["proof_id"], "sha256": a_sha256, "median_tokens_per_second": a_median},
-            "placement_b": {"proof_id": b["proof_id"], "sha256": b_sha256, "median_tokens_per_second": b_median},
+        "shared_contract": {
+            "workload_contract_sha256": a["workload_contract_sha256"],
+            "workload": dict(a["workload"]),
         },
-        "median_tokens_per_second_ratio_a_over_b": a_median / b_median,
+        "placements": {
+            LABEL_A: _placement_summary(a, a_sha256),
+            LABEL_B: _placement_summary(b, b_sha256),
+        },
+        "descriptive_ratios": {
+            "mean_b_over_a": _ratio(second["mean"], first["mean"]),
+            "median_b_over_a": _ratio(second["median"], first["median"]),
+            "minimum_b_over_a": _ratio(second["minimum"], first["minimum"]),
+            "maximum_b_over_a": _ratio(second["maximum"], first["maximum"]),
+        },
+        "separation": {
+            "observed_ranges_overlap": overlap,
+            "outcome": "inconclusive-overlapping-observed-ranges"
+            if overlap
+            else "disjoint-observed-ranges",
+            "higher_median_label": higher_median_label,
+        },
         "interpretation": "descriptive-only-not-a-core-placement-decision",
+        "gate_status": "g4-open",
     }
 
 

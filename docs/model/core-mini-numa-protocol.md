@@ -19,7 +19,10 @@ produit une preuve publique conforme à
 [`core-mini-numa-evidence.schema.json`](../../schemas/core-mini-numa-evidence.schema.json)
 pour un seul placement. Elle ne compare pas deux placements et n'applique
 jamais elle-même une affinité. La version `0.2.0` du contrat lie séparément les
-locks PyTorch et NumPy à la preuve.
+locks PyTorch et NumPy à la preuve. La comparaison de deux preuves relève d'un
+outil séparé, `tools/compare_core_mini_numa_evidence.py`, décrit plus bas avec
+son contrat de sortie
+[`core-mini-numa-comparison.schema.json`](../../schemas/core-mini-numa-comparison.schema.json).
 
 ## Frontière du placement externe
 
@@ -156,6 +159,125 @@ workload, avec deux contrats de placement distincts. Elle doit vérifier les
 SHA-256 des preuves avant de calculer des ratios descriptifs. Le libellé opaque
 ne permet pas, à lui seul, d'affirmer « un socket » ou « deux sockets ».
 
+## Comparateur de deux preuves (`core-mini-numa-comparison.v2`)
+
+**Statut : PROVISOIRE.** Ce contrat de sortie est testé sur fixtures
+synthétiques uniquement. Il n'a pas été rejoué sur les preuves réelles, qui
+restent privées et hors Git ; le serveur de calcul est hors ligne.
+
+`tools/compare_core_mini_numa_evidence.py` consomme exactement deux preuves
+`0.2.0` :
+
+```text
+python3 -B tools/compare_core_mini_numa_evidence.py \
+  --placement-a <preuve-a.json> --placement-b <preuve-b.json> \
+  --output <comparaison.json>
+```
+
+La sortie est créée exclusivement, sans jamais remplacer une cible existante,
+sous la forme `canonical-json-v1` suivie d'un unique LF ; les mêmes octets sont
+écrits sur stdout. Tout refus renvoie le code 1 et le seul message
+`CORE-MINI NUMA comparison refused`, sans chemin, sans valeur et sans trace
+Python.
+
+### Refus du comparateur
+
+Avant tout ratio, le comparateur refuse :
+
+- un fichier non régulier, un lien symbolique, une taille hors borne, un JSON
+  invalide, une clé dupliquée, une constante non finie, un entier géant ou une
+  imbrication excessive ;
+- des octets qui ne sont pas exactement la forme `canonical-json-v1` suivie
+  d'un unique LF : indentation, clés non triées, CRLF, LF absent ou doublé,
+  échappements superflus ;
+- une preuve d'une autre version que `0.2.0`, une clé inconnue ou manquante ;
+- un `proof_id`, un identifiant de session, un horodatage, un engagement ou une
+  empreinte mal formés, ainsi qu'un champ de workload hors du contrat `0.2.0`,
+  puisque le workload est recopié dans la sortie ;
+- un nombre de répétitions hors de 3 à 10, zéro compris, ou une statistique
+  que le recalcul exact ne retrouve pas ;
+- deux fichiers de même SHA-256, deux `proof_id` identiques, ou des libellés
+  autres que `placement-a` puis `placement-b` ;
+- deux sessions différentes, un champ de workload différent (le refus interne
+  nomme le champ, la CLI ne l'affiche pas) ou deux empreintes de workload
+  différentes ;
+- deux preuves qui partagent `placement.contract_commitment_sha256`.
+
+Limite : l'engagement de placement est salé à chaque run. Deux engagements
+différents écartent la réutilisation d'une même preuve, mais ne prouvent pas
+que les deux contrats privés désignent des placements différents. Le
+comparateur ne vérifie donc pas la distinction effective des placements ; sans
+vérification privée séparée, une comparaison doit être lue comme « distinction
+des placements non vérifiée ».
+
+### Contenu de la sortie v2
+
+| Champ | Contenu |
+| --- | --- |
+| `schema_version` | `core-mini-numa-comparison.v2` |
+| `artifact_type` | `descriptive-two-placement-comparison` |
+| `canonicalization` | `canonical-json-v1` |
+| `evidence_schema_version` | `0.2.0`, version des deux preuves consommées |
+| `benchmark_session_id` | Session commune aux deux preuves. |
+| `shared_contract` | `workload_contract_sha256` et l'objet `workload` commun complet : commit et empreintes des sources, locks PyTorch et NumPy, observation du runtime, contrat d'environnement, configuration et dimensions. L'empreinte se recalcule sur cet objet. |
+| `placements` | Pour `placement-a` et `placement-b` : `proof_id`, SHA-256 du fichier de preuve, engagement salé, nombre de répétitions et distribution des débits (moyenne, médiane, minimum, maximum, écart-type de population, MAD). |
+| `descriptive_ratios` | Ratios B/A de la moyenne, de la médiane, du minimum et du maximum. |
+| `separation` | `observed_ranges_overlap`, `outcome` et `higher_median_label`. |
+| `interpretation` | `descriptive-only-not-a-core-placement-decision` |
+| `gate_status` | `g4-open`, constant. |
+
+Les intervalles observés `[minimum ; maximum]` sont fermés. S'ils se
+recouvrent, y compris par une borne commune, `outcome` vaut
+`inconclusive-overlapping-observed-ranges` ; sinon il vaut
+`disjoint-observed-ranges`. Trois à dix répétitions ne permettent aucune
+conclusion statistique : même des intervalles disjoints restent une
+description. `higher_median_label` (`placement-a`, `placement-b` ou `tied`)
+nomme la médiane la plus haute, jamais un gagnant, et aucun libellé n'est
+traduit en socket.
+
+Le schéma est fermé à tous les niveaux. Ses définitions `workload`,
+`distribution`, `sha256`, `proofId` et `sessionId` sont identiques à celles du
+schéma de preuve `0.2.0`. Les tests valident les artefacts produits contre le
+fichier de schéma avec un vérificateur en bibliothèque standard, limité aux
+mots-clés employés et qui refuse tout autre mot-clé ; aucune dépendance n'est
+ajoutée.
+
+### Migration v1 → v2
+
+Le format `core-mini-numa-comparison.v1` (commit `d13b4cf`) reste documenté
+comme **format historique** : c'est celui des artefacts locaux de comparaison
+produits le 2026-09-06 et le 2026-09-07, conservés hors Git. Le comparateur
+n'émet plus que v2. Les artefacts v1 existants ne sont ni réécrits ni
+convertis ; ils restent lisibles grâce à cette table.
+
+| Champ v1 | Équivalent v2 |
+| --- | --- |
+| `schema_version` = `core-mini-numa-comparison.v1` | `schema_version` = `core-mini-numa-comparison.v2` |
+| `artifact_type`, `benchmark_session_id`, `interpretation` | Inchangés. |
+| `workload_contract_sha256` (racine) | `shared_contract.workload_contract_sha256` |
+| `evidence.placement_a.proof_id` et `evidence.placement_b.proof_id` | `placements.placement-a.proof_id` et `placements.placement-b.proof_id` |
+| `evidence.placement_a.sha256` et `evidence.placement_b.sha256` | `placements.<libellé>.proof_file_sha256` |
+| `evidence.placement_a.median_tokens_per_second` et son équivalent B | `placements.<libellé>.tokens_per_second.median` |
+| `median_tokens_per_second_ratio_a_over_b` (A/B) | `descriptive_ratios.median_b_over_a` (B/A), soit l'inverse du ratio v1. |
+| Absents en v1 | `canonicalization`, `evidence_schema_version`, `shared_contract.workload`, engagements, distributions complètes, ratios de la moyenne, du minimum et du maximum, `separation`, `gate_status`. |
+
+L'orientation du ratio s'inverse : le ratio v1 de `0,9497` (A/B) décrit la même
+observation qu'un `median_b_over_a` d'environ `1,053`.
+
+Un artefact v1 a été produit avant les refus ci-dessus. Il n'atteste ni la
+forme canonique des preuves, ni les bornes de répétitions, ni la différence des
+engagements de placement. Le runner impose déjà une sortie canonique et 3 à
+10 répétitions lorsqu'il crée une preuve, mais la différence des engagements
+entre les deux preuves n'a jamais été contrôlée par le comparateur v1.
+
+Déduction arithmétique, non rejouée : pour la paire du 2026-09-07, la médiane
+de B (906,51 tokens/s) se situe dans l'intervalle observé de A
+(751,45 à 926,16 tokens/s), si bien que les deux intervalles se recouvrent
+nécessairement. La règle v2 classerait donc cette paire
+`inconclusive-overlapping-observed-ranges`, avec `higher_median_label` égal à
+`placement-b`. La production réelle d'un artefact v2 sur ces preuves privées
+reste une étape à exécuter sur le serveur de calcul.
+
 ## Minimisation de la sortie publique
 
 Le schéma est fermé avec `additionalProperties: false`. La sortie ne contient
@@ -214,7 +336,8 @@ Une seconde preuve comparable,
 `proof-c40e4682-0063-4eea-aa28-e119dc303977`, a été exécutée avec le même
 workload et la même session de benchmark. Sa médiane est de 906,51 tokens/s,
 contre 860,88 tokens/s pour la première. L'artefact de comparaison local
-`core-mini-numa-comparison.v1` donne un ratio A/B de `0,9497`, soit B environ
+`core-mini-numa-comparison.v1` (format historique, voir « Migration v1 → v2 »)
+donne un ratio A/B de `0,9497`, soit B environ
 5,3 % au-dessus de A sur ce test miniature. Cette différence est descriptive :
 elle ne choisit pas encore une allocation pour CORE-700M et devra être
 confirmée avec des charges, durées et mesures mémoire plus représentatives.
