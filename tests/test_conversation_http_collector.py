@@ -147,6 +147,9 @@ class CollectorSurfaceTests(unittest.TestCase):
         self.assert_nothing_written()
 
     def test_put_delete_patch_are_not_implemented(self) -> None:
+        # Seule la ligne de statut est épinglée : sur ce chemin, send_error
+        # journalise aussi un message qui recopie la méthode du client (écart
+        # connu, voir test_unsupported_method_log_carries_status_only).
         body = json.dumps(conversation()).encode("utf-8")
         for method in ("PUT", "DELETE", "PATCH"):
             with self.subTest(method=method):
@@ -155,6 +158,29 @@ class CollectorSurfaceTests(unittest.TestCase):
                 self.assertEqual(status, 501)
                 self.assertIn("collector event status=501\n", log)
         self.assert_nothing_written()
+
+    def test_client_chosen_method_is_not_implemented_and_writes_nothing(self) -> None:
+        method = "FOOBAR" + uuid4().hex.upper()
+        status, _payload, log = self.exchange(method, "/v1/conversations")
+        self.assertEqual(status, 501)
+        self.assertIn("collector event status=501\n", log)
+        self.assert_nothing_written()
+
+    @unittest.expectedFailure
+    def test_unsupported_method_log_carries_status_only(self) -> None:
+        """Écart connu du code de production, consigné ici plutôt que masqué.
+
+        BaseHTTPRequestHandler.send_error appelle log_error(format, code, message)
+        et log_message journalise arguments[1] : le message « Unsupported method »
+        recopie donc dans le journal une méthode choisie par le client. Ce test
+        deviendra un succès inattendu quand le collecteur ne journalisera plus que
+        des statuts numériques ; cette correction relève du code de production,
+        après la PR #17, et non de ce lot de tests.
+        """
+        method = "FOOBAR" + uuid4().hex.upper()
+        _status, _payload, log = self.exchange(method, "/v1/conversations")
+        self.assertNotIn(method, log)
+        self.assertEqual(log, "collector event status=501\n")
 
 
 class ConversationHttpCollectorTests(unittest.TestCase):
