@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/derived-artifact/0.1.0/schema.json",
+  "title": "Artefact dérivé et sa lignée",
+  "description": "PROVISOIRE : contrat candidat, non câblé (docs/data/derived-artifacts.md). Un enregistrement décrit une transformation (masquage, nettoyage, résumé, traduction, découpage, embedding, index) qui produit un nouvel artefact à partir de parents identifiés par empreinte. Il ne contient jamais le contenu des parents ni du résultat, aucun chemin et aucun secret ; le changement d'état d'un artefact remplacé reste un événement SUPERSEDED du journal de cycle de vie.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "parents",
+    "transformation",
+    "actor",
+    "started_at",
+    "completed_at",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "artifact_id": {
+      "$ref": "#/$defs/identifier",
+      "description": "Identifiant stable du dérivé ; même motif que le provenance_id du manifeste de corpus et que l'artifact_id du journal de cycle de vie."
+    },
+    "parents": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/parentRef"
+      },
+      "description": "Artefacts d'entrée, au moins un de rôle primary. Un parent est un RAW (research_package, conversation, conversation_revision) ou un autre dérivé ; jamais le dérivé lui-même."
+    },
+    "transformation": {
+      "$ref": "#/$defs/transformation"
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "started_at": {
+      "$ref": "#/$defs/dateTime"
+    },
+    "completed_at": {
+      "$ref": "#/$defs/dateTime",
+      "description": "Postérieur ou égal à started_at."
+    },
+    "result": {
+      "$ref": "#/$defs/result"
+    },
+    "replaces": {
+      "$ref": "#/$defs/artifactRef",
+      "description": "Facultatif : artefact que ce dérivé corrige ou remplace pour les usages courants. Le lien documente l'intention ; le changement d'état lui-même est un événement SUPERSEDED du journal."
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "artifactKind": {
+      "enum": [
+        "research_package",
+        "conversation",
+        "conversation_revision",
+        "derived_artifact"
+      ],
+      "description": "Mêmes types que le sujet d'un événement de cycle de vie."
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "artifact_id",
+        "sha256"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "$ref": "#/$defs/artifactKind"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "subject_sha256 de l'artefact dans le journal : octets reçus pour un RAW, result.content_sha256 pour un dérivé."
+        }
+      }
+    },
+    "parentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_kind",
+        "artifact_id",
+        "sha256",
+        "role"
+      ],
+      "properties": {
+        "artifact_kind": {
+          "$ref": "#/$defs/artifactKind"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "role": {
+          "enum": [
+            "primary",
+            "supporting"
+          ],
+          "description": "primary : contenu transformé. supporting : entrée auxiliaire qui influence le résultat sans être transformée (liste de masquage, glossaire...)."
+        }
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "version",
+        "parameters"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "redact",
+            "clean",
+            "summarize",
+            "translate",
+            "chunk",
+            "embed",
+            "index"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "description": "Version de l'implémentation de la transformation."
+        },
+        "parameters": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/parameter"
+          }
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^(?!.*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|auth(?:orization)?|password|passwd|secret|credential|cookie|private[_-]?key))[a-z][a-z0-9_.-]{0,63}$",
+          "description": "Même motif que generationParameter du paquet de recherche : un nom évoquant un secret est refusé."
+        },
+        "value": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 1024
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "internal_service",
+            "operator"
+          ],
+          "description": "Le Collector et les producteurs externes ne dérivent jamais."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+          "description": "Identifiant technique non nominatif."
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content_sha256",
+        "byte_size",
+        "media_type"
+      ],
+      "properties": {
+        "content_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 des octets du résultat, stocké comme objet séparé ; c'est le subject_sha256 du dérivé dans le journal."
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1099511627776
+        },
+        "media_type": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$",
+          "maxLength": 255
+        }
+      }
+    }
+  }
+}

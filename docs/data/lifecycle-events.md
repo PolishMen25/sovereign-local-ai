@@ -2,7 +2,7 @@
 
 > Statut : **PROVISOIRE**. Contrat candidat pour l'issue #6 (schéma `lifecycle-event` 0.1.0, relecture `lifecycle-event-replay-v1`), rédigé avant l'ADR du Research Gateway. Il n'est câblé à aucune route, aucun service et aucun port ; aucun journal réel n'est tenu. Sa publication comme contrat attend une décision du propriétaire. Le registre `docs/project/decisions.md` n'est pas modifié.
 
-`docs/data/provenance-and-lifecycle.md` exige que « les événements d'état, relations `SUPERSEDED` et artefacts dérivés » disposent de schémas append-only avant toute implémentation. Ce document spécifie le premier : `schemas/lifecycle-event.schema.json` (Draft 2020-12, fermé partout par `additionalProperties: false`), implémenté sans dépendance tierce par `services/quarantine/lifecycle.py` et vérifié par `tests/test_lifecycle_events.py`. Les artefacts dérivés relèvent d'un schéma de lignée distinct.
+`docs/data/provenance-and-lifecycle.md` exige que « les événements d'état, relations `SUPERSEDED` et artefacts dérivés » disposent de schémas append-only avant toute implémentation. Ce document spécifie le premier : `schemas/lifecycle-event.schema.json` (Draft 2020-12, fermé partout par `additionalProperties: false`), implémenté sans dépendance tierce par `services/quarantine/lifecycle.py` et vérifié par `tests/test_lifecycle_events.py`. Les artefacts dérivés relèvent d'un schéma de lignée distinct, spécifié dans `docs/data/derived-artifacts.md`.
 
 ## Principes
 
