@@ -10,6 +10,15 @@ Il ne fournit aucune recherche, lecture de document privé, mémoire d'agent, fi
 
 Le Collector impose un jeton Bearer d'au moins 32 caractères, `application/json`, une limite de 1 Mio et la validation stricte de l'export. Il ne journalise ni corps, ni en-tête, ni contenu. Une soumission acceptée reste `RAW` et ne devient jamais automatiquement une connaissance MCP.
 
+Le premier instantané d'une conversation reste dans `raw/conversations/<id>.json`.
+Si une session ultérieure apporte un contenu différent sous le même identifiant,
+le Collector conserve aussi cet instantané dans
+`raw/conversations/versions/<id>/<sha256>.json` sans modifier l'original.
+Un nouvel envoi des mêmes octets renvoie `already_imported`. Chaque version reste
+en RAW : son stockage et son accusé de réception ne valent ni validation ni
+indexation. La restauration et l'export complet doivent inclure le sous-dossier
+`versions`.
+
 ## Synchronisation des conversations Codex
 
 `tools/codex_conversation_sync.py` est le relais local destiné au hook Codex `SessionEnd`. Il extrait uniquement les messages utilisateur et assistant du transcript local, retire les secrets probables, découpe les conversations sous la limite d'ingress puis les place dans une file locale avant envoi HTTPS. Le hook ne bloque pas sur le réseau : un processus détaché expédie la file, et un hook `SessionStart` relance les envois différés.
@@ -50,7 +59,11 @@ conversation reste en file pour une nouvelle tentative.
 Avant tout envoi, chaque fichier de file est lu avec une limite de 1 Mio,
 doit être un fichier régulier, un objet JSON UTF-8 strict et canonique, respecter
 le schéma minimal d'une conversation et porter le même `conversation_id` que
-son nom. Après un `202`, le relais exige `application/json` lorsque les en-têtes
+la première partie de son nom. Une révision en attente est nommée
+`<id>.<sha256>.json` : plusieurs instantanés d'une même session coexistent
+sans écrasement et sont envoyés dans leur ordre de mise en file. Les anciens
+fichiers `<id>.json` restent lisibles. Après un `202`, le relais exige
+`application/json` lorsque les en-têtes
 sont accessibles puis un accusé composé exactement de `state`,
 `conversation_id` et `sha256`. L'état doit être `raw_imported` ou
 `already_imported`; l'identifiant et l'empreinte SHA-256 doivent correspondre
@@ -58,7 +71,9 @@ exactement aux octets envoyés.
 
 Le reçu local ajoute uniquement `received_at`. Il est écrit atomiquement après
 synchronisation du fichier, relu et validé contre le payload avant suppression
-de la file. Un reçu absent, vide, corrompu, lié ou incohérent ne sert jamais à
+de la file. Chaque révision possède son reçu `<id>.<sha256>.json` ; les anciens
+reçus `<id>.json` sont encore reconnus lorsqu'ils correspondent exactement aux
+octets envoyés. Un reçu absent, vide, corrompu, lié ou incohérent ne sert jamais à
 dédupliquer : le relais régénère ou conserve alors la conversation pour une
 nouvelle tentative.
 
