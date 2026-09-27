@@ -68,8 +68,12 @@ PROOF_ID_PATTERN = re.compile(
 CREATED_AT_PATTERN = re.compile(
     r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"
 )
-# Workload fields are echoed in the public comparison, so each one is held to
-# the evidence 0.2.0 contract (and the runner's own bounds) before use.
+# Every workload field is held to the evidence 0.2.0 contract (and the
+# runner's own bounds) before use, so no proof outside that contract is ever
+# compared. Only the digests below are echoed in shared_contract: threads and
+# the other workload parameters stay bound through workload_contract_sha256
+# and each proof file SHA-256, pending the owner's D-025 ruling on publishing
+# a thread level equal to the affinity size (protocol, owner point 7).
 WORKLOAD_DIGEST_KEYS = (
     "source_archive_sha256", "source_tree_manifest_sha256",
     "offline_runtime_lock_sha256", "numpy_runtime_lock_sha256",
@@ -95,8 +99,9 @@ def _is_sha256(value: Any) -> bool:
 
 def _require_regular_non_link(path: Path, subject: str) -> None:
     # The bounded read also uses O_NOFOLLOW where the platform offers it; this
-    # explicit check keeps the refusal on platforms without that flag. The
-    # placement verifier reuses it for its own inputs.
+    # explicit check keeps the refusal on platforms without that flag. Like
+    # O_NOFOLLOW, it inspects the final path component only: symbolic links in
+    # parent directories are followed. The placement verifier reuses it.
     try:
         metadata = os.lstat(path)
     except (OSError, ValueError):
@@ -354,7 +359,7 @@ def compare(placement_a: Path, placement_b: Path) -> dict[str, Any]:
         "benchmark_session_id": a["benchmark_session_id"],
         "shared_contract": {
             "workload_contract_sha256": a["workload_contract_sha256"],
-            "workload": dict(a["workload"]),
+            **{key: a["workload"][key] for key in WORKLOAD_DIGEST_KEYS},
         },
         "placements": {
             LABEL_A: _placement_summary(a, a_sha256),

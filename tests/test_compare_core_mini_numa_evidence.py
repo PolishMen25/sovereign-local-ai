@@ -167,11 +167,14 @@ class ComparisonTests(unittest.TestCase):
             result["placements"]["placement-b"]["tokens_per_second"],
             distribution(SAMPLES_B),
         )
-        self.assertEqual(result["shared_contract"]["workload"], workload())
+        # Hashes only: threads and the other workload parameters stay bound
+        # through workload_contract_sha256 and are never echoed (D-025).
         self.assertEqual(
-            result["shared_contract"]["workload_contract_sha256"],
-            evidence_a()["workload_contract_sha256"],
+            result["shared_contract"],
+            {"workload_contract_sha256": evidence_a()["workload_contract_sha256"]}
+            | {key: workload()[key] for key in comparison.WORKLOAD_DIGEST_KEYS},
         )
+        self.assertTrue(all(key.endswith("_sha256") for key in result["shared_contract"]))
         ratios = result["descriptive_ratios"]
         self.assertEqual(ratios["median_b_over_a"], 1850.0 / 2000.0)
         self.assertEqual(ratios["mean_b_over_a"], statistics.fmean(SAMPLES_B) / statistics.fmean(SAMPLES_A))
@@ -527,7 +530,7 @@ class SeparationTests(unittest.TestCase):
         rendered = first.decode("utf-8").lower()
         for forbidden in (
             "/", "\\", "host", "socket", "cpu", "node", "affinity", "winner",
-            "faster", "recommend", "created_at",
+            "faster", "recommend", "created_at", "threads",
         ):
             self.assertNotIn(forbidden, rendered)
 
@@ -547,8 +550,20 @@ def load_comparison_schema() -> dict:
 
 
 def _same_json_value(left, right) -> bool:
-    # JSON Schema const/enum equality: True must not match 1, nor 1.0 match True.
-    return type(left) is type(right) and left == right
+    # const/enum equality, type-strict at every depth: True never matches 1,
+    # even inside an object or array enum. Stricter than JSON Schema, which
+    # holds 1 and 1.0 equal: this closed contract never needs that leniency.
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(
+            _same_json_value(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list):
+        return len(left) == len(right) and all(
+            _same_json_value(item, other) for item, other in zip(left, right)
+        )
+    return left == right
 
 
 def check_against_schema(instance, schema: dict, root: dict | None = None, where: str = "$") -> None:
@@ -657,10 +672,26 @@ class ComparisonSchemaTests(unittest.TestCase):
         evidence_schema = json.loads(
             (SCHEMA_ROOT / "core-mini-numa-evidence.schema.json").read_text(encoding="utf-8")
         )
-        for name in ("workload", "distribution", "sha256", "proofId", "sessionId"):
+        for name in ("distribution", "sha256", "proofId", "sessionId"):
             with self.subTest(definition=name):
                 self.assertEqual(schema["$defs"][name], evidence_schema["$defs"][name])
-        self.assertEqual(set(schema["$defs"]["workload"]["required"]), comparison.WORKLOAD_KEYS)
+        # shared_contract echoes the workload digest plus the workload's own
+        # digest fields, and nothing else from the workload.
+        shared = schema["$defs"]["sharedContract"]
+        self.assertEqual(
+            set(shared["required"]),
+            {"workload_contract_sha256", *comparison.WORKLOAD_DIGEST_KEYS},
+        )
+        evidence_workload = evidence_schema["$defs"]["workload"]["properties"]
+        for key in comparison.WORKLOAD_DIGEST_KEYS:
+            with self.subTest(digest=key):
+                self.assertEqual(evidence_workload[key], {"$ref": "#/$defs/sha256"})
+                self.assertEqual(shared["properties"][key], evidence_workload[key])
+        self.assertEqual(
+            {key for key, value in evidence_workload.items() if value == {"$ref": "#/$defs/sha256"}},
+            set(comparison.WORKLOAD_DIGEST_KEYS),
+        )
+        self.assertNotIn("workload", schema["$defs"])
         self.assertEqual(
             schema["properties"]["schema_version"]["const"],
             comparison.COMPARISON_SCHEMA_VERSION,
@@ -708,7 +739,11 @@ class ComparisonSchemaTests(unittest.TestCase):
             ),
             "zero ratio": lambda d: d["descriptive_ratios"].update(mean_b_over_a=0.0),
             "socket claim": lambda d: d["placements"].update(socket_count=2),
-            "workload extra": lambda d: d["shared_contract"]["workload"].update(hostname="x"),
+            "echoed thread count": lambda d: d["shared_contract"].update(threads=12),
+            "echoed workload object": lambda d: d["shared_contract"].update(workload={}),
+            "missing numpy lock digest": lambda d: d["shared_contract"].pop(
+                "numpy_runtime_lock_sha256"
+            ),
         }
         for name, change in violations.items():
             with self.subTest(violation=name):
@@ -716,6 +751,34 @@ class ComparisonSchemaTests(unittest.TestCase):
                     check_against_schema(mutated(change), schema)
         with self.assertRaises(AssertionError):
             check_against_schema(valid, schema | {"minProperties": 1})
+
+    def test_the_object_enum_alone_rejects_non_boolean_stand_ins(self) -> None:
+        # Strip the per-property keywords so only the separation enum can
+        # reject: an integer or float must never stand in for a boolean.
+        separation = load_comparison_schema()["properties"]["separation"]
+        enum_only = separation | {
+            "properties": {key: {} for key in separation["properties"]}
+        }
+        valid = compare_documents(evidence_a(), evidence_b())["separation"]
+        check_against_schema(valid, enum_only)
+        for stand_in in (1, 1.0):
+            with self.subTest(stand_in=stand_in):
+                with self.assertRaises(AssertionError) as caught:
+                    check_against_schema(valid | {"observed_ranges_overlap": stand_in}, enum_only)
+                self.assertIn("not in enum", str(caught.exception))
+
+    def test_json_value_equality_is_type_strict_at_every_depth(self) -> None:
+        for left, right in (
+            (True, 1), (1.0, 1), ({"x": True}, {"x": 1}), ({"x": 1.0}, {"x": 1}),
+            ([True], [1]), ([True], [True, True]), ({"x": True}, {"x": True, "y": 1}),
+            ({"x": {"y": False}}, {"x": {"y": 0}}),
+        ):
+            with self.subTest(left=left, right=right):
+                self.assertFalse(_same_json_value(left, right))
+                self.assertFalse(_same_json_value(right, left))
+        for value in ("tied", True, {"x": [False, "a"]}, [{"x": 1}]):
+            with self.subTest(value=value):
+                self.assertTrue(_same_json_value(value, json.loads(json.dumps(value))))
 
 
 if __name__ == "__main__":

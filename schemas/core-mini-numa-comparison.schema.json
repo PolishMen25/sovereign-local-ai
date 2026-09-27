@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.local-ai.invalid/core-mini-numa-comparison/v2/schema.json",
   "title": "Comparaison descriptive de deux preuves CORE-MINI",
-  "description": "Contrat public fermé de la sortie du comparateur de deux preuves 0.2.0 (placement-a, placement-b). L'artefact décrit des distributions observées et leur recouvrement ; il ne désigne aucun placement gagnant, ne traduit jamais les libellés opaques en sockets et laisse le gate G4 ouvert. Aucun chemin, nom d'hôte ni identifiant de CPU ou de nœud n'y figure.",
+  "description": "Contrat public fermé de la sortie du comparateur de deux preuves 0.2.0 (placement-a, placement-b). L'artefact décrit des distributions observées et leur recouvrement ; il ne désigne aucun placement gagnant, ne traduit jamais les libellés opaques en sockets et laisse le gate G4 ouvert. Aucun chemin, nom d'hôte, identifiant de CPU ou de nœud ni nombre de threads n'y figure.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,15 +24,7 @@
     "canonicalization": { "const": "canonical-json-v1" },
     "evidence_schema_version": { "const": "0.2.0" },
     "benchmark_session_id": { "$ref": "#/$defs/sessionId" },
-    "shared_contract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["workload_contract_sha256", "workload"],
-      "properties": {
-        "workload_contract_sha256": { "$ref": "#/$defs/sha256" },
-        "workload": { "$ref": "#/$defs/workload" }
-      }
-    },
+    "shared_contract": { "$ref": "#/$defs/sharedContract" },
     "placements": {
       "type": "object",
       "additionalProperties": false,
@@ -123,52 +115,29 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
-    "workload": {
+    "sharedContract": {
+      "description": "Empreintes seulement. Les paramètres du workload (threads, lot, séquence, graine, étapes, chauffe, répétitions) et le commit source ne sont pas recopiés : ils restent liés par workload_contract_sha256 et par le SHA-256 de chaque fichier de preuve. Publier un niveau de threads relève de D-025 (point 7 du protocole, ouvert).",
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "model_name",
-        "data_mode",
-        "repetitions",
-        "source_revision",
+        "workload_contract_sha256",
         "source_archive_sha256",
         "source_tree_manifest_sha256",
         "offline_runtime_lock_sha256",
         "numpy_runtime_lock_sha256",
         "runtime_observation_sha256",
         "environment_contract_sha256",
-        "model_config_sha256",
-        "steps",
-        "warmup_steps",
-        "batch_size",
-        "sequence_length",
-        "learning_rate",
-        "seed",
-        "threads"
+        "model_config_sha256"
       ],
       "properties": {
-        "model_name": { "const": "CORE-MINI-1M" },
-        "data_mode": { "const": "synthetic" },
-        "repetitions": { "type": "integer", "minimum": 3, "maximum": 10 },
-        "source_revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "workload_contract_sha256": { "$ref": "#/$defs/sha256" },
         "source_archive_sha256": { "$ref": "#/$defs/sha256" },
         "source_tree_manifest_sha256": { "$ref": "#/$defs/sha256" },
         "offline_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
         "numpy_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
         "runtime_observation_sha256": { "$ref": "#/$defs/sha256" },
         "environment_contract_sha256": { "$ref": "#/$defs/sha256" },
-        "model_config_sha256": { "$ref": "#/$defs/sha256" },
-        "steps": { "type": "integer", "minimum": 6, "maximum": 1000 },
-        "warmup_steps": { "type": "integer", "minimum": 1, "maximum": 997 },
-        "batch_size": { "type": "integer", "minimum": 1, "maximum": 64 },
-        "sequence_length": { "type": "integer", "minimum": 2, "maximum": 512 },
-        "learning_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "seed": {
-          "type": "integer",
-          "minimum": -9223372036854775808,
-          "maximum": 9223372036854775807
-        },
-        "threads": { "type": "integer", "minimum": 1, "maximum": 256 }
+        "model_config_sha256": { "$ref": "#/$defs/sha256" }
       }
     },
     "distribution": {

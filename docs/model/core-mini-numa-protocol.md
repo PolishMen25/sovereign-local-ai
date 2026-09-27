@@ -185,18 +185,21 @@ Python.
 
 Avant tout ratio, le comparateur refuse :
 
-- un fichier non régulier, un lien symbolique, une taille hors borne, un JSON
-  invalide, une clé dupliquée, une constante non finie, un entier géant ou une
-  imbrication excessive. Le refus des liens repose sur un contrôle `lstat`
-  explicite, partagé avec le vérificateur de distinction, qui vaut aussi là où
-  `O_NOFOLLOW` n'existe pas, par exemple sous Windows ;
+- un fichier non régulier, un lien symbolique en dernier composant du chemin,
+  une taille hors borne, un JSON invalide, une clé dupliquée, une constante non
+  finie, un entier géant ou une imbrication excessive. Le refus des liens
+  repose sur un contrôle `lstat` explicite, partagé avec le vérificateur de
+  distinction, qui vaut aussi là où `O_NOFOLLOW` n'existe pas, par exemple sous
+  Windows. Comme `O_NOFOLLOW`, il ne porte que sur le dernier composant : les
+  répertoires parents ne sont pas contrôlés ;
 - des octets qui ne sont pas exactement la forme `canonical-json-v1` suivie
   d'un unique LF : indentation, clés non triées, CRLF, LF absent ou doublé,
   échappements superflus ;
 - une preuve d'une autre version que `0.2.0`, une clé inconnue ou manquante ;
 - un `proof_id`, un identifiant de session, un horodatage, un engagement ou une
-  empreinte mal formés, ainsi qu'un champ de workload hors du contrat `0.2.0`,
-  puisque le workload est recopié dans la sortie ;
+  empreinte mal formés, ainsi qu'un champ de workload hors du contrat `0.2.0`.
+  Seules les empreintes du workload sont recopiées dans la sortie, mais aucune
+  preuve hors contrat n'est comparée ;
 - un nombre de répétitions hors de 3 à 10, zéro compris, ou une statistique
   que le recalcul exact ne retrouve pas ou ne peut pas représenter (débits
   finis proches du maximum flottant) ;
@@ -229,7 +232,7 @@ non vérifiée ».
 | `canonicalization` | `canonical-json-v1` |
 | `evidence_schema_version` | `0.2.0`, version des deux preuves consommées |
 | `benchmark_session_id` | Session commune aux deux preuves. |
-| `shared_contract` | `workload_contract_sha256` et l'objet `workload` commun complet : commit et empreintes des sources, locks PyTorch et NumPy, observation du runtime, contrat d'environnement, configuration et dimensions. L'empreinte se recalcule sur cet objet. |
+| `shared_contract` | Empreintes seulement : `workload_contract_sha256` et les sept empreintes communes du workload (archive et arbre source, locks PyTorch et NumPy, observation du runtime, contrat d'environnement, configuration du modèle). Les paramètres du workload et le commit source ne sont pas recopiés. |
 | `placements` | Pour `placement-a` et `placement-b` : `proof_id`, SHA-256 du fichier de preuve, engagement salé, nombre de répétitions et distribution des débits (moyenne, médiane, minimum, maximum, écart-type de population, MAD). |
 | `descriptive_ratios` | Ratios B/A de la moyenne, de la médiane, du minimum et du maximum. |
 | `separation` | `observed_ranges_overlap`, `outcome` et `higher_median_label`, limités par le schéma à leurs combinaisons cohérentes. |
@@ -249,15 +252,20 @@ des intervalles disjoints l'issue `disjoint-observed-ranges`, et `tied` n'est
 jamais disjoint, puisque deux médianes égales appartiennent aux deux
 intervalles.
 
-`shared_contract.workload` recopie `threads`, comme le font déjà les preuves
-`0.2.0`. Si ce niveau égale la taille exacte de l'affinité, une comparaison v2
-répète donc un effectif de CPU. Le point 7 des « Points soumis au
-propriétaire » (D-025, **OUVERT**) couvre aussi les artefacts de comparaison
-v2 ; le comparateur reste inchangé en attendant cette décision.
+`shared_contract` ne recopie ni `threads`, ni le lot, la séquence, la graine,
+les étapes, la chauffe, le nombre de répétitions ou le commit source. Ces
+valeurs restent liées à la comparaison par `workload_contract_sha256` et par
+le SHA-256 de chaque fichier de preuve, sans être répétées. Un niveau de
+threads égal à la taille exacte de l'affinité révélerait un effectif de CPU ;
+les preuves `0.2.0` le publient déjà, mais sa publication dans un nouveau type
+d'artefact relève du point 7 des « Points soumis au propriétaire » (D-025,
+**OUVERT**). Si le propriétaire l'autorise, ces champs pourront entrer dans
+une version ultérieure du contrat de comparaison.
 
-Le schéma est fermé à tous les niveaux. Ses définitions `workload`,
-`distribution`, `sha256`, `proofId` et `sessionId` sont identiques à celles du
-schéma de preuve `0.2.0`. Les tests valident les artefacts produits contre le
+Le schéma est fermé à tous les niveaux. Ses définitions `distribution`,
+`sha256`, `proofId` et `sessionId` sont identiques à celles du schéma de preuve
+`0.2.0`, et les empreintes de `shared_contract` reprennent celles de sa
+définition `workload`. Les tests valident les artefacts produits contre le
 fichier de schéma avec un vérificateur en bibliothèque standard, limité aux
 mots-clés employés et qui refuse tout autre mot-clé ; aucune dépendance n'est
 ajoutée.
@@ -279,7 +287,7 @@ convertis ; ils restent lisibles grâce à cette table.
 | `evidence.placement_a.sha256` et `evidence.placement_b.sha256` | `placements.<libellé>.proof_file_sha256` |
 | `evidence.placement_a.median_tokens_per_second` et son équivalent B | `placements.<libellé>.tokens_per_second.median` |
 | `median_tokens_per_second_ratio_a_over_b` (A/B) | `descriptive_ratios.median_b_over_a` (B/A), soit l'inverse du ratio v1. |
-| Absents en v1 | `canonicalization`, `evidence_schema_version`, `shared_contract.workload`, engagements, distributions complètes, ratios de la moyenne, du minimum et du maximum, `separation`, `gate_status`. |
+| Absents en v1 | `canonicalization`, `evidence_schema_version`, les sept empreintes du workload dans `shared_contract`, engagements, distributions complètes, ratios de la moyenne, du minimum et du maximum, `separation`, `gate_status`. |
 
 L'orientation du ratio s'inverse : le ratio v1 de `0,9497` (A/B) décrit la même
 observation qu'un `median_b_over_a` d'environ `1,053`.
@@ -293,10 +301,14 @@ entre les deux preuves n'a jamais été contrôlée par le comparateur v1.
 Déduction arithmétique, non rejouée : pour la paire du 2026-09-07, la médiane
 de B (906,51 tokens/s) se situe dans l'intervalle observé de A
 (751,45 à 926,16 tokens/s), si bien que les deux intervalles se recouvrent
-nécessairement. La règle v2 classerait donc cette paire
+nécessairement, et la médiane la plus haute est celle de B. Le comparateur v2
+applique toutefois ses refus avant tout classement (octets canoniques,
+engagements distincts, contrat strict du workload et des répétitions). Leur
+effet sur ces preuves privées n'a pas été vérifié, le serveur de calcul étant
+hors ligne. Si la paire franchit ces refus, la règle v2 la classerait
 `inconclusive-overlapping-observed-ranges`, avec `higher_median_label` égal à
-`placement-b`. La production réelle d'un artefact v2 sur ces preuves privées
-reste une étape à exécuter sur le serveur de calcul.
+`placement-b` ; sinon, v2 la refuserait. La production réelle d'un artefact v2
+sur ces preuves reste une étape à exécuter sur le serveur de calcul.
 
 ## Reçu de distinction des placements (`core-mini-placement-distinctness.v1`)
 
@@ -320,8 +332,9 @@ privé. Le contrat est le fichier exact passé au runner. L'outil :
 1. relit les deux preuves avec les contrôles du comparateur, et exige une paire
    que le comparateur accepterait ;
 2. relit chaque contrat avec le chargeur strict du runner, et chaque sel, qui
-   doit faire exactement 32 octets. Il ne suit aucun lien symbolique et refuse
-   ces fichiers privés s'ils se trouvent dans l'arbre source ;
+   doit faire exactement 32 octets. Il refuse un lien symbolique en dernier
+   composant du chemin, sans contrôler les répertoires parents, et refuse ces
+   fichiers privés si leur chemin résolu se trouve dans l'arbre source ;
 3. recalcule chaque engagement sur les octets exacts du contrat, jamais
    resérialisés, avec le séparateur `core-mini-placement-commitment-v1`. Il
    exige l'égalité avec l'engagement publié par la preuve du même libellé ;
@@ -337,7 +350,8 @@ trace Python. L'outil refuse :
   preuve ;
 - le même sel pour les deux runs ;
 - deux placements identiques sur les deux axes ;
-- un lien symbolique, un fichier non régulier, trop grand ou tronqué ;
+- un lien symbolique en dernier composant du chemin, un fichier non régulier,
+  trop grand ou tronqué ;
 - une preuve non canonique, ou un contrat que le runner aurait refusé ;
 - une sortie existante.
 
@@ -464,9 +478,13 @@ Préconditions communes (PROVISOIRE) :
   de ce protocole. Restent **OUVERTS** : ce que G4 conditionne désormais, le
   modèle visé par l'extrapolation et l'usage éventuel des temps d'étape de
   cette lignée, mesurés avec un autre protocole ;
-- l'hôte est au repos : les autres charges de calcul sont arrêtées pendant
-  toute la session, et l'opérateur le consigne dans l'enregistrement privé du
-  run. La façon de le vérifier depuis l'invité est **OUVERTE** ;
+- la session ne démarre qu'après la fin des calculs autonomes en cours,
+  conformément à la règle de [la passation](../project/claude-code-handoff.md)
+  qui interdit d'interrompre un entraînement actif. Ce protocole n'arrête
+  aucune charge active : tout arrêt d'un entraînement ou d'un service pour
+  libérer l'hôte relève du propriétaire. L'opérateur consigne l'état de l'hôte
+  dans l'enregistrement privé du run. La façon de vérifier le repos depuis
+  l'invité est **OUVERTE** ;
 - toutes les exécutions restent CPU-only et sans réseau, sous les préconditions
   d'isolation déjà imposées par le runner.
 
@@ -543,7 +561,8 @@ Règles :
   [l'état des capacités](../project/current-capabilities.md) rapporte pour la
   paire du 2026-09-06 un écart en sens inverse ;
 - les niveaux de threads, de lot et de séquence restent des paramètres de
-  workload publiés, comme `threads` aujourd'hui. Un niveau égal à la taille
+  workload publiés dans les preuves, comme `threads` aujourd'hui, mais non
+  recopiés par la comparaison v2. Un niveau égal à la taille
   exacte de l'affinité révélerait un effectif de CPU : sa publication relève
   de D-025 et reste **OUVERTE** ;
 - la grille des niveaux est **OUVERTE**. Les bornes actuelles du runner
@@ -725,8 +744,11 @@ après des mesures reproductibles sur le serveur de calcul. Le modèle cible est
 
 **CONFIRMÉ.** Le runner impose un délai de 30 à 3 600 s par processus enfant.
 Il refuse toute répétition incomplète, expirée ou diagnostiquée sur stderr, et
-toute valeur non finie. Le trainer vérifie la finitude des gradients à chaque
-étape. Une preuve partielle n'est jamais publiée.
+toute valeur non finie. Un enfant qui ne se termine pas avec le code 0 est
+refusé, y compris un enfant tué par `SIGKILL`, par exemple par le tueur OOM.
+Ce refus tient au contrôle du code de retour dans `run_child` ; aucun test ne
+le simule encore avec un signal. Le trainer vérifie la finitude des gradients
+à chaque étape. Une preuve partielle n'est jamais publiée.
 
 **PROVISOIRE.** Les catégories d'arrêt ci-dessous sont surveillées pendant les
 étapes et entre les phases. Un déclenchement arrête le run sans preuve
@@ -735,7 +757,7 @@ publique ; la catégorie est consignée dans l'enregistrement privé du run.
 | Catégorie | Source prévue | Déclenchement | Seuil |
 | --- | --- | --- | --- |
 | Mémoire disponible | la plus petite de deux marges : `MemAvailable` de `/proc/meminfo` et `memory.max − memory.current` du cgroup | marge sous un plancher | **OUVERT** |
-| OOM | enfant terminé par `SIGKILL`, ou incrément de `oom_kill` dans `memory.events` | toute occurrence | sans seuil : arrêt immédiat |
+| OOM du cgroup | compteur `oom_kill` de `memory.events` du cgroup du conteneur. Il compte les processus tués dans tout le conteneur, pas seulement l'enfant du benchmark ; l'enfant tué est déjà refusé (CONFIRMÉ ci-dessus) | incrément pendant la session | **OUVERT**, seuil et réaction compris |
 | Disque libre | `statvfs` du système de fichiers du répertoire de run, avant chaque checkpoint | espace sous un plancher | **OUVERT** |
 | Température | source **OUVERTE** : les capteurs `hwmon` ne sont probablement pas visibles depuis l'invité non privilégié (**HYPOTHÈSE**) ; une surveillance côté hôte devrait alors arrêter le run | valeur au-dessus d'un plafond | **OUVERT** |
 | Stabilité numérique | perte ou gradient non fini (déjà refusé) ; perte qui dépasse un multiple de sa valeur à la fin de la chauffe | valeur non finie ; divergence au-delà du seuil | **OUVERT** pour la divergence |
@@ -743,8 +765,9 @@ publique ; la catégorie est consignée dans l'enregistrement privé du run.
 
 La dérive du temps d'étape signale un étranglement thermique ou une contention.
 Elle arrête le run parce qu'elle fausserait la mesure, même sans danger pour le
-matériel. Le propriétaire fixe les fenêtres, les seuils numériques, la source
-de température et la réaction attendue côté hôte.
+matériel. Le propriétaire fixe les fenêtres, les seuils numériques, la réaction
+à un `oom_kill` du cgroup, la source de température et la réaction attendue
+côté hôte.
 
 ### Configuration et publication
 
@@ -786,15 +809,19 @@ document, identifiée par son commit, et sur les points **OUVERTS** :
    d'extrapolation ;
 4. la longueur du prompt, le nombre de jetons générés et la taille du jeu
    d'évaluation ;
-5. les seuils d'arrêt (mémoire, disque, température, divergence et dérive) et
-   la source de température ;
+5. les seuils d'arrêt pour la mémoire, le disque, la température, la
+   divergence et la dérive, la réaction à un OOM (`oom_kill` du cgroup) et la
+   source de température ;
 6. l'exigence éventuelle d'une reprise bit à bit ;
 7. la publication éventuelle des classes « un socket » et « deux sockets » pour
    les libellés opaques, et celle d'un niveau de threads égal à la taille de
-   l'affinité, que les preuves `0.2.0` et les comparaisons v2 recopient ;
+   l'affinité, que les preuves `0.2.0` publient déjà et que les comparaisons
+   v2 ne recopient pas ;
 8. l'extension du reçu de distinction à d'autres axes que les CPU et les nœuds
    de la politique ;
-9. la façon de vérifier que l'hôte est au repos ;
+9. la façon de vérifier que l'hôte est au repos, et la décision éventuelle
+   d'arrêter une charge active (entraînement autonome ou service) pour une
+   session de benchmark au lieu d'attendre sa fin ;
 10. les défauts NUMA, que l'issue #8 cite parmi les métriques : accepter le
     ratio de localité à leur place, ou chercher un compteur par processus. Les
     candidats sont les champs `numa_faults` de `/proc/<pid>/sched`, qui
