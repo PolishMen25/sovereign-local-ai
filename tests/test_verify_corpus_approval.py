@@ -43,6 +43,21 @@ class CorpusApprovalTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-permissive"):
                 verify_corpus_approval(candidate_path=candidate, approved_path=approved)
 
+    def test_etalab_is_allowed_under_d033(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory); candidate = root / "candidate.json"; approved = root / "approved.json"
+            item = source(license_name="Etalab-2.0"); self.write_json(candidate, {"sources": [item]}); self.write_json(approved, self.approved(item))
+            self.assertEqual(verify_corpus_approval(candidate_path=candidate, approved_path=approved)["source_count"], 1)
+
+    def test_licenses_without_a_decision_or_refused_by_the_register_stay_refused(self) -> None:
+        # 0BSD and Unlicense await an owner decision; D-032/D-033 keep CC-BY-SA, -NC and -ND refused.
+        for license_name in ("0BSD", "Unlicense", "CC-BY-SA-4.0", "CC-BY-NC-4.0", "CC-BY-ND-4.0", "Etalab-1.0", ""):
+            with self.subTest(license=license_name), TemporaryDirectory() as directory:
+                root = Path(directory); candidate = root / "candidate.json"; approved = root / "approved.json"
+                item = source(license_name=license_name); self.write_json(candidate, {"sources": [item]}); self.write_json(approved, self.approved(item))
+                with self.assertRaisesRegex(ValueError, "non-permissive"):
+                    verify_corpus_approval(candidate_path=candidate, approved_path=approved)
+
     def test_divergent_source_list_is_refused(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory); candidate = root / "candidate.json"; approved = root / "approved.json"
