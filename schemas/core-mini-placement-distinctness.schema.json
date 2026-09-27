@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/core-mini-placement-distinctness/v1/schema.json",
+  "title": "Reçu de distinction des placements CORE-MINI",
+  "description": "Contrat public fermé du reçu émis hors ligne par le vérificateur de distinction. Il atteste que les deux contrats privés et leurs sels recalculent exactement les engagements des deux preuves 0.2.0 (placement-a, placement-b) et que les placements diffèrent sur au moins un des deux axes publiés. Il ne contient aucun identifiant de CPU ou de nœud, aucun effectif, aucun sel, aucun chemin et aucune mesure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "canonicalization",
+    "evidence_schema_version",
+    "commitment_scheme",
+    "placements",
+    "distinctness",
+    "verification"
+  ],
+  "properties": {
+    "schema_version": { "const": "core-mini-placement-distinctness.v1" },
+    "artifact_type": { "const": "private-placement-distinctness-receipt" },
+    "canonicalization": { "const": "canonical-json-v1" },
+    "evidence_schema_version": { "const": "0.2.0" },
+    "commitment_scheme": { "const": "core-mini-placement-commitment-v1" },
+    "placements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["placement-a", "placement-b"],
+      "properties": {
+        "placement-a": { "$ref": "#/$defs/placementCommitment" },
+        "placement-b": { "$ref": "#/$defs/placementCommitment" }
+      }
+    },
+    "distinctness": {
+      "description": "Au moins un axe diffère : deux placements identiques sur les deux axes sont refusés et ne reçoivent aucun reçu.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu_sets_differ", "policy_nodes_differ"],
+      "properties": {
+        "cpu_sets_differ": { "type": "boolean" },
+        "policy_nodes_differ": { "type": "boolean" }
+      },
+      "enum": [
+        { "cpu_sets_differ": true, "policy_nodes_differ": true },
+        { "cpu_sets_differ": true, "policy_nodes_differ": false },
+        { "cpu_sets_differ": false, "policy_nodes_differ": true }
+      ]
+    },
+    "verification": {
+      "const": "private-contracts-and-salts-matched-public-commitments"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "placementCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_commitment_sha256"],
+      "properties": {
+        "contract_commitment_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}
