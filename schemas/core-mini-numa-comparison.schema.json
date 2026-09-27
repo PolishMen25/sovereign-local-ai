@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/core-mini-numa-comparison/v2/schema.json",
+  "title": "Comparaison descriptive de deux preuves CORE-MINI",
+  "description": "Contrat public fermé de la sortie du comparateur de deux preuves 0.2.0 (placement-a, placement-b). L'artefact décrit des distributions observées et leur recouvrement ; il ne désigne aucun placement gagnant, ne traduit jamais les libellés opaques en sockets et laisse le gate G4 ouvert. Aucun chemin, nom d'hôte, identifiant de CPU ou de nœud ni nombre de threads n'y figure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "canonicalization",
+    "evidence_schema_version",
+    "benchmark_session_id",
+    "shared_contract",
+    "placements",
+    "descriptive_ratios",
+    "separation",
+    "interpretation",
+    "gate_status"
+  ],
+  "properties": {
+    "schema_version": { "const": "core-mini-numa-comparison.v2" },
+    "artifact_type": { "const": "descriptive-two-placement-comparison" },
+    "canonicalization": { "const": "canonical-json-v1" },
+    "evidence_schema_version": { "const": "0.2.0" },
+    "benchmark_session_id": { "$ref": "#/$defs/sessionId" },
+    "shared_contract": { "$ref": "#/$defs/sharedContract" },
+    "placements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["placement-a", "placement-b"],
+      "properties": {
+        "placement-a": { "$ref": "#/$defs/placementSummary" },
+        "placement-b": { "$ref": "#/$defs/placementSummary" }
+      }
+    },
+    "descriptive_ratios": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean_b_over_a",
+        "median_b_over_a",
+        "minimum_b_over_a",
+        "maximum_b_over_a"
+      ],
+      "properties": {
+        "mean_b_over_a": { "$ref": "#/$defs/positiveNumber" },
+        "median_b_over_a": { "$ref": "#/$defs/positiveNumber" },
+        "minimum_b_over_a": { "$ref": "#/$defs/positiveNumber" },
+        "maximum_b_over_a": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "separation": {
+      "description": "Combinaisons admissibles seulement : un recouvrement donne toujours l'issue inconclusive, des intervalles disjoints l'issue disjoint. Deux médianes égales appartiennent aux deux intervalles, qui se recouvrent donc : tied n'est jamais disjoint.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_ranges_overlap", "outcome", "higher_median_label"],
+      "properties": {
+        "observed_ranges_overlap": { "type": "boolean" },
+        "outcome": {
+          "enum": [
+            "inconclusive-overlapping-observed-ranges",
+            "disjoint-observed-ranges"
+          ]
+        },
+        "higher_median_label": {
+          "enum": ["placement-a", "placement-b", "tied"]
+        }
+      },
+      "enum": [
+        {
+          "observed_ranges_overlap": true,
+          "outcome": "inconclusive-overlapping-observed-ranges",
+          "higher_median_label": "placement-a"
+        },
+        {
+          "observed_ranges_overlap": true,
+          "outcome": "inconclusive-overlapping-observed-ranges",
+          "higher_median_label": "placement-b"
+        },
+        {
+          "observed_ranges_overlap": true,
+          "outcome": "inconclusive-overlapping-observed-ranges",
+          "higher_median_label": "tied"
+        },
+        {
+          "observed_ranges_overlap": false,
+          "outcome": "disjoint-observed-ranges",
+          "higher_median_label": "placement-a"
+        },
+        {
+          "observed_ranges_overlap": false,
+          "outcome": "disjoint-observed-ranges",
+          "higher_median_label": "placement-b"
+        }
+      ]
+    },
+    "interpretation": { "const": "descriptive-only-not-a-core-placement-decision" },
+    "gate_status": { "const": "g4-open" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proofId": {
+      "type": "string",
+      "pattern": "^proof-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^session-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "sharedContract": {
+      "description": "Empreintes seulement. Les paramètres du workload (threads, lot, séquence, graine, étapes, chauffe, répétitions) et le commit source ne sont pas recopiés : ils restent liés par workload_contract_sha256 et par le SHA-256 de chaque fichier de preuve. Publier un niveau de threads relève de D-025 (point 7 du protocole, ouvert).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workload_contract_sha256",
+        "source_archive_sha256",
+        "source_tree_manifest_sha256",
+        "offline_runtime_lock_sha256",
+        "numpy_runtime_lock_sha256",
+        "runtime_observation_sha256",
+        "environment_contract_sha256",
+        "model_config_sha256"
+      ],
+      "properties": {
+        "workload_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "source_archive_sha256": { "$ref": "#/$defs/sha256" },
+        "source_tree_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "offline_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "numpy_runtime_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_observation_sha256": { "$ref": "#/$defs/sha256" },
+        "environment_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "model_config_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mean",
+        "median",
+        "minimum",
+        "maximum",
+        "population_standard_deviation",
+        "median_absolute_deviation"
+      ],
+      "properties": {
+        "mean": { "$ref": "#/$defs/positiveNumber" },
+        "median": { "$ref": "#/$defs/positiveNumber" },
+        "minimum": { "$ref": "#/$defs/positiveNumber" },
+        "maximum": { "$ref": "#/$defs/positiveNumber" },
+        "population_standard_deviation": { "type": "number", "minimum": 0 },
+        "median_absolute_deviation": { "type": "number", "minimum": 0 }
+      }
+    },
+    "placementSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proof_id",
+        "proof_file_sha256",
+        "contract_commitment_sha256",
+        "repetitions_completed",
+        "tokens_per_second"
+      ],
+      "properties": {
+        "proof_id": { "$ref": "#/$defs/proofId" },
+        "proof_file_sha256": { "$ref": "#/$defs/sha256" },
+        "contract_commitment_sha256": { "$ref": "#/$defs/sha256" },
+        "repetitions_completed": { "type": "integer", "minimum": 3, "maximum": 10 },
+        "tokens_per_second": { "$ref": "#/$defs/distribution" }
+      }
+    }
+  }
+}
