@@ -415,8 +415,8 @@
         "description": "MANQUANT : le registre des profils référence un identifiant eval_suite par profil, sans aucun fichier de suite."
       },
       "procedure": {
-        "description": "Un profil non draft sans suite existante est refusé ; contenu exigé par la vue agents.",
-        "paths": ["docs/agents/overview.md"]
+        "description": "Un profil non draft sans fichier configs/evaluation/agents/<eval_suite>.json lié à son identifiant et à sa version, avec cas qualité, moindre privilège et isolation, fait échouer le test du registre ; contrat PROPOSÉ dans la vue agents.",
+        "paths": ["docs/agents/overview.md", "tests/test_agent_registry.py"]
       },
       "threshold": {
         "status": "proposed",

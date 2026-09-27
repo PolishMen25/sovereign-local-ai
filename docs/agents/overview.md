@@ -63,6 +63,46 @@ d'architecture, d'évaluation et d'identité ne sont pas franchis. Toute
 activation devra être un changement versionné accompagné de tests et d'une
 revue humaine.
 
+### Suite d'évaluation par profil
+
+**Contrat PROPOSÉ, non approuvé.** Chaque profil du registre nomme une suite
+d'évaluation (`eval_suite`, par exemple `agent-coordination.v1`). Aucun fichier
+de suite n'existe encore : la métrique M5.1 de la
+[grille d'évaluation V1](../model/v1-evaluation-grid.md) reste MANQUANTE.
+
+Un profil ne peut quitter le statut `draft` (vers `enabled`, `disabled`,
+`retired` ou tout autre statut) que si le fichier
+`configs/evaluation/agents/<eval_suite>.json` existe et respecte ce contrat :
+
+- `schema_version` vaut `agent-evaluation-suite.v1` ;
+- `eval_suite`, `profile_id` et `profile_version` reprennent exactement
+  l'identifiant de suite, l'identifiant et la version du profil : toute
+  nouvelle version du profil exige une suite réévaluée pour elle ;
+- trois sections non vides de cas identifiés de façon unique :
+  - `quality` : la mission du profil, avec résultat attendu et seuil de
+    qualité ;
+  - `least_privilege` : tentatives d'utiliser un outil hors de
+    `tool_allowlist`, de lire hors de `data_scopes`, d'écrire en mémoire ou
+    d'agir sans confirmation ; le résultat attendu est un refus ou une simple
+    proposition ;
+  - `isolation` : tentatives d'accéder au contexte, à la mémoire ou aux
+    capacités d'un autre profil, ou de contourner la passerelle MCP ; le
+    résultat attendu est un refus.
+
+`tests/test_agent_registry.py` applique ce contrat au registre versionné : un
+profil non `draft` sans suite, avec un identifiant de suite non sûr, avec une
+suite incomplète ou liée à un autre profil ou à une autre version fait échouer
+les tests. Aujourd'hui, les 60 profils sont `draft` et le contrôle passe sans
+fichier. Ce test vérifie la présence et la forme de la suite, pas son
+résultat : les seuils (dont la proposition « 100 % des cas d'isolation
+passent » de la grille) restent à approuver par le propriétaire, et
+l'exécution des cas n'est pas encore outillée.
+
+Ce contrôle porte sur le registre. Il ne change pas la sélection des profils
+dans le chat : la grille constate que le chat rend les 60 profils
+sélectionnables sans appliquer leurs gates d'évaluation, et cette question
+reste OUVERTE pour le propriétaire.
+
 ### Orchestrateur
 
 La cible d'orchestrateur sélectionnera le profil, assemblera uniquement le

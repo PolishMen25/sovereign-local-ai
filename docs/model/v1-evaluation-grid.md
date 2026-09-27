@@ -201,7 +201,7 @@ avec réponse. Aucun moteur n'a été évalué sur cette suite.
 
 | Métrique | Fixture | Procédure / outil | Seuil | R | G | A |
 |---|---|---|---|---|---|---|
-| M5.1 Suite d'évaluation par profil | MANQUANT — `configs/agents/registry.json` référence un identifiant `eval_suite` par profil, sans aucun fichier de suite | un profil non `draft` sans suite existante est refusé ; contenu exigé par la [vue agents](../agents/overview.md) | PROPOSÉ : chaque profil activé possède des cas qualité, moindre privilège et isolation ; 100 % des cas d'isolation passent | Propr. | G8 | A4 |
+| M5.1 Suite d'évaluation par profil | MANQUANT — `configs/agents/registry.json` référence un identifiant `eval_suite` par profil, sans aucun fichier de suite | un profil non `draft` sans fichier `configs/evaluation/agents/<eval_suite>.json` lié à son identifiant et à sa version fait échouer `tests/test_agent_registry.py` ; contrat PROPOSÉ dans la [vue agents](../agents/overview.md#suite-dévaluation-par-profil) | PROPOSÉ : chaque profil activé possède des cas qualité, moindre privilège et isolation ; 100 % des cas d'isolation passent | Propr. | G8 | A4 |
 | M5.2 Isolation et moindre privilège | `tests/test_orchestrator_dispatch.py` (profil `draft` non appelable), `tests/test_authz_policy.py` | tentative d'accès aux capacités d'un autre profil ou de contournement de la passerelle MCP | PROPOSÉ : 0 accès croisé, selon l'exigence de la [vue agents](../agents/overview.md) ; D-016 impose des profils logiques sans copie du modèle | Propr. | G8 | A2, A4 |
 
 Constat sans décision : le code du chat rend les 60 profils du registre
