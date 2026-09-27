@@ -15,6 +15,16 @@
   propriétaire et à ne pas étendre. C'est une déclaration du propriétaire ;
   aucun relevé versionné (empreinte, révision, écoute) ne l'atteste encore
   (section 1.2).
+- Mise à jour d'intégration (`main` à `30f5e8e`) : D-043 à D-045 ne portent
+  pas sur ce moteur. Le chargeur de points de terminaison privés de D-036 ne
+  couvre que `core_inference` et `qwen_coder` : le client d'embeddings garde
+  son défaut loopback décrit en 1.3 (**CONFIRMÉ**). `main` a reçu un banc
+  hors ligne, [`evaluate_retrieval.py`](../../tools/evaluate_retrieval.py)
+  (recall@k, MRR, nDCG@k en modes lexical, vectoriel et hybride, balayage du
+  poids lexical), avec un [jeu d'or synthétique](../../configs/knowledge/README.md)
+  dont les scores ne disent rien de la recherche réelle. Aucune mesure sur le
+  corpus réel n'est versionnée : les poids 0,45/0,55 restent non mesurés et
+  la recommandation 3 (section 6) est inchangée (**OUVERT**).
 - Numérotation : le tri de phase 0 proposait « ADR-0006 » ; ce numéro est
   pris par l'[ADR-0006](adr-0006-research-gateway-vs-direct-deposit.md)
   (Research Gateway, PROPOSÉ). Cet ADR prend donc le numéro 0007.

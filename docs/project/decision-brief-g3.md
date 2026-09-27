@@ -52,6 +52,28 @@ incréments ne satisfont pas cette condition en l'état.
 
 D-035 à D-038 ne portent pas sur G3. D-038 fait passer le projet en phase 1.
 
+**Mise à jour d'intégration (`main` à `30f5e8e`)** — Le propriétaire a
+ensuite consigné D-043 à D-045 (`367f48a`), qui complètent le sujet 5
+(**CONFIRMÉ** au registre) :
+
+- D-043 révoque l'autorisation d'entraînement des incréments `0001` et
+  `0002` (code résolvant des tâches E2 et code de BOOTSTRAP), de façon tracée
+  et append-only ; les originaux restent en RAW et en VALIDATED. Le constat
+  de recouvrement ci-dessus est donc traité pour ces deux incréments.
+- D-044 étiquette la suite E2 « contaminée » et la remplace par une suite
+  E2-v2 scellée, hors du dépôt public, dont seule l'empreinte est versionnée
+  et qui n'est jamais exposée à l'arena ni à un entraînement.
+- D-045 active l'approbation automatique réelle des paquets arena selon la
+  politique de D-039 et les limites de D-040, avec l'acteur `policy:auto-v1`,
+  un journal d'audit, un interrupteur d'arrêt et la révocation.
+
+La mise en œuvre de ces trois entrées n'est pas vérifiée par cette note
+(**OUVERT**). `main` a aussi reçu des outils hors ligne qui instrumentent les
+sujets 4 et 7 sans les trancher : l'évaluation des tokenizers
+([protocole PROPOSÉ](../model/tokenizer-experiments-protocol.md), aucun seuil
+décidé) et un banc de recherche sur jeu d'or synthétique
+([`evaluate_retrieval.py`](../../tools/evaluate_retrieval.py)).
+
 ## Synthèse
 
 | # | Décision | Recommandation PROVISOIRE | Dépendances |

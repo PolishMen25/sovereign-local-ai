@@ -130,6 +130,9 @@ l'acquisition, pas des tokens Byte-BPE ; voir la
 
 ### 2.5 Incréments synthétiques de l'arène
 
+État à `db9414d`. D-040, D-043, D-044 et D-045, consignées depuis,
+s'appliquent désormais à cette famille : voir la mise à jour de la section 5.
+
 - **État — CONFIRMÉ** : un paquet de solutions de l'arène, approuvé par le
   propriétaire dans l'interface, devient un incrément RAW. Son manifeste
   porte `arena-corpus-increment.v1`, `classification: synthetic`,
@@ -233,6 +236,20 @@ que D-040 prescrit. D-039 ratifie le retrait du fichier d'approbation du
 préflight ; son application aux familles 2 et 5 n'est pas vérifiée ici. Les
 questions 1, 2, 6 et 7 restent ouvertes. Les sections 1 à 4 décrivent l'état
 à `db9414d`.
+
+**Mise à jour d'intégration (`main` à `30f5e8e`)** — Le propriétaire a
+ensuite consigné D-043 à D-045 (`367f48a`), qui modifient la famille 5
+(section 2.5) : D-043 révoque l'autorisation d'entraînement des incréments
+`0001` et `0002` (contamination E2 et code de BOOTSTRAP), de façon tracée et
+sans suppression, ce qui répond à la question 4 pour ces deux incréments ;
+D-044 étiquette la suite E2 « contaminée » et la remplace par une suite
+E2-v2 scellée, jamais exposée à l'arena ; D-045 remplace l'approbation
+manuelle paquet par paquet par l'approbation automatique réelle selon la
+politique de D-039 et les limites de D-040 (acteur `policy:auto-v1`, journal
+d'audit, interrupteur d'arrêt, révocation). L'approbateur et la ligne
+« aucune entrée D- » de la famille 5 dans les sections 1 et 2.5 décrivent
+donc l'état antérieur. La mise en œuvre de ces entrées n'est pas vérifiée
+ici (**OUVERT**).
 
 1. pilote-v3 : faut-il publier, sans contenu, la liste de ses paquets et de
    leurs licences, puis la rattacher à une entrée du registre ? Défaut

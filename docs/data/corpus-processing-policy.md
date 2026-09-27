@@ -197,7 +197,7 @@ en-tête de licence, autre version) n'est pas détectée.
 | Fichier de politique candidate, liste `allowed_licenses` | oui | oui | oui | non |
 | Fichier de politique candidate, liste `acquisition_guard` | non | oui | oui | oui |
 | Manifeste d'entraînement `0.2.0` ([validateur](../../tools/validate_training_corpus_manifest.py)) | oui | oui | oui | oui |
-| Audit [`verify_corpus_approval.py`](../../tools/verify_corpus_approval.py) | non | non | oui | oui |
+| Audit [`verify_corpus_approval.py`](../../tools/verify_corpus_approval.py) | non | non à `db9414d` ; oui depuis `485fd72` (D-033) | oui | oui |
 
 - **CONFIRMÉ** — Les deux lignes du fichier de politique candidate décrivent
   le contenu de ce fichier, pas un refus. Le
@@ -247,10 +247,10 @@ n'est pas fusionné.
 | Quasi-doublons | **OUVERT** — seule l'égalité exacte des octets est détectée, et pas partout. | Détection par shingles ou MinHash en bibliothèque standard (A37). |
 | Découpage par paquet du dérivé étendu | **OUVERT** — le découpage par document viole la règle du manifeste `0.2.0`. | Outil de split par paquet ou par dépôt, sortie RAW candidate (A37). |
 | Données personnelles | **OUVERT** — aucun détecteur dans la chaîne corpus. L'exclusion `personal-data` de la politique n'est qu'une déclaration. | Choix de politique d'abord ; aucun outil tant que le niveau n'est pas fixé. |
-| Identification de langue | **OUVERT** — l'attribution par répertoire ou par source ne mesure pas la prose. | Heuristique sans dépendance, ou mesure a posteriori avec le tokenizer (A24). |
+| Identification de langue | **OUVERT** — l'attribution par répertoire ou par source ne mesure pas la prose. | Heuristique sans dépendance, ou mesure a posteriori avec le tokenizer (A24, [`evaluate_tokenizer.py`](../../tools/evaluate_tokenizer.py), fusionné en `48fc63f` ; l'étiquetage de langue des splits y reste OUVERT). |
 | Listes de suffixes | **OUVERT** — acquisition et matérialisation divergent. | Liste unique versionnée, reprise par les deux outils. |
 | Troncature | **OUVERT** — l'arrêt à 16 Mio dépend de l'ordre alphabétique. | Refuser au lieu de tronquer, ou sous-échantillonner de façon déterministe (A38). |
-| Couverture du filtre de secrets | **OUVERT** — 5 marqueurs, sans compteur d'exclusion. | Réutiliser les catégories du futur scanner `collector-secret-scan-v1` (A17) et inscrire les compteurs. |
+| Couverture du filtre de secrets | **OUVERT** — 5 marqueurs, sans compteur d'exclusion. | Réutiliser les catégories du scanner `collector-secret-scan-v1` (A17, fusionné en `30f5e8e`, PROVISOIRE et non câblé) et inscrire les compteurs. |
 | Licence par fichier | **OUVERT** — un fichier tiers embarqué dans un dépôt hérite de la licence du dépôt, sauf sous `vendor`. | Liste d'exclusion par chemin et relecture des fichiers `NOTICE`. |
 | Contenu généré ou minifié | **OUVERT** — aucun filtre spécifique. | Heuristique de longueur de ligne et de ratio de caractères. |
 | Retrait d'une source déjà intégrée | **OUVERT** — procédure absente. | Document dédié (A34). |
@@ -292,6 +292,14 @@ l'alignement des validateurs reste à faire. Aucune entrée ne choisit les règl
 de la section 4 : cette politique reste **PROVISOIRE**, et les questions 1 à 7
 et 9 restent ouvertes.
 
+**Mise à jour d'intégration (`main` à `30f5e8e`)** — D-043 à D-045,
+consignées ensuite (`367f48a`), portent sur les incréments de l'arène,
+l'évaluation E2 et l'approbation automatique des paquets ; elles ne
+choisissent aucune règle de la section 4. `main` a aussi reçu l'analyseur
+`collector-secret-scan-v1` (PROVISOIRE, non câblé), l'outil d'évaluation des
+tokenizers et l'acceptation d'`Etalab-2.0` par l'audit d'approbation
+(section 2.9) ; aucune question ci-dessous n'en est tranchée.
+
 1. **Quasi-doublons** : faut-il les retirer avant toute nouvelle
    matérialisation ? Défaut proposé : oui, avec un seuil à fixer après mesure.
 2. **Découpage** : le découpage par paquet devient-il obligatoire pour tous
@@ -308,8 +316,8 @@ et 9 restent ouvertes.
    approuvée.
 6. **Troncature** : faut-il refuser un split trop grand au lieu de le
    tronquer ? Défaut proposé : refuser.
-7. **Secrets** : faut-il étendre le filtre aux catégories du scanner prévu
-   et publier les compteurs ? Défaut proposé : oui.
+7. **Secrets** : faut-il étendre le filtre aux catégories du scanner
+   `collector-secret-scan-v1` et publier les compteurs ? Défaut proposé : oui.
 8. **Attestation** : l'approbation doit-elle rester écrite par le
    matérialiseur, ou être portée par un artefact distinct du propriétaire ?
    Défaut proposé : artefact distinct.

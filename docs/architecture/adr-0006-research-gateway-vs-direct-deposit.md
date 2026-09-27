@@ -18,6 +18,20 @@
   configuration privée hors Git.
   L'analyse, rédigée sur `db9414d`, n'est pas réécrite ; seules les sections
   1.4 et 7, ainsi que la question Q-C, sont ajustées en conséquence.
+- Mise à jour d'intégration (`main` à `30f5e8e`) : D-043 à D-045 portent sur
+  l'arena et l'évaluation, pas sur cet ADR. `main` a reçu depuis des contrats
+  candidats, tous **PROVISOIRES** ou **PROPOSÉS** et câblés à aucune route,
+  aucun service ni aucun port (**CONFIRMÉ**) : validateur
+  `research-package-contract-v1` ([validation](../data/research-package-validation.md)),
+  canonicalisation RFC 8785 et schéma d'accusé du Collector
+  ([empreintes](../data/canonical-hashing.md)), politique statique
+  `url-ssrf-policy-v1` pour T09 ([politique URL](../security/url-ssrf-policy.md)),
+  analyseur `collector-secret-scan-v1`, et gabarit de
+  [matrice des flux](../security/network-flow-matrix.md) pour l'issue #4, sans
+  matrice réelle. Aucun ne tranche entre Gateway et dépôt direct. Le chemin
+  `/v1/conversations` décrit en 1.4 et 1.5 n'est pas modifié par ces contrats ;
+  `submit_research_package` reste sans implémentation ; la condition de
+  révision sur l'issue #4 (section 8) reste **OUVERT**.
 
 Ce document compare des options et formule une recommandation provisoire. Il
 ne vaut pas décision, n'ajoute aucune entrée au registre, n'autorise aucun appel
@@ -369,7 +383,9 @@ Les identifiants renvoient au [modèle de menaces](../security/threat-model.md).
   qu'après fusion de la PR #17.
 - **CONFIRMÉ** — Le modèle de menaces (§2) indique encore que le DL380p Gen8 ne
   participe pas à la V1, alors que D-006 est remplacée par D-034. La passe
-  d'alignement doit le signaler, pas le corriger en silence.
+  d'alignement doit le signaler, pas le corriger en silence. Depuis `30f5e8e`,
+  le modèle de menaces porte une note **OUVERT** qui signale cet écart sans
+  modifier la ligne ; sa reformulation revient au propriétaire.
 - **PROVISOIRE** — La conception du contrat (§1.5 et oracle du §5) est
   renvoyée à l'issue #6 ; le placement du Gateway et du Collector à l'issue #4.
 
