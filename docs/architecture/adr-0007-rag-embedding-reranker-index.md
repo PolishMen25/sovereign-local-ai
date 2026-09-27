@@ -25,8 +25,8 @@ service ni aucune unité et ne ratifie aucun modèle. Il accompagne un lock
 - **À VÉRIFIER** : licence ou caractéristique d'un artefact tiers qui n'a pas
   été relue depuis sa source.
 
-Le nœud de calcul est hors ligne depuis environ douze jours. Aucun état de
-déploiement n'a été revérifié ; aucune mesure n'a été faite pour cet ADR.
+Aucun état de déploiement n'a été revérifié en direct à la date de rédaction
+(2026-09-26) ; aucune mesure n'a été faite pour cet ADR.
 
 ## 1. Contexte
 
@@ -83,10 +83,13 @@ déploiement n'a été revérifié ; aucune mesure n'a été faite pour cet ADR.
 - Une requête reçoit une consigne de recherche en préfixe ; un document est
   encodé tel quel. Toute erreur lève une exception, et l'appelant se replie sur
   la recherche lexicale.
-- La passerelle lit `SOVEREIGN_EMBED_ENDPOINT` ; une valeur vide désactive le
-  client. Elle encode chaque chunk à l'ingestion d'un document (1 200
-  caractères au plus, 400 chunks au plus par document) et la requête de chat
-  ou de l'outil `search_knowledge`.
+- La passerelle lit `SOVEREIGN_EMBED_ENDPOINT`. Si la variable est absente,
+  elle utilise un point de terminaison loopback par défaut : la recherche
+  dense est donc active par défaut. Seule une affectation explicitement vide
+  désactive le client. L'outil de réindexation applique le même défaut.
+- Quand le client est actif, la passerelle encode chaque chunk à l'ingestion
+  d'un document (1 200 caractères au plus, 400 chunks au plus par document) et
+  la requête de chat ou de l'outil `search_knowledge`.
 - [`HybridKnowledgeIndex`](../../services/knowledge/hybrid_index.py) stocke
   chaque vecteur en float32 petit-boutiste dans un BLOB SQLite. La recherche
   hybride prend jusqu'à 100 candidats lexicaux FTS5 (bm25). Elle balaie ensuite
@@ -205,9 +208,11 @@ médiane, dispersion et période de chauffe, conformément à `AGENTS.md`.
 1. Garder E1 comme **candidat** et ne pas le ratifier avant la relecture
    matérielle : empreinte, taille, révision amont, licence, écoute locale et
    absence de sortie réseau. Le lock candidat reste refusé jusque-là.
-2. Au retour du matériel, recherche lexicale seule (valeur vide de
-   `SOVEREIGN_EMBED_ENDPOINT`) tant que la relecture n'est pas faite.
-   Ratification ensuite si elle concorde.
+2. Avant tout nouvel usage, recherche lexicale seule tant que la relecture
+   n'est pas faite : `SOVEREIGN_EMBED_ENDPOINT` explicitement vide, pas
+   seulement absente, puisqu'une variable absente active le client sur son
+   défaut loopback (section 1.3). Ratification ensuite si la relecture
+   concorde.
 3. R0 tant qu'un banc de recherche — recall@k, MRR et nDCG en modes lexical,
    vectoriel et hybride, avec balayage des poids — ne montre pas de gain.
 4. I1 tant qu'une mesure au volume réel reste sous un budget de latence à
@@ -229,8 +234,9 @@ Si le propriétaire accepte cet ADR :
 - toute dépendance nouvelle d'index passe par un lock et une provenance
   vérifiée.
 
-S'il le refuse, E0 s'applique : valeur vide de `SOVEREIGN_EMBED_ENDPOINT`,
-vecteurs conservés mais inutilisés, et le lock candidat reste non activable.
+S'il le refuse, E0 s'applique : `SOVEREIGN_EMBED_ENDPOINT` explicitement vide
+(pas seulement absente), vecteurs conservés mais inutilisés, et le lock
+candidat reste non activable.
 
 ## 8. Conditions de révision
 
@@ -247,7 +253,8 @@ Chaque question est fermée ; le défaut proposé est le plus sûr.
 
 1. Ratifier Qwen3-Embedding-0.6B Q8_0 comme instance de D-028 ? Défaut : non
    avant relecture de l'empreinte et de la licence.
-2. Suspendre la recherche dense jusqu'à cette relecture ? Défaut : oui.
+2. Suspendre la recherche dense jusqu'à cette relecture, par une valeur
+   explicitement vide de `SOVEREIGN_EMBED_ENDPOINT` ? Défaut : oui.
 3. Ajouter un reranker ? Défaut : non avant mesure d'un gain.
 4. Quel budget de latence p95 déclenche une réévaluation de l'index ?
    Défaut : aucun changement d'index avant mesure.
@@ -263,20 +270,35 @@ Chaque question est fermée ; le défaut proposé est le plus sûr.
 décrit l'artefact attendu. Ses champs `sha256`, `byte_size`, `revision`,
 dépôt, nom de fichier, licence et preuves valent `pending_raw_readback`. Son
 reçu de promotion et la ratification valent `pending_*`. Son statut est
-`candidate_pending_raw_readback`.
+`candidate_pending_raw_readback`, son ADR est `proposed` et son état de
+déploiement `unverified_no_readback`.
 
 [`tests/test_embedding_model_lock.py`](../../tests/test_embedding_model_lock.py)
 applique une vérification d'activation qui refuse :
 
-- toute valeur `pending_*` ;
-- un statut autre que `promoted_owner_approved` ;
+- toute valeur commençant par `pending`, sans tenir compte de la casse ;
+- un statut autre que `promoted_owner_approved`, un objet autre que
+  l'embedding RAG séparé de CORE, et un état de déploiement autre que
+  `verified_by_readback` ;
+- un ADR non accepté : `adr_status` autre que `accepted`, ou chemin qui ne
+  désigne pas un fichier `docs/architecture/adr-NNNN-*.md` existant dans le
+  dépôt, ou ADR encore marqué PROPOSÉ ;
+- une ratification qui ne cite pas une entrée unique et non remplacée du
+  registre ; le registre est seulement lu ;
 - une empreinte, une taille ou une révision mal formées ;
+- un contexte hors de 1 à 32 768 tokens, ou un pooling hors de `cls`, `last`
+  et `mean` ;
 - un drapeau de la porte d'activation désactivé ;
 - une politique d'exécution autre que CPU, hors ligne et loopback ;
-- un reçu de promotion absent.
+- un reçu de promotion absent, qui n'est pas un JSON strict (taille bornée,
+  clés en double et valeurs non finies refusées), ou qui ne reprend pas
+  exactement l'empreinte, la taille et la révision du lock et sa ratification.
 
-Le test prouve aussi qu'un lock complet et synthétique passe cette
-vérification. Le refus n'est donc pas trivial.
+Le test prouve aussi qu'un lock complet et synthétique, accompagné d'un ADR,
+d'un registre et d'un reçu synthétiques dans un répertoire temporaire, passe
+cette vérification. Le refus n'est donc pas trivial. Le format complet du reçu
+de promotion reste à fixer avec la ratification ; le test n'en exige que les
+champs liés au lock.
 
 **CONFIRMÉ** — Aucune unité ni aucun service ne lit ce lock : la vérification
 est un contrôle du dépôt, pas une barrière d'exécution. Brancher une

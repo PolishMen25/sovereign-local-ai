@@ -16,8 +16,8 @@ décision. Aucun agent ne crée `core-v1-source-policy.approved.json`.
 
 Étiquettes : **CONFIRMÉ** (vérifiable dans le dépôt), **PROVISOIRE**
 (proposition non validée), **OUVERT** (non tranché), **HYPOTHÈSE** (déduction
-non mesurée). Le nœud de calcul est hors ligne ; aucun état n'a été revérifié
-en direct.
+non mesurée). Aucun état n'a été revérifié en direct à la date de rédaction
+(2026-09-26).
 
 ## Synthèse
 
@@ -103,8 +103,8 @@ Conséquences communes :
 - **HYPOTHÈSE** — Au-delà d'un facteur 2, le suréchantillonnage répète les
   mêmes textes et favorise la mémorisation plutôt que la langue.
 - Toute nouvelle source exige une vérification de licence avant acquisition.
-  L'acquisition est une opération ponctuelle hors de CORE, à faire au retour
-  du matériel.
+  L'acquisition est une opération ponctuelle hors de CORE, à planifier par le
+  propriétaire.
 - Les proportions doivent être remesurées avec le tokenizer de référence
   (décision 4) avant d'être figées.
 - Un plafond par source (par exemple 15 ou 25 % du sous-échantillon, valeur
@@ -132,12 +132,19 @@ aucun quasi-doublon, split par document pour le dérivé étendu, aucun détecte
 de données personnelles, langue attribuée par répertoire, 5 marqueurs de
 secrets sans compteur, troncature à 16 Mio.
 
+**CONFIRMÉ** — Le matérialiseur accepte plusieurs sources pour un même split
+sans le signaler : la dernière écrase les autres, et le manifeste attribue le
+split à la première tout en listant toutes les sources. Le validateur `0.2.0`
+refuse ensuite ce manifeste, s'il est lancé. Un découpage par paquet avec plus
+de trois paquets exige donc d'abord ce correctif
+([politique](../data/corpus-processing-policy.md), section 2.5).
+
 ### Options par axe
 
 | Axe | Options | Conséquences |
 | --- | --- | --- |
 | Déduplication | exacte seule / exacte et quasi-doublons | Les quasi-doublons exigent un outil et un seuil mesuré ; sans eux, les versions voisines d'un même dépôt restent répétées. |
-| Découpage | par document / par paquet | Le manifeste `0.2.0` impose déjà le paquet ; le dérivé étendu doit être reconstruit. |
+| Découpage | par document / par paquet | Le manifeste `0.2.0` impose déjà le paquet ; le dérivé étendu doit être reconstruit, et le matérialiseur corrigé pour placer plusieurs paquets dans un split. |
 | Données personnelles | aucun filtre / masquage / exclusion du fichier | Le masquage conserve le code, l'exclusion réduit le volume ; les deux exigent un compteur. |
 | Langue | par répertoire / par contenu | L'attribution par contenu est nécessaire pour mesurer les proportions de la décision 2. |
 | Secrets | 5 marqueurs / catégories étendues et compteurs | L'extension réduit le risque de fuite et rend l'effet auditable. |
@@ -238,8 +245,13 @@ pas être assoupli avant cette entrée.
 
 - **CONFIRMÉ** — `0BSD` et `Unlicense` figurent depuis `cb67544`
   (2026-09-07) dans la politique candidate et son validateur. Elles figurent
-  dans le validateur de manifeste depuis `6d959d7`. Elles sont absentes de
-  `acquisition_guard` et de `verify_corpus_approval.py`.
+  dans le validateur de manifeste depuis `6d959d7`. Elles sont absentes de la
+  liste `acquisition_guard` du fichier candidat, mais acceptées par son
+  validateur (contrôle d'inclusion), et absentes de
+  `verify_corpus_approval.py`.
+- **CONFIRMÉ** — L'énumération du schéma JSON de la politique admet `0BSD` et
+  `Unlicense`, mais ni `CC-BY-4.0` ni `Etalab-2.0` : le fichier de politique
+  candidate n'est pas conforme à son propre schéma.
 - **CONFIRMÉ** — `verified-public-domain` est admis par l'`acquisition_guard`,
   le validateur de manifeste et l'audit, sans définition de ce qui le
   vérifie.
@@ -248,14 +260,14 @@ pas être assoupli avant cette entrée.
   `CC-BY-4.0` et `Etalab-2.0`.
 - **CONFIRMÉ** — Aucune source actuelle n'en dépend : le catalogue et le
   corpus initial sont sous MIT, Apache-2.0 ou BSD-3-Clause.
-- Le tableau comparatif des quatre listes figure dans la
+- Le tableau comparatif des cinq listes figure dans la
   [politique](../data/corpus-processing-policy.md), section 2.9.
 
 ### Options
 
 | Option | Contenu | Conséquences |
 | --- | --- | --- |
-| A. Ratifier | Une entrée nomme la liste complète, trois valeurs comprises. | Les validateurs pourront partager une constante unique ; l'incohérence disparaît. |
+| A. Ratifier | Une entrée nomme la liste complète, trois valeurs comprises. | Les validateurs et le schéma pourront partager une liste unique ; l'incohérence disparaît. |
 | B. Retirer | Supprimer les trois valeurs des validateurs jusqu'à ce qu'une source en ait besoin. | Plus strict, sans effet sur les sources actuelles ; changement de code et de tests. |
 | C. Statu quo | Documenter l'écart sans rien changer. | L'incohérence entre validateurs demeure. |
 
@@ -284,10 +296,11 @@ constante partagée suivrait cette entrée, pas l'inverse.
   moteur « figé par empreinte et licence ».
 - **CONFIRMÉ** — P-004 laisse le reranker et le moteur d'index « à valider
   par benchmark ». Le score hybride 0,45/0,55 est codé en dur, sans mesure.
-- **CONFIRMÉ** — Une valeur vide de `SOVEREIGN_EMBED_ENDPOINT` désactive le
-  client : la recherche reste alors lexicale.
-- **OUVERT** — Le déploiement réel n'est pas vérifiable tant que le nœud de
-  calcul est hors ligne.
+- **CONFIRMÉ** — Si `SOVEREIGN_EMBED_ENDPOINT` est absente, la passerelle
+  utilise un point de terminaison loopback par défaut : la recherche dense
+  reste active. Seule une valeur explicitement vide désactive le client ; la
+  recherche reste alors lexicale.
+- **OUVERT** — Le déploiement réel n'est attesté par aucun relevé versionné.
 - L'analyse détaillée figure dans
   [l'ADR-0007 (PROPOSÉ)](../architecture/adr-0007-rag-embedding-reranker-index.md).
 
@@ -296,7 +309,7 @@ constante partagée suivrait cette entrée, pas l'inverse.
 | Option | Contenu | Conséquences |
 | --- | --- | --- |
 | A. Ratifier a posteriori | Qwen3-Embedding-0.6B Q8_0 devient l'instance de D-028 après relecture matérielle (SHA-256, taille, révision, licence). | Le lock candidat devient un lock réel avec reçu de promotion. Aucun changement de code. |
-| B. Suspendre puis ratifier | Recherche lexicale seule au retour du matériel, jusqu'à la relecture ; puis option A si la relecture concorde. | Perte temporaire du rappel sémantique ; conformité à D-028 rétablie avant usage. |
+| B. Suspendre puis ratifier | Recherche lexicale seule jusqu'à la relecture, par `SOVEREIGN_EMBED_ENDPOINT` explicitement vide (pas seulement absente) ; puis option A si la relecture concorde. | Perte temporaire du rappel sémantique ; conformité à D-028 rétablie avant usage. |
 | C. Remplacer | Choisir un autre modèle après comparaison mesurée. | Réindexation complète ; nouvelle acquisition et nouveau lock. |
 
 Reranker : aucun, ou petit modèle local après mesure du gain de rappel.

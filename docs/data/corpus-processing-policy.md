@@ -22,9 +22,9 @@ document. Il ne couvre ni l'index RAG ni l'ingress `research-package`.
 - **OUVERT** : question sans réponse qui conditionne la politique.
 - **HYPOTHÈSE** : conséquence déduite par l'auteur, non mesurée.
 
-Aucun état de déploiement n'a été revérifié : le nœud de calcul est hors ligne
-depuis environ douze jours. Les volumes cités proviennent de documents ou de
-messages de commit datés, jamais d'une observation récente.
+Aucun état de déploiement n'a été revérifié en direct à la date de rédaction
+(2026-09-26). Les volumes cités proviennent de documents ou de messages de
+commit datés, jamais d'une observation récente.
 
 ## 1. Chaîne de traitement actuelle
 
@@ -72,6 +72,10 @@ n'appliquent pas les mêmes règles.
 | Marqueurs de secrets | non appliqués | 5 marqueurs (voir 2.3) |
 | Borne globale | aucune | archive 128 Mio ; split 16 Mio |
 
+- **CONFIRMÉ** — Aucune des deux listes de suffixes ne contient l'autre :
+  `.psd1` et `.pyi` ne sont admis qu'à la matérialisation. Leur intersection
+  compte 12 suffixes : `.go .json .md .ps1 .psm1 .py .rst .sh .toml .txt
+  .yaml .yml`.
 - **HYPOTHÈSE** — Les mesures d'acquisition ne prédisent pas le volume
   matérialisable. Les suffixes `.ts`, `.tsx`, `.js`, `.html` et `.css` sont
   comptés à l'acquisition mais écartés à la matérialisation : l'essentiel du
@@ -87,9 +91,16 @@ n'appliquent pas les mêmes règles.
   `password=`, `api_key=` et `access_token=`.
 - **CONFIRMÉ** — Aucun compteur de fichiers écartés n'est inscrit dans le
   manifeste ; l'effet du filtre n'est pas auditable après coup.
-- **HYPOTHÈSE** — Le filtre ne reconnaît pas les en-têtes PEM RSA ou EC, les
-  affectations avec espaces ou en syntaxe YAML/JSON, les préfixes de jetons de
-  fournisseurs ni les chaînes à forte entropie.
+- **CONFIRMÉ** (lecture du code) — Les marqueurs sont des sous-chaînes
+  exactes, à la casse près. L'en-tête PEM générique ne correspond donc pas aux
+  en-têtes PEM `RSA`, `EC` ni `ENCRYPTED`, dont le mot-clé s'intercale avant
+  `PRIVATE KEY`. Les affectations avec espaces (`password = …`) ou en syntaxe
+  YAML ou JSON (`password: …`, `"password": …`) ne sont pas reconnues non
+  plus.
+- **HYPOTHÈSE** — Aucune règle ne vise les préfixes de jetons de fournisseurs
+  ni les chaînes à forte entropie : ils ne seraient écartés que s'ils suivent
+  l'une des trois affectations collées. Leur présence dans les archives n'est
+  pas mesurée.
 - **CONFIRMÉ** — Les conversations suivent un autre filtre : la mémoire privée
   masque les secrets probables avant stockage (lignes et affectations
   sensibles, en-têtes `Bearer`, préfixes de jetons connus, paramètres d'URL,
@@ -113,11 +124,25 @@ n'appliquent pas les mêmes règles.
 
 ### 2.5 Découpage en train, validation et test
 
-- **CONFIRMÉ** — Le matérialiseur exige exactement une archive source par
-  split : le découpage est de fait au niveau du paquet. Le corpus initial
-  approuvé le 2026-09-07 suit cette règle.
+- **CONFIRMÉ** (lecture du code et reproduction sur des archives
+  synthétiques) — Le matérialiseur vérifie seulement que l'ensemble des
+  valeurs `split` de la spécification vaut exactement `train`, `validation`
+  et `test`. Son message d'erreur annonce une source par split, mais rien
+  n'interdit deux sources pour le même split. Dans ce cas, les enregistrements
+  de la dernière source traitée écrasent ceux des autres, et
+  `splits.<split>.package_ids` nomme la première source de la spécification.
+  `source_packages` liste pourtant toutes les sources, et l'outil annonce une
+  matérialisation réussie. Le validateur `0.2.0` refuse ensuite ce manifeste,
+  puisqu'un paquet n'y est rattaché à aucun split, mais seulement s'il est
+  lancé.
+- **CONFIRMÉ** — Chaque source reste entière dans un seul split : le
+  découpage du matérialiseur est au niveau du paquet, mais il ne sait pas
+  placer plusieurs paquets dans un même split. Le corpus initial approuvé le
+  2026-09-07 compte trois archives pour trois splits ; il n'est pas touché par
+  ce défaut.
 - **CONFIRMÉ** — Le validateur du manifeste `0.2.0` refuse qu'un paquet
-  appartienne à plus d'un split et exige trois empreintes de split distinctes.
+  appartienne à plus d'un split, exige que chaque paquet soit rattaché à un
+  split et exige trois empreintes de split distinctes.
 - **CONFIRMÉ** — Le dérivé étendu découpe **par document** : les huit premiers
   caractères hexadécimaux du SHA-256 du texte, modulo 100, envoient le reste 0
   en test, le reste 1 en validation et le reste en entraînement (98/1/1). Un
@@ -164,17 +189,32 @@ en-tête de licence, autre version) n'est pas détectée.
 
 ### 2.9 Licences admises
 
-**CONFIRMÉ** — Quatre listes coexistent et ne coïncident pas.
+**CONFIRMÉ** — Cinq listes coexistent et ne coïncident pas.
 
-| Liste | `0BSD`, `Unlicense` | `Etalab-2.0` | `verified-public-domain` |
-| --- | --- | --- | --- |
-| Politique candidate, `allowed_licenses` ([validateur](../../tools/validate_training_source_policy.py)) | oui | oui | non |
-| Politique candidate, `acquisition_guard` | non | oui | oui |
-| Manifeste d'entraînement `0.2.0` | oui | oui | oui |
-| Audit [`verify_corpus_approval.py`](../../tools/verify_corpus_approval.py) | non | non | oui |
+| Liste | `0BSD`, `Unlicense` | `Etalab-2.0` | `CC-BY-4.0` | `verified-public-domain` |
+| --- | --- | --- | --- | --- |
+| Schéma JSON de la politique, énumération `allowed_licenses` ([schéma](../../schemas/training-source-policy.schema.json)) | oui | non | non | non |
+| Fichier de politique candidate, liste `allowed_licenses` | oui | oui | oui | non |
+| Fichier de politique candidate, liste `acquisition_guard` | non | oui | oui | oui |
+| Manifeste d'entraînement `0.2.0` ([validateur](../../tools/validate_training_corpus_manifest.py)) | oui | oui | oui | oui |
+| Audit [`verify_corpus_approval.py`](../../tools/verify_corpus_approval.py) | non | non | oui | oui |
 
-Les quatre listes admettent `MIT`, `Apache-2.0`, `BSD-2-Clause`,
-`BSD-3-Clause`, `ISC`, `CC0-1.0` et `CC-BY-4.0`. Le registre autorise
+- **CONFIRMÉ** — Les deux lignes du fichier de politique candidate décrivent
+  le contenu de ce fichier, pas un refus. Le
+  [validateur de la politique](../../tools/validate_training_source_policy.py)
+  ne contrôle que l'inclusion. Il accepte dans `acquisition_guard` toute valeur
+  de sa liste générale, plus `verified-public-domain` : `0BSD` et `Unlicense`
+  sont donc absentes de la liste `acquisition_guard` du fichier candidat, mais
+  acceptées par son validateur.
+- **CONFIRMÉ** — Le fichier de politique candidate n'est pas conforme à son
+  propre schéma. Il contient `CC-BY-4.0` et `Etalab-2.0`, absentes de
+  l'énumération, ainsi que des clés de premier niveau que le schéma interdit
+  (`additionalProperties: false`), dont `acquisition_guard` et `sources`.
+  Aucun test ne valide ce fichier contre le schéma.
+
+Les cinq listes admettent `MIT`, `Apache-2.0`, `BSD-2-Clause`,
+`BSD-3-Clause`, `ISC` et `CC0-1.0` ; toutes sauf le schéma admettent aussi
+`CC-BY-4.0`. Le registre autorise
 nommément `CC-BY-4.0` (D-032) et `Etalab-2.0` (D-033) ; D-031 pose le critère
 général « strictement réutilisables ». Aucune entrée ne nomme `0BSD`,
 `Unlicense` ni `verified-public-domain`. La licence est contrôlée **par
@@ -203,6 +243,7 @@ n'est pas fusionné.
 
 | Lacune | Constat | Travail préparatoire possible |
 | --- | --- | --- |
+| Plusieurs paquets par split | **CONFIRMÉ** — écrasement silencieux et attribution erronée dans le manifeste (section 2.5) ; seul le validateur `0.2.0`, s'il est lancé, refuse le résultat. | Refuser toute valeur `split` en double dans la spécification du matérialiseur ; correctif de code à traiter dans une tâche séparée, non fait ici. |
 | Quasi-doublons | **OUVERT** — seule l'égalité exacte des octets est détectée, et pas partout. | Détection par shingles ou MinHash en bibliothèque standard (A37). |
 | Découpage par paquet du dérivé étendu | **OUVERT** — le découpage par document viole la règle du manifeste `0.2.0`. | Outil de split par paquet ou par dépôt, sortie RAW candidate (A37). |
 | Données personnelles | **OUVERT** — aucun détecteur dans la chaîne corpus. L'exclusion `personal-data` de la politique n'est qu'une déclaration. | Choix de politique d'abord ; aucun outil tant que le niveau n'est pas fixé. |
@@ -222,7 +263,9 @@ n'est appliquée par ce document.
 1. Un seul jeu de règles de sélection, versionné, partagé par l'acquisition et
    la matérialisation.
 2. Découpage au niveau du paquet pour tout nouveau manifeste, conformément au
-   validateur `0.2.0`.
+   validateur `0.2.0`. Avec plus de trois paquets, cela suppose d'abord de
+   corriger le matérialiseur, qui ne sait pas placer plusieurs paquets dans un
+   même split (section 2.5).
 3. Déduplication exacte obligatoire dans et entre familles, puis détection de
    quasi-doublons avec un seuil approuvé par le propriétaire.
 4. Refus plutôt que troncature silencieuse ; tout sous-échantillonnage passe
@@ -246,8 +289,11 @@ Aucune n'est tranchée ici.
    proposé : masquer, avec compteur.
 4. **Langue** : faut-il une identification par le contenu avant de fixer les
    proportions FR/EN ? Défaut proposé : oui, sans dépendance nouvelle.
-5. **Suffixes** : quelle liste unique retenir ? Défaut proposé : la plus
-   restrictive des deux, tant qu'une autre n'est pas approuvée.
+5. **Suffixes** : quelle liste unique retenir ? Aucune des deux listes
+   actuelles ne contient l'autre (section 2.2). Défaut proposé :
+   l'intersection des deux, soit les 12 suffixes `.go .json .md .ps1 .psm1
+   .py .rst .sh .toml .txt .yaml .yml`, tant qu'une autre liste n'est pas
+   approuvée.
 6. **Troncature** : faut-il refuser un split trop grand au lieu de le
    tronquer ? Défaut proposé : refuser.
 7. **Secrets** : faut-il étendre le filtre aux catégories du scanner prévu

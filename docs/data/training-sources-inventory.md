@@ -22,9 +22,9 @@ restent dans les documents liés.
 - **OUVERT** : information absente du dépôt ou question non tranchée.
 - **HYPOTHÈSE** : déduction de l'auteur, non vérifiée.
 
-Le nœud de calcul et le stockage sont hors ligne depuis environ douze jours.
-Aucun état ci-dessous n'a été revérifié en direct. Un chiffre tiré d'un message
-de commit ou du point de reprise est signalé comme tel.
+Aucun état ci-dessous n'a été revérifié en direct à la date de rédaction
+(2026-09-26). Un chiffre tiré d'un message de commit ou du point de reprise est
+signalé comme tel.
 
 ## 1. Vue d'ensemble
 
@@ -135,17 +135,17 @@ l'acquisition, pas des tokens Byte-BPE ; voir la
   porte `arena-corpus-increment.v1`, `classification: synthetic`,
   `max_share_in_corpus_increment: 0.20` et `training_authorization:
   not_approved`. Une approbation d'incrément déposée depuis l'interface est
-  appliquée par une minuterie toutes les deux minutes. Elle écrit une copie
-  VALIDATED avec `training_authorization: approved`.
+  appliquée ensuite par une tâche planifiée, qui écrit une copie VALIDATED
+  avec `training_authorization: approved`.
 - **Volumes — non revérifiés** : le message du commit `dbca0c6`
   (2026-09-13) mentionne 41 paquets, dont 2 convertis en incréments. La
   [spécification d'auto-entraînement](../model/self-training-loop-spec.md)
   cite 28 paquets réels de septembre 2026. Le nombre d'incréments promus en
   VALIDATED est **OUVERT**.
 - **Approbateur** : le propriétaire, par un clic par paquet puis par incrément.
-  **CONFIRMÉ** : ces approbations sont des fichiers JSON non signés. L'unité
-  systemd qui les applique ne déclare aucune directive `User=` ; installée
-  comme unité système, elle s'exécute donc en root.
+  **CONFIRMÉ** : les approbations ne sont pas signées et l'applicateur n'a
+  pas d'utilisateur dédié ; voir la décision propriétaire sur la signature
+  des approbations.
 - **Décision** : aucune entrée D-. La spécification d'auto-entraînement reste
   marquée INACTIVE. Commits `229ffe0` (pont RAW), `689fa70` (promotion
   depuis l'interface), `dbca0c6` (conversion par lot).

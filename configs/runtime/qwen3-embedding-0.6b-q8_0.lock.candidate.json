@@ -42,5 +42,5 @@
     "owner_ratification_required": true
   },
   "promotion_record": "pending_owner_promotion",
-  "deployment_state": "unverified_compute_node_offline"
+  "deployment_state": "unverified_no_readback"
 }
