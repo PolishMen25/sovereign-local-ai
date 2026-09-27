@@ -265,7 +265,7 @@ class GatewayHttpTests(GatewayTestCase):
 
     def test_authenticated_read_routes(self) -> None:
         self.login()
-        self.assertEqual(json.loads(self.request("GET", "/v1/session", session=True)[2]), {"username": "owner", "expires_at": "2026-09-12T00:00:00Z", "engine": "BOOTSTRAP", "rag_mode": "lexical"})
+        self.assertEqual(json.loads(self.request("GET", "/v1/session", session=True)[2]), {"username": "owner", "expires_at": "2026-09-12T00:00:00Z", "engine": "BOOTSTRAP", "rag_mode": "lexical", "actions_enabled": False})
         self.assertEqual(json.loads(self.request("GET", "/v1/profiles", session=True)[2])["profiles"][0]["profile_id"], "coordination")
         engines = json.loads(self.request("GET", "/v1/engines", session=True)[2])["engines"]
         self.assertEqual([(e["engine"], e["available"]) for e in engines], [("BOOTSTRAP", True), ("CORE-700M", False), ("QWEN-CODER", True)])
@@ -593,6 +593,28 @@ class ActionSwitchGatewayTests(GatewayTestCase):
         self.assertEqual([name for name, _ in self.events(handler.wfile.getvalue())], ["error"])
         self.assertEqual(self.events(handler.wfile.getvalue())[0][1]["error"], "action_refused")
         self.assertEqual([fields["stage"] for fields in self.refusals()], ["execute", "execute", "propose"])
+
+    def test_session_and_health_expose_a_content_free_actions_flag(self) -> None:
+        import services.web.code_sandbox as sandbox
+        probes: list[int] = []
+        sandbox.available = lambda: probes.append(1) or True  # restored by setUp's cleanup
+        session = json.loads(self.request("GET", "/v1/session", session=True)[2])
+        self.assertIs(session["actions_enabled"], False)
+        actions = json.loads(self.request("GET", "/v1/health", session=True)[2])["actions"]
+        self.assertEqual(actions, {"sandbox": False, "tools_enabled": True, "actions_enabled": False})
+        self.assertEqual(probes, [])  # disabled: the sandbox self-test is not even run
+        self.enable_actions()
+        self.assertIs(json.loads(self.request("GET", "/v1/session", session=True)[2])["actions_enabled"], True)
+        actions = json.loads(self.request("GET", "/v1/health", session=True)[2])["actions"]
+        self.assertEqual(actions, {"sandbox": True, "tools_enabled": True, "actions_enabled": True})
+        self.assertEqual(self.request("GET", "/v1/session")[0], 401)  # the flag is behind the session
+
+    def test_the_interface_reads_the_flag_and_never_offers_approval_when_disabled(self) -> None:
+        index = self.request("GET", "/")[2].decode()
+        script = self.request("GET", "/app.js")[2].decode()
+        self.assertIn('id="actions-status"', index)
+        self.assertIn("session.actions_enabled === true", script)
+        self.assertIn("if (!state.actionsEnabled)", script)
 
     def test_enabled_path_offers_actions_with_the_unchanged_prompt(self) -> None:
         self.enable_actions()

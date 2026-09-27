@@ -605,7 +605,9 @@ class LocalWebHandler(BaseHTTPRequestHandler):
         except PermissionError:
             self.send_json(401, {"error": "unauthorized"})
             return
-        self.send_json(200, {**session, "engine": self.state.runtime.engine, "rag_mode": "lexical"})
+        # actions_enabled: a content-free boolean so the UI can say actions are off (D-035).
+        self.send_json(200, {**session, "engine": self.state.runtime.engine, "rag_mode": "lexical",
+                             "actions_enabled": self.state.actions_enabled})
 
     # --- POST ------------------------------------------------------------
 
@@ -828,8 +830,10 @@ class LocalWebHandler(BaseHTTPRequestHandler):
     # --- chat ------------------------------------------------------------
 
     def _get_health(self) -> None:
+        # With actions off (D-035) the gateway does not even run the sandbox self-test.
+        sandbox_available = code_sandbox.available() if self.state.actions_enabled else False
         self.send_json(200, health.snapshot(
-            self.state, state_root=self.state.state_root, sandbox_available=code_sandbox.available()))
+            self.state, state_root=self.state.state_root, sandbox_available=sandbox_available))
 
     def _get_workspace_listing(self) -> None:
         root = self.state.workspace_dir
