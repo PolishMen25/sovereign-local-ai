@@ -8,7 +8,13 @@
 - Mise à jour du 2026-09-27 : aucune des entrées D-035 à D-042, consignées
   depuis sur `main`, ne porte sur ce moteur. D-038 fait passer le projet en
   phase 1 ; un nouveau service ou port y exige toujours une décision du
-  propriétaire au registre.
+  propriétaire au registre. L'`AGENTS.md` de `main` (`4775afb`), maintenu
+  sous l'autorité du propriétaire, range ce moteur parmi les composants en
+  service **sans décision au registre** : « autorisé dans son principe par
+  D-028 mais sans lock ni reçu de promotion », à régulariser par le
+  propriétaire et à ne pas étendre. C'est une déclaration du propriétaire ;
+  aucun relevé versionné (empreinte, révision, écoute) ne l'atteste encore
+  (section 1.2).
 - Numérotation : le tri de phase 0 proposait « ADR-0006 » ; ce numéro est
   pris par l'[ADR-0006](adr-0006-research-gateway-vs-direct-deposit.md)
   (Research Gateway, PROPOSÉ). Cet ADR prend donc le numéro 0007.
@@ -22,7 +28,7 @@ service ni aucune unité et ne ratifie aucun modèle. Il accompagne un lock
 ## Étiquettes employées
 
 - **CONFIRMÉ** : vérifiable dans le dépôt à `db9414d` (code, configuration,
-  registre, ADR approuvé).
+  registre, ADR approuvé), ou à `5e28408` pour la mise à jour datée.
 - **PROVISOIRE** : proposition sans validation du propriétaire.
 - **OUVERT** : question sans réponse qui conditionne la décision.
 - **HYPOTHÈSE** : appréciation ou estimation de l'auteur, non mesurée.
@@ -73,6 +79,9 @@ Aucun état de déploiement n'a été revérifié en direct à la date de rédac
   `services/knowledge/README.md` et `services/web/README.md`. Leur
   rafraîchissement relève d'autres tâches.
 - **OUVERT** — Le déploiement réel n'est attesté par aucun relevé versionné.
+  Depuis `4775afb`, l'`AGENTS.md` de `main` le déclare en service, à
+  régulariser ; cette déclaration du propriétaire ne remplace pas la relecture
+  de l'artefact.
 
 ### 1.3 Comportement du code à `db9414d`
 
@@ -111,10 +120,13 @@ Aucun état de déploiement n'a été revérifié en direct à la date de rédac
 
 **CONFIRMÉ par lecture de l'unité :** llama.cpp en mode embedding, pooling
 `last`, contexte de 8 192, 8 threads, aucune couche GPU, écoute sur la boucle
-locale, option `--offline`, utilisateur non privilégié. Contrairement à l'unité
-BOOTSTRAP, elle ne déclare ni `NoNewPrivileges`, ni `PrivateTmp`, ni
-`ProtectHome`, ni `ProtectSystem`. Aucune des deux ne restreint les familles
-d'adresses ni les destinations réseau.
+locale, option `--offline`.
+
+**CONFIRMÉ** — L'unité d'embeddings est moins restreinte que l'unité de
+référence BOOTSTRAP. L'alignement est à décider par le propriétaire ; le
+détail directive par directive relève de sa documentation privée, hors du
+dépôt public, qui ne recense pas la posture de sécurité d'un service en
+fonctionnement (`AGENTS.md`).
 
 ## 2. Critères
 
@@ -192,10 +204,10 @@ médiane, dispersion et période de chauffe, conformément à `AGENTS.md`.
 - **Artefact tiers** : un fichier GGUF est une entrée non fiable, analysée par
   le runtime. Sans empreinte figée, une substitution de fichier passe
   inaperçue ; c'est l'objet du lock candidat.
-- **Oracle local** : le point de terminaison loopback n'a pas
-  d'authentification ; tout processus local du même invité peut l'interroger.
-  **HYPOTHÈSE** : risque faible tant que l'invité n'héberge que des services
-  du projet.
+- **Frontière locale** : le point de terminaison n'écoute que sur la boucle
+  locale ; son contrôle d'accès repose sur l'isolation de l'invité qui
+  l'héberge. **HYPOTHÈSE** : risque faible tant que l'invité n'héberge que des
+  services du projet.
 - **Contenu empoisonné** : un chunk validé mais hostile peut influencer le
   classement. La confiance se décide à la promotion, pas à l'indexation. Les
   documents téléversés entrent aujourd'hui dans le même index ; leur statut
@@ -216,7 +228,10 @@ médiane, dispersion et période de chauffe, conformément à `AGENTS.md`.
    n'est pas faite : `SOVEREIGN_EMBED_ENDPOINT` explicitement vide, pas
    seulement absente, puisqu'une variable absente active le client sur son
    défaut loopback (section 1.3). Ratification ensuite si la relecture
-   concorde.
+   concorde. Appliquer cette valeur modifie la configuration d'un service en
+   fonctionnement : c'est une opération du propriétaire, selon les règles
+   d'exploitation d'`AGENTS.md` (sauvegarde de l'état modifié, retour arrière
+   décrit, redémarrage annoncé puis vérifié), pas un travail d'agent.
 3. R0 tant qu'un banc de recherche — recall@k, MRR et nDCG en modes lexical,
    vectoriel et hybride, avec balayage des poids — ne montre pas de gain.
 4. I1 tant qu'une mesure au volume réel reste sous un budget de latence à
@@ -231,7 +246,8 @@ médiane, dispersion et période de chauffe, conformément à `AGENTS.md`.
 Si le propriétaire accepte cet ADR :
 
 - une entrée au registre, au prochain numéro libre, ratifie le modèle comme
-  instance de D-028 et met à jour P-004 ;
+  instance de D-028, en le nommant ou en citant son empreinte, et met à jour
+  P-004 ;
 - le lock candidat devient un lock réel, accompagné d'un reçu de promotion sur
   le modèle de Qwen-Coder ;
 - les quatre documents cités en 1.2 sont alignés ;
@@ -239,8 +255,9 @@ Si le propriétaire accepte cet ADR :
   vérifiée.
 
 S'il le refuse, E0 s'applique : `SOVEREIGN_EMBED_ENDPOINT` explicitement vide
-(pas seulement absente), vecteurs conservés mais inutilisés, et le lock
-candidat reste non activable.
+(pas seulement absente), appliquée par le propriétaire comme au point 2 de la
+section 6, vecteurs conservés mais inutilisés, et le lock candidat reste non
+activable.
 
 ## 8. Conditions de révision
 
@@ -258,7 +275,10 @@ Chaque question est fermée ; le défaut proposé est le plus sûr.
 1. Ratifier Qwen3-Embedding-0.6B Q8_0 comme instance de D-028 ? Défaut : non
    avant relecture de l'empreinte et de la licence.
 2. Suspendre la recherche dense jusqu'à cette relecture, par une valeur
-   explicitement vide de `SOVEREIGN_EMBED_ENDPOINT` ? Défaut : oui.
+   explicitement vide de `SOVEREIGN_EMBED_ENDPOINT` ? Défaut : oui. Si oui,
+   le propriétaire l'applique lui-même au service en fonctionnement
+   (sauvegarde, retour arrière décrit, redémarrage annoncé) ; aucun agent ne
+   modifie ce service.
 3. Ajouter un reranker ? Défaut : non avant mesure d'un gain.
 4. Quel budget de latence p95 déclenche une réévaluation de l'index ?
    Défaut : aucun changement d'index avant mesure.
@@ -284,11 +304,23 @@ applique une vérification d'activation qui refuse :
 - un statut autre que `promoted_owner_approved`, un objet autre que
   l'embedding RAG séparé de CORE, et un état de déploiement autre que
   `verified_by_readback` ;
-- un ADR non accepté : `adr_status` autre que `accepted`, ou chemin qui ne
+- un ADR non accepté : `adr_status` autre que `accepted`, chemin qui ne
   désigne pas un fichier `docs/architecture/adr-NNNN-*.md` existant dans le
-  dépôt, ou ADR encore marqué PROPOSÉ ;
+  dépôt, ou ADR dont la première ligne `Statut :`, normalisée en NFC, ne
+  commence pas par ACCEPTÉ ou APPROUVÉ en majuscules. Un statut absent,
+  PROPOSÉ (en gras ou non), REJETÉ, REFUSÉ, remplacé ou retiré est refusé :
+  l'acceptation se prouve par un marqueur positif, pas par l'absence de
+  PROPOSÉ ;
 - une ratification qui ne cite pas une entrée unique et non remplacée du
-  registre ; le registre est seulement lu ;
+  registre, qui cite D-028 elle-même (l'autorisation de principe ne ratifie
+  pas l'artefact), ou dont la ligne ne nomme ni le modèle, nom borné compris,
+  ni son empreinte ; le registre est seulement lu ;
+- une licence qui n'est pas un identifiant de forme SPDX relu : les valeurs
+  d'attente comme « à vérifier », `unknown`, `NOASSERTION` ou `TBD` sont
+  refusées, sans tenir compte de la casse ni de la normalisation Unicode, de
+  même qu'une licence relue différente de celle qu'affirmait le commit
+  `d7cc78c`. La liste des licences admissibles pour un moteur relève du
+  propriétaire ; le test ne la fixe pas ;
 - une empreinte, une taille ou une révision mal formées ;
 - un contexte hors de 1 à 32 768 tokens, ou un pooling hors de `cls`, `last`
   et `mean` ;
@@ -303,6 +335,10 @@ d'un registre et d'un reçu synthétiques dans un répertoire temporaire, passe
 cette vérification. Le refus n'est donc pas trivial. Le format complet du reçu
 de promotion reste à fixer avec la ratification ; le test n'en exige que les
 champs liés au lock.
+
+Ces contrôles restent structurels : ils vérifient qu'une entrée du registre
+nomme l'artefact, pas le sens de cette entrée. Le lien entre l'empreinte et
+la ratification repose sur le reçu de promotion du propriétaire.
 
 **CONFIRMÉ** — Aucune unité ni aucun service ne lit ce lock : la vérification
 est un contrôle du dépôt, pas une barrière d'exécution. Brancher une

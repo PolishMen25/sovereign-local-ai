@@ -6,6 +6,18 @@
 - Issue : #5 (phase 0, gate G1)
 - Orientation concernée : P-001, qui reste provisoire tant que cet ADR n'est
   pas accepté
+- Mise à jour du 2026-09-27 : D-035 à D-042 ont été consignées depuis sur
+  `main`. D-038 fait passer le projet en phase 1, et le tableau de phase de
+  l'`AGENTS.md` de `main` (`4775afb`) range le « collecteur de conversations
+  en écriture seule vers RAW » parmi les composants en service, rattaché à
+  D-008, D-009 et D-032 (**CONFIRMÉ** à `5e28408`). Aucune de ces entrées ne
+  décide de son exposition réseau ni du choix entre Gateway et dépôt direct
+  (**OUVERT**). En phase 1, un nouveau service, un flux entre zones ou un appel
+  fournisseur exige toujours une décision du propriétaire au registre. D-036
+  renvoie les adresses, noms d'hôte et chemins internes vers une
+  configuration privée hors Git.
+  L'analyse, rédigée sur `db9414d`, n'est pas réécrite ; seules les sections
+  1.4 et 7, ainsi que la question Q-C, sont ajustées en conséquence.
 
 Ce document compare des options et formule une recommandation provisoire. Il
 ne vaut pas décision, n'ajoute aucune entrée au registre, n'autorise aucun appel
@@ -108,9 +120,12 @@ observation récente.
   vérifié au 2026-09-07, et les [capacités actuelles](../project/current-capabilities.md)
   enregistrent un « ingress write-only actif » derrière un relais HTTPS,
   qualifié de preuve opérationnelle réversible de phase 0.
-- **OUVERT** — Aucun ADR ni aucune entrée D- n'approuve l'exposition réseau de
-  ce chemin. La portée du relais, privée ou publique, n'est pas documentée dans
-  le dépôt public. Cet ADR ne l'approuve pas a posteriori.
+- **CONFIRMÉ (mise à jour du 2026-09-27)** — D-038 et le tableau de phase de
+  l'`AGENTS.md` de `main` rattachent ce collecteur, en service, à D-008, D-009
+  et D-032.
+- **OUVERT** — Aucun ADR ni aucune entrée D- ne décide de l'exposition réseau
+  de ce chemin. Sa portée d'exposition est une question à traiter avec le
+  propriétaire hors du dépôt public. Cet ADR ne l'approuve pas a posteriori.
 - **PROVISOIRE** — La [PR #17](https://github.com/PolishMen25/sovereign-local-ai/pull/17),
   ouverte et non fusionnée à la date de rédaction,
   modifie `conversation_import.py`. Un contenu différent sous un
@@ -324,7 +339,9 @@ Les identifiants renvoient au [modèle de menaces](../security/threat-model.md).
 ### Si B est retenue
 
 - **HYPOTHÈSE** — Le Gateway reste à concevoir (placement via #4, contrat via
-  #6) ; aucun code n'est écrit en phase 0.
+  #6) ; aucun code n'est écrit avant l'acceptation de cet ADR et une décision
+  du propriétaire au registre (nouveau service, flux entre zones ou appel
+  fournisseur ; `AGENTS.md`, phase 1).
 - **HYPOTHÈSE** — Le Collector n'accepte plus qu'une identité : celle du Gateway.
   Le chemin `/v1/conversations` est retiré ou devient une exception documentée,
   datée et révisable.
@@ -392,12 +409,13 @@ qu'aucune réponse n'est enregistrée. Les réponses détaillées qui ne doivent
   Défaut sûr : poids non validés ; la matrice reste indicative.
 - **Q-C — Chemin `/v1/conversations`** : dans le périmètre de l'option retenue
   (A ou C), exception documentée et bornée dans le temps (B), ou suspendu
-  jusqu'au durcissement de l'issue #6 ? Portée du relais : privée uniquement ou
-  publique ?
-  Défaut sûr : statu quo gelé, sans nouveau client, sans extension du contrat
-  et sans exposition supplémentaire ; le chemin reste non approuvé. Maintenir
-  ou restreindre la portée actuelle du relais est une décision du propriétaire ;
-  aucun agent ne la modifie.
+  jusqu'au durcissement de l'issue #6 ? La portée d'exposition du relais est
+  traitée avec le propriétaire hors du dépôt public.
+  Défaut sûr : statu quo sans extension (D-038) : le collecteur reste en
+  service dans les limites de D-008, D-009 et D-032, sans nouveau client, sans
+  extension du contrat et sans exposition supplémentaire. Son exposition
+  réseau reste non décidée par le registre. La maintenir ou la restreindre est
+  une décision du propriétaire ; aucun agent ne la modifie.
 
 ### Annexe — questionnaire « Recherche externe », Q1 à Q7
 

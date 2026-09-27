@@ -143,9 +143,10 @@ l'acquisition, pas des tokens Byte-BPE ; voir la
   cite 28 paquets réels de septembre 2026. Le nombre d'incréments promus en
   VALIDATED est **OUVERT**.
 - **Approbateur** : le propriétaire, par un clic par paquet puis par incrément.
-  **CONFIRMÉ** : les approbations ne sont pas signées et l'applicateur n'a
-  pas d'utilisateur dédié ; voir la décision propriétaire sur la signature
-  des approbations.
+  L'authentification des approbations et le compte d'exécution de
+  l'applicateur relèvent de la décision propriétaire en attente sur la
+  signature des approbations ; leur détail relève de la documentation privée
+  du propriétaire, hors du dépôt public.
 - **Décision** : aucune entrée D-. La spécification d'auto-entraînement reste
   marquée INACTIVE. Commits `229ffe0` (pont RAW), `689fa70` (promotion
   depuis l'interface), `dbca0c6` (conversion par lot).

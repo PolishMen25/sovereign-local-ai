@@ -3,15 +3,18 @@
 The embedding runtime was wired by commit d7cc78c without a lock, a promotion
 record or a register entry (D-028 requires a verified license and digest).
 The candidate lock records what is still unknown as ``pending_*`` values.  The
-check below refuses activation while any pending value remains, while the ADR
-is not accepted, while the deployment is not verified by readback, and unless
-a strict promotion record repeats the digest, size and revision of the lock
-and cites a ratification present in the decision register.  A synthetic
-complete lock, checked against a synthetic repository root, proves that the
-refusal is not unconditional.
+check below refuses activation while any pending value remains, unless the
+first status line of the cited ADR positively reads ACCEPTÉ or APPROUVÉ, while
+the deployment is not verified by readback, while the license is not a
+read-back SPDX-style identifier equal to the one claimed by the commit, and
+unless a strict promotion record repeats the digest, size and revision of the
+lock and cites a live register entry, distinct from D-028, that names the
+model or its digest.  A synthetic complete lock, checked against a synthetic
+repository root, proves that the refusal is not unconditional.
 
-Nothing reads this lock at runtime: this is a repository gate only.  The
-decision register is only read, never written.
+These checks stay structural: they never interpret the meaning of a register
+entry.  Nothing reads this lock at runtime: this is a repository gate only.
+The decision register is only read, never written.
 """
 
 import copy
@@ -19,6 +22,7 @@ import json
 from pathlib import Path
 import re
 import tempfile
+import unicodedata
 import unittest
 
 
@@ -34,8 +38,17 @@ VERIFIED_DEPLOYMENT_STATES = frozenset({"verified_by_readback"})
 LOCK_PURPOSE = "local_rag_embedding_separate_from_core"
 ALLOWED_POOLING = frozenset({"cls", "last", "mean"})
 MAXIMUM_CONTEXT_SIZE = 32768
-PROPOSED_ADR_MARKER = "Statut : **PROPOSÉ**"
 REGISTER_PATH = "docs/project/decisions.md"
+# The first "Statut :" line of an ADR, bold or not, as a list item or not.
+ADR_STATUS_LINE = re.compile(r"^[ \t]*(?:-[ \t]+)?(?:\*\*)?[ \t]*Statut[ \t]*:(?P<value>.*)$", re.MULTILINE)
+ACCEPTED_ADR_VALUE = re.compile(r"^(?:ACCEPTÉ|APPROUVÉ)(?!\w)")
+WITHDRAWN_ADR_MARKERS = ("SUPERSEDED", "REMPLACÉ", "REJETÉ", "REFUSÉ", "RETIRÉ", "ABANDONNÉ", "OBSOLÈTE", "SUSPENDU")
+MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$")
+LICENSE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$")
+PLACEHOLDER_LICENSES = frozenset({
+    "à vérifier", "a verifier", "unknown", "noassertion", "none", "tbd", "todo",
+    "other", "n/a", "na", "inconnu", "inconnue",
+})
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GIT_REVISION = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9._-]{1,96}/[A-Za-z0-9._-]{1,96}$")
@@ -64,6 +77,8 @@ GATE_KEYS = {
     "loopback_and_no_egress_test_required", "promotion_record_required", "owner_ratification_required",
 }
 BOUND_MODEL_FIELDS = ("sha256", "byte_size", "revision")
+ADR_NOT_ACCEPTED = "governance.adr status is not ACCEPTÉ or APPROUVÉ"
+RATIFICATION_UNBOUND = "governance.owner_ratification register entry does not name the model or its digest"
 
 
 def _refuse_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -137,6 +152,25 @@ def _section(document: dict, name: str, keys: set[str], blockers: list[str]) -> 
     return section
 
 
+def adr_status(text: str) -> str | None:
+    """Return the NFC-normalised value of the first status line, or None."""
+
+    match = ADR_STATUS_LINE.search(unicodedata.normalize("NFC", text))
+    if match is None:
+        return None
+    return match.group("value").replace("*", " ").strip()
+
+
+def adr_is_accepted(text: str) -> bool:
+    """Only a positive ACCEPTÉ or APPROUVÉ status counts; anything else refuses."""
+
+    status = adr_status(text)
+    if status is None or not ACCEPTED_ADR_VALUE.match(status):
+        return False
+    upper = status.upper()
+    return not any(marker in upper for marker in WITHDRAWN_ADR_MARKERS)
+
+
 def _adr_blockers(adr: object, repository_root: Path) -> list[str]:
     if not isinstance(adr, str) or not ADR_PATH.fullmatch(adr):
         return ["governance.adr must name a docs/architecture/adr-NNNN-*.md file"]
@@ -147,12 +181,29 @@ def _adr_blockers(adr: object, repository_root: Path) -> list[str]:
         text = _read_bounded_text(path, MAXIMUM_ADR_BYTES)
     except (OSError, ValueError):
         return ["governance.adr file is unreadable or too large"]
-    if PROPOSED_ADR_MARKER in text:
-        return ["governance.adr is still PROPOSÉ"]
+    if adr_status(text) is None:
+        return ["governance.adr has no status line"]
+    if not adr_is_accepted(text):
+        return [ADR_NOT_ACCEPTED]
     return []
 
 
-def _register_blockers(ratification: str, repository_root: Path) -> list[str]:
+def _names_the_model(row: str, model: dict) -> bool:
+    """True when the register row names the model or carries its digest."""
+
+    name, digest = model.get("name"), model.get("sha256")
+    if isinstance(digest, str) and SHA256.fullmatch(digest) and digest in row:
+        return True
+    if not isinstance(name, str) or not MODEL_NAME.fullmatch(name):
+        return False
+    bounded = re.compile(
+        r"(?<![A-Za-z0-9._-])" + re.escape(name) + r"(?![A-Za-z0-9_-]|\.[A-Za-z0-9])",
+        re.IGNORECASE,
+    )
+    return bounded.search(row) is not None
+
+
+def _register_blockers(ratification: str, model: dict, repository_root: Path) -> list[str]:
     """Read the decision register, never write it, and find the cited entry."""
 
     path = _inside(repository_root, REGISTER_PATH)
@@ -165,8 +216,28 @@ def _register_blockers(ratification: str, repository_root: Path) -> list[str]:
     rows = [line for line in text.splitlines() if line.startswith(f"| {ratification} |")]
     if len(rows) != 1:
         return ["governance.owner_ratification is not a single register entry"]
-    if "SUPERSEDED" in rows[0]:
+    row = unicodedata.normalize("NFC", rows[0])
+    if "SUPERSEDED" in row.upper():
         return ["governance.owner_ratification cites a superseded register entry"]
+    if not model:
+        return ["governance.owner_ratification cannot be bound to an invalid lock"]
+    if not _names_the_model(row, model):
+        return [RATIFICATION_UNBOUND]
+    return []
+
+
+def _license_blockers(license_value: object, claimed: object) -> list[str]:
+    """Refuse placeholders and any read-back license that differs from the claim."""
+
+    if not isinstance(license_value, str):
+        return ["model.license must be a read-back SPDX-style identifier"]
+    normalized = unicodedata.normalize("NFC", license_value).strip().casefold()
+    if normalized in PLACEHOLDER_LICENSES:
+        return ["model.license is a placeholder, not a read-back license"]
+    if not LICENSE_IDENTIFIER.fullmatch(license_value):
+        return ["model.license must be a read-back SPDX-style identifier"]
+    if license_value != claimed:
+        return ["model.license differs from the license claimed by the commit"]
     return []
 
 
@@ -212,6 +283,7 @@ def activation_blockers(document: object, *, repository_root: Path) -> list[str]
         blockers.append("deployment_state is not verified by readback")
 
     governance = _section(document, "governance", GOVERNANCE_KEYS, blockers)
+    model = _section(document, "model", MODEL_KEYS, blockers)
     if governance:
         if governance["decision"] != "D-028":
             blockers.append("governance.decision must be D-028")
@@ -221,11 +293,15 @@ def activation_blockers(document: object, *, repository_root: Path) -> list[str]
         ratification = governance["owner_ratification"]
         if not isinstance(ratification, str) or not DECISION_ID.fullmatch(ratification):
             blockers.append("governance.owner_ratification must cite a register entry")
+        elif ratification == governance["decision"]:
+            # D-028 authorises the principle; it cannot ratify this artifact.
+            blockers.append("governance.owner_ratification cannot be the base decision itself")
         else:
-            blockers.extend(_register_blockers(ratification, repository_root))
+            blockers.extend(_register_blockers(ratification, model, repository_root))
 
-    model = _section(document, "model", MODEL_KEYS, blockers)
     if model:
+        if not isinstance(model["name"], str) or not MODEL_NAME.fullmatch(model["name"]):
+            blockers.append("model.name must be a bounded artifact name")
         if not isinstance(model["sha256"], str) or not SHA256.fullmatch(model["sha256"]):
             blockers.append("model.sha256 must be a lowercase SHA-256")
         if type(model["byte_size"]) is not int or model["byte_size"] <= 0:
@@ -237,8 +313,7 @@ def activation_blockers(document: object, *, repository_root: Path) -> list[str]
         filename = model["filename"]
         if not isinstance(filename, str) or not filename.endswith(".gguf") or "/" in filename or "\\" in filename:
             blockers.append("model.filename must be a bare .gguf file name")
-        if not isinstance(model["license"], str) or not model["license"].strip():
-            blockers.append("model.license must be read back")
+        blockers.extend(_license_blockers(model["license"], model["license_claimed_by_commit"]))
         for field in ("license_evidence_url", "source_url"):
             if not isinstance(model[field], str) or not model[field].startswith("https://"):
                 blockers.append(f"model.{field} must be an https URL")
@@ -298,8 +373,8 @@ def synthetic_complete_lock() -> dict:
             "filename": "synthetic-embedding.gguf",
             "byte_size": 1,
             "sha256": "a" * 64,
-            "license": "Synthetic-License",
-            "license_claimed_by_commit": "Synthetic-License",
+            "license": "LicenseRef-Synthetic",
+            "license_claimed_by_commit": "LicenseRef-Synthetic",
             "license_evidence_url": "https://example.invalid/license",
             "source_url": "https://example.invalid/model",
         },
@@ -329,17 +404,29 @@ def synthetic_promotion_record(lock: dict) -> dict:
 
 
 def write_synthetic_repository(root: Path, lock: dict) -> None:
-    """Write the synthetic ADR, register and promotion record that ``lock`` cites."""
+    """Write the synthetic ADR, register and promotion record that ``lock`` cites.
+
+    The ADR status and register rows are fixture text in a temporary
+    directory; they carry no decision value.
+    """
 
     adr = root / lock["governance"]["adr"]
     adr.parent.mkdir(parents=True, exist_ok=True)
-    adr.write_text("# ADR synthétique\n\n- Statut : synthétique, sans valeur de décision\n", encoding="utf-8")
+    adr.write_text(
+        "# ADR synthétique\n\n- Statut : **ACCEPTÉ** (fixture synthétique, sans valeur de décision)\n",
+        encoding="utf-8",
+    )
     register = root / REGISTER_PATH
     register.parent.mkdir(parents=True, exist_ok=True)
+    name = lock["model"]["name"]
     register.write_text(
         "| ID | Décision | Conséquence |\n| --- | --- | --- |\n"
-        f"| {lock['governance']['owner_ratification']} | Entrée synthétique. | Aucune. |\n"
-        "| D-001 | **SUPERSEDED par D-000.** Entrée synthétique remplacée. | Aucune. |\n",
+        f"| {lock['governance']['owner_ratification']} | Entrée synthétique : {name} ratifié. | Aucune. |\n"
+        "| D-001 | **SUPERSEDED par D-000.** Entrée synthétique remplacée. | Aucune. |\n"
+        "| D-002 | Entrée synthétique sans rapport avec le moteur. | Aucune. |\n"
+        f"| D-003 | Entrée synthétique : artefact d'empreinte {lock['model']['sha256']}. | Aucune. |\n"
+        f"| D-004 | Entrée synthétique : {name}-Large seulement. | Aucune. |\n"
+        f"| {lock['governance']['decision']} | Entrée synthétique : principe du moteur {name}. | Aucune. |\n",
         encoding="utf-8",
     )
     record = root / lock["promotion_record"]
@@ -435,7 +522,7 @@ class EmbeddingModelLockTests(unittest.TestCase):
             (("governance", "adr"), "docs/architecture/adr-7-short.md", adr_pattern_refusal),
             (("governance", "adr"), "docs/other/adr-0007-rag-embedding-reranker-index.md", adr_pattern_refusal),
             (("governance", "adr"), "docs/architecture/../architecture/adr-0007-x.md", adr_pattern_refusal),
-            (("governance", "adr"), "docs/architecture/adr-0009-synthetic-proposed.md", "governance.adr is still PROPOSÉ"),
+            (("governance", "adr"), "docs/architecture/adr-0009-synthetic-proposed.md", ADR_NOT_ACCEPTED),
             (("governance", "owner_ratification"), "D-999", "governance.owner_ratification is not a single register entry"),
             (("governance", "owner_ratification"), "D-001", "governance.owner_ratification cites a superseded register entry"),
             (("governance", "owner_ratification"), "D-28", "governance.owner_ratification must cite a register entry"),
@@ -445,6 +532,113 @@ class EmbeddingModelLockTests(unittest.TestCase):
                 document = synthetic_complete_lock()
                 _set_field(document, path, value)
                 self.assertIn(expected, activation_blockers(document, repository_root=self.root))
+
+    def test_adr_status_must_be_positively_accepted(self) -> None:
+        adr_path = "docs/architecture/adr-0009-synthetic-status.md"
+        nfd = unicodedata.normalize("NFD", "É")
+        refused = {
+            "bold_value_proposed": "- Statut : **PROPOSÉ**\n",
+            "bold_line_proposed": "**Statut : PROPOSÉ**\n",
+            "bold_item_proposed": "- **Statut : PROPOSÉ**\n",
+            "plain_proposed": "- Statut : PROPOSÉ\n",
+            "nfd_proposed": f"- Statut : **PROPOS{nfd}**\n",
+            "rejected": "- Statut : **REJETÉ**\n",
+            "refused": "- Statut : **REFUSÉ**\n",
+            "superseded": "- Statut : **SUPERSEDED par ADR-0010**\n",
+            "accepted_then_superseded": "- Statut : **ACCEPTÉ, SUPERSEDED par ADR-0010**\n",
+            "negated": "- Statut : **NON ACCEPTÉ**\n",
+            "lowercase": "- Statut : accepté\n",
+            "prefix_only": "- Statut : **ACCEPTÉS**\n",
+            "first_line_wins": "- Statut : **PROPOSÉ**\n- Statut : **ACCEPTÉ**\n",
+        }
+        accepted = {
+            "bold_value": "- Statut : **ACCEPTÉ**\n",
+            "bold_line": "**Statut : APPROUVÉ**\n",
+            "bold_item": "- **Statut : APPROUVÉ**\n",
+            "qualified": "- Statut : **ACCEPTÉ, acquisition en attente**\n",
+            "nfd_accepted": f"- Statut : **ACCEPT{nfd}**\n",
+        }
+        document = synthetic_complete_lock()
+        document["governance"]["adr"] = adr_path
+        target = self.root / adr_path
+        for name, status in refused.items():
+            with self.subTest(refused=name):
+                target.write_text(f"# ADR synthétique\n\n{status}", encoding="utf-8")
+                self.assertIn(ADR_NOT_ACCEPTED, activation_blockers(document, repository_root=self.root))
+        for name, status in accepted.items():
+            with self.subTest(accepted=name):
+                target.write_text(f"# ADR synthétique\n\n{status}", encoding="utf-8")
+                self.assertEqual(activation_blockers(document, repository_root=self.root), [])
+        with self.subTest(refused="no_status_line"):
+            target.write_text("# ADR synthétique\n\nAucune ligne de statut.\n", encoding="utf-8")
+            self.assertIn("governance.adr has no status line", activation_blockers(document, repository_root=self.root))
+
+    def test_every_proposed_repository_adr_is_refused(self) -> None:
+        for path in sorted((REPOSITORY_ROOT / "docs" / "architecture").glob("adr-*.md")):
+            status = adr_status(path.read_text(encoding="utf-8"))
+            if status is None or "PROPOSÉ" not in status.upper():
+                continue
+            with self.subTest(adr=path.name):
+                relative = path.relative_to(REPOSITORY_ROOT).as_posix()
+                self.assertIn(ADR_NOT_ACCEPTED, _adr_blockers(relative, REPOSITORY_ROOT))
+
+    def test_ratification_must_be_a_distinct_entry_naming_the_model(self) -> None:
+        cases = {
+            "base_decision": ("D-028", "governance.owner_ratification cannot be the base decision itself"),
+            "unrelated_live_entry": ("D-002", RATIFICATION_UNBOUND),
+            "longer_model_name_only": ("D-004", RATIFICATION_UNBOUND),
+        }
+        for name, (ratification, expected) in cases.items():
+            with self.subTest(case=name):
+                document = synthetic_complete_lock()
+                document["governance"]["owner_ratification"] = ratification
+                self.assertIn(expected, activation_blockers(document, repository_root=self.root))
+        with self.subTest(case="base_decision_in_the_real_register"):
+            document = synthetic_complete_lock()
+            document["governance"]["owner_ratification"] = "D-028"
+            self.assertIn(
+                "governance.owner_ratification cannot be the base decision itself",
+                activation_blockers(document, repository_root=REPOSITORY_ROOT),
+            )
+        with self.subTest(case="entry_naming_the_digest"):
+            document = synthetic_complete_lock()
+            document["governance"]["owner_ratification"] = "D-003"
+            record = self.root / document["promotion_record"]
+            record.write_text(json.dumps(synthetic_promotion_record(document)), encoding="utf-8")
+            self.assertEqual(activation_blockers(document, repository_root=self.root), [])
+        with self.subTest(case="invalid_model_name"):
+            document = synthetic_complete_lock()
+            document["model"]["name"] = "x"
+            blockers = activation_blockers(document, repository_root=self.root)
+            self.assertIn("model.name must be a bounded artifact name", blockers)
+            self.assertIn(RATIFICATION_UNBOUND, blockers)
+
+    def test_license_must_be_read_back_and_match_the_claim(self) -> None:
+        nfd_placeholder = unicodedata.normalize("NFD", "à vérifier")
+        placeholders = ["à vérifier", "À VÉRIFIER", nfd_placeholder, "unknown", "NOASSERTION", "TBD", "other"]
+        for value in placeholders:
+            with self.subTest(placeholder=value):
+                document = synthetic_complete_lock()
+                document["model"]["license"] = value
+                self.assertIn(
+                    "model.license is a placeholder, not a read-back license",
+                    activation_blockers(document, repository_root=self.root),
+                )
+        for value in ["", "  ", "Apache 2.0", "Apache-2.0\n", 1, None]:
+            with self.subTest(malformed=repr(value)):
+                document = synthetic_complete_lock()
+                document["model"]["license"] = value
+                self.assertIn(
+                    "model.license must be a read-back SPDX-style identifier",
+                    activation_blockers(document, repository_root=self.root),
+                )
+        with self.subTest(mismatch="MIT"):
+            document = synthetic_complete_lock()
+            document["model"]["license"] = "MIT"
+            self.assertIn(
+                "model.license differs from the license claimed by the commit",
+                activation_blockers(document, repository_root=self.root),
+            )
 
     def test_ratification_requires_the_register(self) -> None:
         (self.root / REGISTER_PATH).unlink()
@@ -594,9 +788,10 @@ class EmbeddingModelLockTests(unittest.TestCase):
             numbers.append(match.group(1))
         self.assertEqual(len(numbers), len(set(numbers)), "two ADR files share a number")
         self.assertEqual(ADR_FILE_NAME.fullmatch(adr.name).group(1), "0007")
-        # Accepting the ADR is an owner step: only an ADR still marked PROPOSÉ
-        # constrains the lock, so that step never turns this test red.
-        if PROPOSED_ADR_MARKER in adr.read_text(encoding="utf-8"):
+        # Accepting the ADR is an owner step: only an ADR that is not
+        # positively accepted constrains the lock, so that step never turns
+        # this test red.
+        if not adr_is_accepted(adr.read_text(encoding="utf-8")):
             self.assertNotEqual(governance["adr_status"], ACCEPTED_ADR_STATUS)
             self.assertNotEqual(self.document["status"], ACTIVE_STATUS)
 
