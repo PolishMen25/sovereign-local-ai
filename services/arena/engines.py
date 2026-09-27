@@ -5,16 +5,38 @@ from __future__ import annotations
 import json
 from typing import Any
 from urllib import error, request
+from urllib.parse import urlsplit
+
+from services.common.private_endpoints import PrivateEndpoint
+
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 class EngineUnavailable(RuntimeError):
     """The engine did not answer usefully; the arena pauses and retries later."""
 
 
+def _require_loopback(endpoint: str) -> None:
+    try:
+        parsed = urlsplit(endpoint)
+        _ = parsed.port
+    except ValueError:
+        raise ValueError("arena engine endpoint is invalid") from None
+    if (parsed.scheme != "http" or parsed.hostname not in LOOPBACK_HOSTS
+            or parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment):
+        raise ValueError("arena engines must stay on loopback or on their pinned private endpoint")
+
+
 class ChatEngine:
-    def __init__(self, name: str, endpoint: str, token: str = "", *, timeout: int = 240) -> None:
-        if not endpoint.startswith(("http://127.0.0.1", "http://localhost", "http://192.168.")):
-            raise ValueError("arena engines must stay on loopback or the private LAN")
+    def __init__(self, name: str, endpoint: str, token: str = "", *, timeout: int = 240,
+                 pinned: PrivateEndpoint | None = None) -> None:
+        # A non-loopback engine is reachable only through the exact private
+        # endpoint configured outside Git (D-036); no address prefix is trusted.
+        if pinned is not None:
+            if not isinstance(pinned, PrivateEndpoint) or endpoint != pinned.url:
+                raise ValueError("arena engine endpoint does not match its pinned private endpoint")
+        else:
+            _require_loopback(endpoint)
         self.name, self.endpoint, self.token, self.timeout = name, endpoint.rstrip("/"), token, timeout
         # Never follow proxies from the environment: the engines are local.
         self.opener = request.build_opener(request.ProxyHandler({}))

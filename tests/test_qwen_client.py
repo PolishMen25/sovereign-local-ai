@@ -3,12 +3,31 @@ import json
 import unittest
 from unittest.mock import patch
 
+from services.common.private_endpoints import PrivateEndpoint
 from services.web.qwen_client import QwenClient
+from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, synthetic_private_host
 
 
 class QwenClientTests(unittest.TestCase):
     def setUp(self):
-        self.client = QwenClient("http://192.168.0.144:8790", "x" * 32)
+        self.client = QwenClient(QWEN_ENDPOINT.url, "x" * 32, pinned=QWEN_ENDPOINT)
+
+    def test_endpoint_is_pinned_exactly_to_the_private_configuration(self):
+        self.assertEqual(self.client.endpoint, QWEN_ENDPOINT.url)
+        other_port = PrivateEndpoint("qwen_coder", QWEN_ENDPOINT.host, 8791)
+        for endpoint, pinned in [
+            (f"http://{synthetic_private_host(45)}:8790", QWEN_ENDPOINT),
+            (QWEN_ENDPOINT.url + "/", QWEN_ENDPOINT),
+            ("https://" + QWEN_ENDPOINT.url[len("http://"):], QWEN_ENDPOINT),
+            (QWEN_ENDPOINT.url, other_port),
+            (CORE_ENDPOINT.url, CORE_ENDPOINT),
+            (QWEN_ENDPOINT.url, None),
+        ]:
+            with self.subTest(endpoint=endpoint, pinned=pinned), self.assertRaises(ValueError) as caught:
+                QwenClient(endpoint, "x" * 32, pinned=pinned)
+            self.assertNotIn(QWEN_ENDPOINT.host, str(caught.exception))
+        with self.assertRaises(ValueError):
+            QwenClient(QWEN_ENDPOINT.url, "short", pinned=QWEN_ENDPOINT)
 
     def test_preserves_history_and_references_in_order(self):
         messages = [

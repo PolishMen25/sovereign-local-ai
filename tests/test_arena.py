@@ -6,8 +6,10 @@ import unittest
 
 from services.arena import league
 from services.arena.engines import ChatEngine, EngineUnavailable
-from services.arena.runner import APPROVAL_SCHEMA, Arena, ArenaConfig
+from services.arena.runner import APPROVAL_SCHEMA, Arena, ArenaConfig, build_engines
 from services.arena.store import ArenaStore
+from services.common.private_endpoints import PrivateEndpointsError
+from tests._private_endpoint_support import CORE_ENDPOINT, QWEN_ENDPOINT, write_private_endpoints
 
 TASKS = [
     {"id": "python-01-double", "function_name": "double", "prompt": "Write double(x) that returns 2 * x.",
@@ -280,15 +282,65 @@ class StatusTests(ArenaTestCase):
 
 class EngineTests(unittest.TestCase):
     def test_engines_must_stay_local(self) -> None:
-        with self.assertRaises(ValueError):
-            ChatEngine("X", "https://api.example.com")
-        ChatEngine("X", "http://192.168.0.144:8790", "t" * 32)
+        for endpoint in (
+            "https://api.example.com",
+            "http://127.0.0.1.example.com:8080",
+            "http://user@127.0.0.1:8080",
+            "https://127.0.0.1:8080",
+            "http://127.0.0.1:99999",
+            "http://192.0.2.44:8790",
+            QWEN_ENDPOINT.url,  # a private address needs its exact pin
+        ):
+            with self.subTest(endpoint=endpoint), self.assertRaises(ValueError):
+                ChatEngine("X", endpoint)
+        ChatEngine("X", "http://127.0.0.1:8080")
+        ChatEngine("X", "http://localhost:8081/")
+
+    def test_private_engine_is_pinned_exactly(self) -> None:
+        engine = ChatEngine("X", QWEN_ENDPOINT.url, "t" * 32, pinned=QWEN_ENDPOINT)
+        self.assertEqual(engine.endpoint, QWEN_ENDPOINT.url)
+        for endpoint in (QWEN_ENDPOINT.url + "/", CORE_ENDPOINT.url, "http://127.0.0.1:8790"):
+            with self.subTest(endpoint=endpoint), self.assertRaises(ValueError) as caught:
+                ChatEngine("X", endpoint, "t" * 32, pinned=QWEN_ENDPOINT)
+            self.assertNotIn(QWEN_ENDPOINT.host, str(caught.exception))
 
     def test_unreachable_engine_is_not_busy_and_raises_on_chat(self) -> None:
         engine = ChatEngine("X", "http://127.0.0.1:9", timeout=2)
         self.assertFalse(engine.busy())
         with self.assertRaises(EngineUnavailable):
             engine.chat("s", "u", temperature=0, max_tokens=1, seed=0)
+
+
+
+class BuildEnginesTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self._directory.cleanup)
+        self.directory = self._directory.name
+
+    def test_loopback_engines_need_no_private_configuration(self) -> None:
+        engines = build_engines({"SOVEREIGN_CHAT14B_ENDPOINT": "http://127.0.0.1:8081"})
+        self.assertEqual(sorted(engines), ["BOOTSTRAP", "CHAT-14B"])
+
+    def test_qwen_engine_uses_the_private_configuration(self) -> None:
+        environ = {**write_private_endpoints(self.directory, QWEN_ENDPOINT), "SOVEREIGN_QWEN_TOKEN": "t" * 32}
+        self.assertEqual(build_engines(environ)["QWEN-CODER"].endpoint, QWEN_ENDPOINT.url)
+        environ["SOVEREIGN_QWEN_ENDPOINT"] = QWEN_ENDPOINT.url
+        self.assertEqual(build_engines(environ)["QWEN-CODER"].endpoint, QWEN_ENDPOINT.url)
+
+    def test_qwen_engine_refuses_to_start_without_a_matching_configuration(self) -> None:
+        with self.assertRaises(PrivateEndpointsError):
+            build_engines({"SOVEREIGN_QWEN_TOKEN": "t" * 32})
+        with self.assertRaises(PrivateEndpointsError):
+            build_engines({**write_private_endpoints(self.directory, CORE_ENDPOINT), "SOVEREIGN_QWEN_TOKEN": "t" * 32})
+        environ = {**write_private_endpoints(self.directory, QWEN_ENDPOINT), "SOVEREIGN_QWEN_TOKEN": "t" * 32,
+                   "SOVEREIGN_QWEN_ENDPOINT": CORE_ENDPOINT.url}
+        with self.assertRaises(ValueError):
+            build_engines(environ)
+
+    def test_chat14b_must_stay_on_loopback(self) -> None:
+        with self.assertRaises(ValueError):
+            build_engines({"SOVEREIGN_CHAT14B_ENDPOINT": CORE_ENDPOINT.url})
 
 
 if __name__ == "__main__":

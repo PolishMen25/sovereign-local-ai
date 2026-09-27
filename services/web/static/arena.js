@@ -12,6 +12,7 @@
     engine_unavailable: "en pause : moteur injoignable",
     not_enough_authors: "en pause : il faut au moins deux auteurs",
     sandbox_unavailable: "arrêtée : sandbox indisponible",
+    engine_configuration_refused: "arrêtée : configuration des moteurs refusée (fichier privé des points de terminaison ?)",
   };
   const PACKET_STATES = { awaiting_owner_approval: ["en attente de ton accord", "warn"], flagged: ["signalé : diversité insuffisante", "fail"], approved: ["approuvé", "ok"] };
   const EMPTY = "–";

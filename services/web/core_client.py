@@ -5,14 +5,18 @@ from __future__ import annotations
 import json
 from urllib import error, request
 
+from services.common.private_endpoints import PrivateEndpoint
+
 
 class CoreClient:
     engine = "CORE-700M"
 
-    def __init__(self, endpoint: str, token: str) -> None:
-        if endpoint != "http://192.168.0.143:9000" or len(token) < 32:
-            raise ValueError("CORE client requires the private CORE endpoint and a token")
-        self.endpoint, self.token = endpoint.rstrip("/"), token
+    def __init__(self, endpoint: str, token: str, *, pinned: PrivateEndpoint) -> None:
+        # Exact-match pin on the private address configured outside Git (D-036).
+        if (not isinstance(pinned, PrivateEndpoint) or pinned.name != "core_inference"
+                or endpoint != pinned.url or len(token) < 32):
+            raise ValueError("CORE client requires the pinned private CORE endpoint and a token")
+        self.endpoint, self.token = pinned.url, token
 
     def _call(self, path: str, payload: dict | None = None, *, timeout: int = 90) -> dict:
         if not isinstance(timeout, int) or not 1 <= timeout <= 90:

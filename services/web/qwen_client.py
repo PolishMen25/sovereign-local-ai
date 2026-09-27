@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 from urllib import error, request
 
+from services.common.private_endpoints import PrivateEndpoint
+
 class QwenClient:
     engine = "QWEN-CODER"
-    def __init__(self, endpoint: str, token: str) -> None:
-        if endpoint != "http://192.168.0.144:8790" or len(token) < 32:
-            raise ValueError("Qwen client requires the private endpoint and a token")
-        self.endpoint, self.token = endpoint.rstrip("/"), token
+    def __init__(self, endpoint: str, token: str, *, pinned: PrivateEndpoint) -> None:
+        # Exact-match pin on the private address configured outside Git (D-036).
+        if (not isinstance(pinned, PrivateEndpoint) or pinned.name != "qwen_coder"
+                or endpoint != pinned.url or len(token) < 32):
+            raise ValueError("Qwen client requires the pinned private endpoint and a token")
+        self.endpoint, self.token = pinned.url, token
     def status(self) -> dict:
         try:
             with request.urlopen(request.Request(self.endpoint + "/health"), timeout=5) as response:
