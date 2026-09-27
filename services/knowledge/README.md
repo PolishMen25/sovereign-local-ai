@@ -1,6 +1,7 @@
 # Knowledge interne
 
-> Mise à jour documentaire du 2026-09-26, contre `main` à `db9414d`. Ce
+> Mise à jour documentaire du 2026-09-27, contre `main` à `c0b169e` (code de
+> ce dossier inchangé depuis `db9414d`, registre jusqu'à D-042). Ce
 > document décrit le code, pas l'état installé : le serveur de calcul est hors
 > ligne et le niveau de preuve de chaque capacité figure dans
 > [`docs/project/current-capabilities.md`](../../docs/project/current-capabilities.md).
@@ -15,10 +16,10 @@ d'un document déposé en appelant le runtime local de la passerelle, qui lui
 est fourni comme fonction `generate`.
 
 Il n'est ni routable ni publié vers Internet. Les écritures dans le catalogue
-MCP sont limitées à des workflows de promotion approuvés et audités. **Écart
-constaté dans le code** : les documents déposés depuis la passerelle entrent
-dans la table de l'index hybride sans approbation ni trace d'audit (voir plus
-bas) ; sans décision au registre.
+MCP sont limitées à des workflows de promotion approuvés et audités. Les
+documents déposés depuis la passerelle rejoignent la table de l'index hybride
+(voir plus bas) ; sans décision au registre, ce composant est à régulariser
+selon `AGENTS.md`.
 
 ## Prototype MCP local
 
@@ -54,8 +55,8 @@ n'ouvre aucun socket et n'accepte aucun chemin venant d'un client.
   déploiement non vérifié.** D-028 autorise
   un petit moteur d'embeddings pré-entraîné sous réserve de licence et
   d'empreinte vérifiées, mais aucun lock de ce modèle n'est versionné dans
-  `configs/runtime/` et aucune entrée du registre ne le désigne : décision du
-  propriétaire en attente.
+  `configs/runtime/` et aucune entrée du registre ne le désigne : composant à
+  régulariser selon `AGENTS.md`, décision du propriétaire en attente.
 
 ## Documents déposés
 
@@ -66,8 +67,7 @@ route `POST /v1/documents` de la passerelle (`010706c`, `5c917de`, code seul) :
   découpé en au plus 400 passages de 1 200 caractères ;
 - le texte est extrait en Python pour le texte brut et le `.docx`, et par
   sous-processus hors ligne `pdftotext`/`pdftoppm` (poppler) et `tesseract`
-  pour le PDF et l'OCR, **sans bac à sable** ; leur présence sur le serveur
-  n'est pas consignée ;
+  pour le PDF et l'OCR ; leur présence sur le serveur n'est pas consignée ;
 - chaque passage est écrit par `HybridKnowledgeIndex.upsert_validated` avec une
   provenance `upload:<id>`, dans la même table que le manifeste approuvé ;
 - l'analyse map-reduce est bornée à 30 passages.
@@ -76,7 +76,7 @@ Une reconstruction de l'index approuvé par
 `tools/build_project_knowledge_index.py` crée une base neuve limitée au
 manifeste, sans embeddings, puis remplace le fichier : appliquée à la base de
 la passerelle, elle effacerait les passages déposés et tous les embeddings.
-Le niveau de confiance des documents déposés, l'isolation des extracteurs et
+Le niveau de confiance des documents déposés, l'isolement des extracteurs et
 l'effet d'une reconstruction relèvent d'une décision du propriétaire.
 
 ## Chemins du corpus de l'arène

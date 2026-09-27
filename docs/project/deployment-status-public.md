@@ -1,7 +1,9 @@
 # État public du déploiement
 
 Dernière vérification en direct : 2026-09-09. Dernier relevé versionné :
-2026-09-10. Mise à jour documentaire : 2026-09-26, contre `main` à `db9414d`.
+2026-09-10. Mise à jour documentaire : 2026-09-27, contre `main` à `c0b169e` :
+registre jusqu'à D-042, phase 1 (D-038), interrupteur D-035 et contrôleur de
+disponibilité du NAS ajoutés au code depuis `db9414d`.
 
 La source de vérité détaillée est la page
 [Capacités réellement disponibles](current-capabilities.md), qui donne pour
@@ -16,6 +18,8 @@ n'a été revérifié en direct après le 2026-09-09, hormis les relevés versio
 cités. Ce résumé décrit les derniers relevés et le code de `main`, pas un état
 d'exécution présent. « Sans décision au registre » signale une capacité qui
 dépend d'un choix du propriétaire absent de `docs/project/decisions.md`.
+« À régulariser » reprend la liste de `AGENTS.md` des composants en service
+sans décision au registre ou au-delà de leur décision.
 
 ## État essentiel
 
@@ -25,8 +29,8 @@ dépend d'un choix du propriétaire absent de `docs/project/decisions.md`.
   restait lié à sa boucle locale ; la passerelle authentifiée appelait ce
   moteur et était relayée dans le tailnet. Depuis `9b31b41`, l'interface
   libelle cet emplacement « CHAT-14B · Qwen2.5-14B » alors que le dépôt ne
-  verrouille que le 1.5B : sans décision au registre. Ce modèle tiers
-  temporaire reste distinct de CORE.
+  verrouille que le 1.5B : sans décision au registre, à régulariser. Ce modèle
+  tiers temporaire reste distinct de CORE.
 - **Agent de programmation Qwen2.5-Coder-7B : promu par le propriétaire le
   2026-09-10.** Selon le relevé
   `configs/runtime/qwen2.5-coder-7b-q4km.promotion.json`, il a été déployé sur
@@ -53,9 +57,12 @@ dépend d'un choix du propriétaire absent de `docs/project/decisions.md`.
   comptage exact de 691 160 320 paramètres sont versionnés ; le tokenizer 32k
   est promu en `candidate_core` avec reçu d'empreintes. Conformément à D-034,
   CORE-700M ne reçoit pas de palier long.
-- **Corpus : gate simplifié, ratification en attente.** Depuis `6d959d7`, un
-  manifeste validé suffit au préflight et `approved.json` n'est plus bloquant ;
-  la ratification de ce changement par le propriétaire est en attente.
+- **Corpus : gate simplifié, ratifié par D-039.** Depuis `6d959d7`, un
+  manifeste validé suffit au préflight et `approved.json` n'est plus bloquant.
+  D-039 autorise une version de corpus dès qu'une politique automatique
+  versionnée et auditée produit ce manifeste ; cette politique n'est pas
+  désignée dans le dépôt. D-041 vise environ 40 % de français technique et
+  D-042 un tokenizer réentraîné sur le corpus final.
 - **MCP Knowledge et RAG : recherche lexicale approuvée au relevé ; recherche
   hybride dans le code.** MCP expose en `stdio` l'état, la recherche lexicale
   et une provenance exacte. La passerelle joint des extraits bornés de son
@@ -63,26 +70,31 @@ dépend d'un choix du propriétaire absent de `docs/project/decisions.md`.
   couvre quatre documents internes versionnés ; la page des capacités en fait
   partie et sa révision du 2026-09-26 doit être réapprouvée par le propriétaire
   avant reconstruction. Le moteur d'embeddings Qwen3-Embedding-0.6B est présent
-  dans le code (`d7cc78c`), déploiement non vérifié, sans lock versionné. Les
-  documents partagés entrent dans l'index sans approbation, sans décision au
-  registre.
+  dans le code (`d7cc78c`), déploiement non vérifié, sans lock versionné. Le
+  moteur d'embeddings et le dépôt de documents sont à régulariser.
 - **Interface Web du projet : installée derrière le HTTPS privé au relevé du
   2026-09-09.** Argon2id, sessions, CSRF, mémoire SQLite locale, historique
   réouvrable, export, suppression et client llama.cpp loopback fonctionnaient.
   Le code ajoute depuis les pages `/arena`, `/corpus` et `/sante` ; aucun relevé
   n'atteste leur installation.
-- **Agents et outils : code sans relevé, sans décision au registre.** Le
-  registre garde les 60 profils en `draft`, mais le code rend les profils du
-  catalogue sélectionnables dans le chat sans leurs gates d'évaluation. Il
-  ajoute des outils en lecture seule et deux actions, `run_python` et
-  `write_file`, chacune derrière une confirmation humaine à usage unique.
+- **Agents et outils : code sans relevé.** Le registre garde les 60 profils en
+  `draft`, mais le code rend les profils du catalogue sélectionnables dans le
+  chat sans leurs gates d'évaluation. Il ajoute des outils en lecture seule et
+  deux actions, `run_python` et `write_file`, chacune derrière une
+  confirmation humaine à usage unique. Profils et boucle d'outils sont à
+  régulariser. D-035 place les deux actions derrière l'interrupteur
+  `SOVEREIGN_ACTIONS_ENABLED`, désactivé par défaut ; le code de `main`
+  l'implémente depuis `c0b169e`, sans déploiement consigné.
 - **Arène d'agents et incréments de corpus : code et observations de commit.**
   Le code de l'arène produit des paquets de solutions vérifiées par le bac à
   sable, en attente d'approbation ; un paquet approuvé peut devenir un
   incrément RAW puis être promu en VALIDATED depuis l'interface. Les commits
   rapportent des paquets réels, mais aucun relevé versionné ne les confirme.
-  Activation et promotion sont sans décision au registre, et la suite par
-  défaut de l'arène reste le benchmark E2 scellé.
+  L'arène et la boucle sont à régulariser, et la suite par défaut de l'arène
+  reste le benchmark E2 scellé. D-040 admet le code synthétique de l'arène
+  généré par Qwen2.5-Coder, sans recouvrement avec les jeux d'évaluation, dans
+  la limite de 20 % des tokens d'une version de corpus ; les validateurs de
+  `main` ne sont pas encore alignés sur cette règle.
 - **Orchestrateur et autorisations : préparation seulement.** Les validateurs
   fail-closed existent ; les outils du chat passent par la passerelle, pas par
   l'orchestrateur.
@@ -101,9 +113,9 @@ dépend d'un choix du propriétaire absent de `docs/project/decisions.md`.
   vérifiés, est installé hors ligne et a passé son smoke test CPU. Aucun poids
   CORE utile n'existe.
 
-Ces éléments restent des preuves opérationnelles réversibles de phase 0. Ils ne
-valident ni l'orientation P-002, ni la topologie cible, ni un gate de mise en
-production.
+Ces éléments ont été établis comme preuves opérationnelles réversibles pendant
+la phase 0. Le passage en phase 1 (D-038) ne valide ni l'orientation P-002, ni
+la topologie cible, ni un gate : G0 à G8 et A0 à A8 restent ouverts.
 
 ## Preuves techniques actuelles
 
@@ -141,7 +153,7 @@ production.
 - le summarizer de métriques `v2` valide un journal borné et publie son SHA-256
   exact ainsi que moyenne, médiane, écart-type de population, MAD et débit
   après chauffe ;
-- le runner NUMA phase 0 exige un nouveau répertoire absolu, un contrat de
+- le runner NUMA exige un nouveau répertoire absolu, un contrat de
   placement privé strict, une session UUID v4, une archive Git canonique et un
   lock de runtime offline ; ses paramètres de charge et délais sont bornés ;
 - il refuse de démarrer si les sockets flux ou datagrammes des familles
@@ -155,8 +167,9 @@ production.
   placement sont distincts, et aucune mesure mémoire ni série complète de
   compteurs NUMA ne permet d'extrapoler une durée d'entraînement ;
 - tests : 198 tests passaient à la révision `8071843` ; les messages de commit
-  rapportent 470 tests verts à `dbca0c6` ; aucune CI ni exécution Linux n'est
-  consignée pour `db9414d`.
+  rapportent 470 tests verts à `dbca0c6` ; D-037 décide une intégration
+  continue Linux hébergée, pas encore versionnée, et aucune exécution Linux
+  n'est consignée pour `db9414d`.
 
 ## Non revendiqué
 

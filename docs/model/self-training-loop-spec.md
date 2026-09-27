@@ -2,8 +2,9 @@
 
 ## Statut et invariant
 
-**Statut factuel au 2026-09-26**, établi sans accès au serveur de calcul, hors
-ligne depuis le 2026-09-14 environ :
+**Statut factuel au 2026-09-27**, établi sans accès au serveur de calcul, hors
+ligne depuis le 2026-09-14 environ, contre `main` à `c0b169e` (code de l'arène
+et du pont inchangé depuis `db9414d`, registre jusqu'à D-042) :
 
 - **Spécification** : ce document ne lance lui-même ni génération, ni sandbox,
   ni entraînement.
@@ -19,8 +20,13 @@ ligne depuis le 2026-09-14 environ :
 - **Critères d'activation non consignés** : le pilote CORE-MINI, l'approbation
   explicite du propriétaire et le taux d'acceptation d'au moins 60 % sur 100
   tâches distinctes (§6) ne figurent dans `docs/project/decisions.md` ni comme
-  atteints ni comme levés. **OUVERT**, décision du propriétaire. Rien dans ce
-  document ne vaut approbation d'activation.
+  atteints ni comme levés. `AGENTS.md` (phase 1, D-038) range l'arène et la
+  boucle d'auto-entraînement parmi les composants en service sans décision au
+  registre, à régulariser avant toute extension. **OUVERT**, décision du
+  propriétaire. Rien dans ce document ne vaut approbation d'activation.
+- **Données produites** : D-040 rend admissible pour l'entraînement de CORE le
+  code synthétique de l'arène, dans les limites données au §4 ; cette
+  admissibilité ne vaut pas activation de la boucle.
 - **Suite jouée non consignée** : la suite par défaut de
   `services/arena/runner.py` est le benchmark scellé E2
   (`configs/evaluation/core-python-e2.candidate.json`) et 14 noms de fonction
@@ -76,23 +82,37 @@ tri. Il reste RAW jusqu'à un commit propriétaire de
 `core-v1-source-policy.approved.json` compatible avec le même vérificateur que
 le corpus externe. Aucun résultat de test, journal ou sortie de modèle ne
 constitue une promotion automatique vers l'entraînement.
+*[Condition d'approbation remplacée par D-039 et D-040 ; voir ci-dessous.]*
 
-**Écart du code au 2026-09-26, sans décision au registre.** Dans le code de
-`main`, un paquet approuvé depuis `/arena` est converti en incrément RAW
-synthétique par un outil lancé à la main
-(`tools/build_core_increment_from_arena.py`,
+**Registre au 2026-09-27.** D-039 ratifie `6d959d7`, qui retire
+`core-v1-source-policy.approved.json` du préflight : une version de corpus est
+autorisée dès qu'une politique automatique versionnée et auditée produit son
+manifeste `VALIDATED`, sans approbation du propriétaire par version ; chaque
+décision automatique est journalisée avec un acteur de politique et reste
+révocable avant consommation. D-040 rend admissibles les données
+synthétiques de l'arène, limitées au code dont chaque solution passe ses tests
+en bac à sable, généré par Qwen2.5-Coder, étiqueté synthétique et sans
+recouvrement avec les jeux d'évaluation, dans la limite de 20 % des tokens
+d'une version de corpus ; les sorties de BOOTSTRAP restent exclues. D-040
+résout le conflit entre `promote_arena_increment` et
+`validate_training_corpus_manifest` et demande l'alignement des validateurs.
+
+**Écart du code au 2026-09-27.** Dans le code de `main`, un paquet approuvé
+depuis `/arena` est converti en incrément RAW synthétique par un outil lancé à
+la main (`tools/build_core_increment_from_arena.py`,
 `tools/build_increments_for_approved_packets.py`) ; une approbation déposée
-depuis `/corpus`, fichier JSON non signé, est ensuite appliquée toutes les deux
-minutes par un service périodique qui promeut l'incrément en `VALIDATED` avec
-`training_authorization` `approved` (`tools/promote_arena_increment.py`). Aucun
-commit de `approved.json` n'intervient. Depuis `6d959d7`, le préflight
-tokenizer ne lit d'ailleurs plus ce fichier et un manifeste `VALIDATED` lui
-suffit :
-**ratification par le propriétaire en attente**. Enfin,
-`tools/validate_training_corpus_manifest.py` refuse un matériau `synthetic`
-dont l'autorisation d'entraînement vaut `approved` : aucun chemin contractuel
-ne mène encore ces incréments à un manifeste d'entraînement. La règle
-ci-dessus n'est ni confirmée ni remplacée ici.
+depuis `/corpus` est ensuite appliquée toutes les deux minutes par un service
+périodique qui promeut l'incrément en `VALIDATED` avec
+`training_authorization` `approved` (`tools/promote_arena_increment.py`).
+Restent à livrer par PR : la politique automatique de D-039, qui n'est pas
+désignée dans le dépôt ; l'alignement de
+`tools/validate_training_corpus_manifest.py`, qui refuse encore un matériau
+`synthetic` dont l'autorisation vaut `approved` ; et l'exclusion des
+solutions qui ne viennent pas de Qwen2.5-Coder : les paquets enregistrent le
+moteur de chaque solution (`engine`), les profils `author-bootstrap` de
+`services/arena/league.py` sont servis par BOOTSTRAP, et les outils
+d'incrément ne lisent pas ce champ. D'ici là, aucun chemin contractuel ne
+mène ces incréments à un manifeste d'entraînement.
 
 ## 5. Garde-fous anti-effondrement
 

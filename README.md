@@ -2,7 +2,7 @@
 
 Socle d'une intelligence artificielle locale, souveraine et **CPU-only**, construite progressivement sous contrôle du propriétaire. La V1 vise un modèle de langage créé localement, un RAG traçable, des agents logiques et une séparation stricte entre ingestion externe et connaissances internes, sans donner d'accès Internet à IA-CORE. Depuis D-034, deux voies sont distinctes : CORE-30M valide le pipeline d'entraînement CPU, sans objectif conversationnel, et l'agent de programmation repose sur un modèle tiers, Qwen2.5-Coder-7B, isolé sur un nœud physique séparé ; CORE-700M ne reçoit pas de palier long. Deux services MCP distincts constituent l'option candidate actuelle, encore soumise à audit.
 
-> État documentaire au 2026-09-26, contre `main` à `db9414d` : **socle expérimental contrôlé**. Le serveur de calcul est hors ligne depuis le 2026-09-14 environ ; le dernier relevé en direct date du 2026-09-09 et le dernier relevé versionné du 2026-09-10. Ce README décrit le code de `main` et ces relevés, pas un état d'exécution présent. Ce dépôt ne prétend pas fournir une plateforme de production. La reprise technique par un autre agent est décrite dans le [handoff public](docs/project/claude-code-handoff.md), sans exposer de détail d'accès.
+> État documentaire au 2026-09-27, contre `main` à `c0b169e` (registre jusqu'à D-042 ; depuis `db9414d`, le code n'a reçu que l'interrupteur D-035 et le contrôleur de disponibilité du NAS) : **phase 1, socle expérimental en service** (D-038). Les gates G0 à G8 et A0 à A8 restent ouverts. Le serveur de calcul est hors ligne depuis le 2026-09-14 environ ; le dernier relevé en direct date du 2026-09-09 et le dernier relevé versionné du 2026-09-10. Ce README décrit le code de `main` et ces relevés, pas un état d'exécution présent. Ce dépôt ne prétend pas fournir une plateforme de production. La reprise technique par un autre agent est décrite dans le [handoff public](docs/project/claude-code-handoff.md), sans exposer de détail d'accès.
 
 > **Au dernier relevé, l'interface privée servait le moteur BOOTSTRAP par
 > défaut.** Il fournissait les réponses exploitables ; l'agent de programmation
@@ -40,18 +40,21 @@ Relevés en direct jusqu'au 2026-09-09 et relevés versionnés jusqu'au
   Synology : 169 470 351 octets et 97 396 860 tokens estimés. Il n'est ni
   promu dans `VALIDATED`, ni approuvé, ni consommable par un entraînement ;
 - l'acquisition a révélé que TypeScript et Kubernetes dépassent à eux seuls le
-  format pilote. Un sous-échantillonnage déterministe d'environ 10 M tokens et
-  une approbation propriétaire restent obligatoires ;
+  format pilote. Un sous-échantillonnage déterministe versionné reste
+  obligatoire ; le pilote prévoyait environ 10 M tokens ;
 - depuis `6d959d7` (2026-09-08), le préflight tokenizer ne lit plus
   `configs/corpus/core-v1-source-policy.approved.json` : il exige un manifeste
   de corpus `VALIDATED` qui lie paquets, splits, empreintes et autorisations.
-  Ce changement n'a pas d'entrée au registre : **ratification par le
-  propriétaire en attente**.
+  D-039 ratifie ce changement : une version de corpus est autorisée dès
+  qu'une politique automatique versionnée et auditée produit ce manifeste,
+  sans approbation par version.
 
 Entre le 2026-09-10 et le 2026-09-13, `main` a reçu une arène d'agents, des
 outils de chat, des profils sélectionnables, le dépôt de documents avec OCR et
 une recherche hybride par embeddings. Aucun relevé versionné n'atteste leur
-déploiement et plusieurs dépendent d'un choix absent du registre ; voir la
+déploiement. `AGENTS.md` range la plupart de ces composants parmi ceux en
+service sans décision au registre, à régulariser par le propriétaire avant
+toute extension ; voir la
 [matrice des capacités](docs/project/current-capabilities.md).
 
 ## Utiliser le système
@@ -71,9 +74,13 @@ conversation ne donne aucun accès implicite aux fichiers du Synology, à un
 shell, à Proxmox ou à des outils MCP larges. Le code de `main` raccorde au chat
 des outils en lecture seule et des actions (`run_python` en bac à sable,
 `write_file` dans un espace de travail) soumises à une confirmation humaine à
-usage unique ; ces capacités n'ont pas d'entrée au registre et leur
-déploiement n'est pas consigné. Toute action sensible doit être proposée
-précisément puis confirmée par un humain.
+usage unique ; leur déploiement n'est pas consigné. La boucle d'outils est à
+régulariser selon `AGENTS.md`. D-035 place les deux actions derrière
+l'interrupteur `SOVEREIGN_ACTIONS_ENABLED`, désactivé par défaut ; le code de
+`main` l'implémente depuis `c0b169e`, sans déploiement consigné, et
+l'installation en service garde son comportement antérieur jusqu'à ce
+déploiement. Leur réactivation exige une décision distincte. Toute action sensible doit être proposée précisément puis
+confirmée par un humain.
 
 ### Moteurs de l'interface
 
@@ -82,7 +89,7 @@ Le tableau suit `engines()` de `services/web/app.py` et les libellés de
 
 | Moteur (`engine`) | Libellé affiché | État dans le code et preuves | Usage à retenir |
 | --- | --- | --- | --- |
-| `BOOTSTRAP` | « CHAT-14B · Qwen2.5-14B local » | Moteur par défaut. Le dépôt ne verrouille que Qwen2.5-1.5B (`configs/runtime/bootstrap-qwen2.5-1.5b-q4km.lock.json`, unité `infra/bootstrap-chat/` avec `--no-agent`), vérifié en direct au 2026-09-09. Le libellé 14B (`9b31b41`) n'a ni lock, ni licence, ni unité versionnée, ni entrée au registre : **décision du propriétaire en attente**. D-024 exclut outil, agent et RAG pour BOOTSTRAP, alors que le code y raccorde la boucle d'outils. | Conversation courante. Modèle tiers, jamais présenté comme CORE. |
+| `BOOTSTRAP` | « CHAT-14B · Qwen2.5-14B local » | Moteur par défaut. Le dépôt ne verrouille que Qwen2.5-1.5B (`configs/runtime/bootstrap-qwen2.5-1.5b-q4km.lock.json`, unité `infra/bootstrap-chat/` avec `--no-agent`), vérifié en direct au 2026-09-09. Le libellé 14B (`9b31b41`) n'a ni lock, ni licence, ni unité versionnée, ni entrée au registre : composant à régulariser selon `AGENTS.md`, **décision du propriétaire en attente**. D-024 exclut outil, agent et RAG pour BOOTSTRAP, alors que le code y raccorde la boucle d'outils. | Conversation courante. Modèle tiers, jamais présenté comme CORE. |
 | `QWEN-CODER` | « Qwen Coder · programmation locale » | Promu par le propriétaire le 2026-09-10 (D-034, ADR-0005) ; relevés `configs/runtime/qwen2.5-coder-7b-q4km.promotion.json` et `docs/operations/qwen-conversation-fix.md`. Disponible seulement si `SOVEREIGN_QWEN_TOKEN` est configuré ; sinon la passerelle répond 503. | Programmation ; moteur des profils de la famille `development`. |
 | `CORE-700M` | « CORE-700M expérimental » | Raccordé en expérimental ; disponible seulement si son checkpoint et sa provenance sont validés. Voie archivée par D-034 : aucun palier long. | Diagnostic de raccordement uniquement ; ne pas l'employer pour des réponses utiles. |
 
@@ -104,32 +111,40 @@ vers `VALIDATED`, ni ajoutées aux poids.
 ```text
 Internet autorisé (acquisition ponctuelle)
         -> RAW Synology : 10 archives, 169.47 MB
-        -> revue propriétaire + sous-échantillon déterministe
-        -> manifeste approuvé avec SHA-256
-        -> VALIDATED
-        -> tokenizer / entraînement CORE
+        -> plan d'échantillonnage déterministe versionné
+        -> politique automatique versionnée et auditée (D-039)
+        -> manifeste VALIDATED avec SHA-256
+        -> tokenizer / entraînement CORE, après contrat et gate acceptés
 ```
 
 Le premier relevé dépasse volontairement le plafond pilote : 97.4 M tokens
 estimés au lieu d'environ 10 M, dont seulement 0.42 % de français. Ce constat
 est utile : il interdit de présenter ce lot comme le corpus final ou comme un
-corpus français-technique équilibré. TypeScript et Kubernetes devront être
-bornés par une règle de sélection reproductible avant toute approbation.
+corpus français-technique équilibré. D-041 vise environ 40 % de français
+technique : des sources françaises sous licence admise doivent être acquises
+par le flux contrôlé. TypeScript et Kubernetes devront être bornés par une
+règle de sélection reproductible avant toute version de corpus.
 
 ## Ce qui bloque volontairement la suite
 
-1. Le propriétaire choisit et approuve un sous-échantillon déterministe proche
-   de 10 M tokens, avec une proportion FR/EN cible explicite.
-2. Le changement de gate `6d959d7` attend une décision du propriétaire :
-   ratification ou retour à `approved.json`. Depuis `6d959d7`, le préflight
-   exige un manifeste `VALIDATED` avec empreintes
-   ([gate corpus et tokenizer](docs/model/corpus-and-tokenizer-gate.md)) et ne
-   lit plus `core-v1-source-policy.approved.json`, que seul le propriétaire
-   pourrait commiter. Ce remplacement n'a pas d'entrée au registre. Ce README
-   ne tranche pas si le catalogue de 10 sources et les incréments
-   synthétiques de l'arène exigent encore ce fichier, comme l'indique le §4 de
-   la [spécification d'auto-entraînement](docs/model/self-training-loop-spec.md).
-3. Le gate G4, benchmark CPU/NUMA reproductible, reste ouvert : aucune durée
+1. La part d'environ 40 % de français technique fixée par D-041 n'est pas
+   atteignable avec le catalogue RAW actuel : il faut acquérir des sources
+   françaises sous licence admise par le flux contrôlé, puis répartir le reste
+   entre code et anglais technique par un plan d'échantillonnage déterministe
+   versionné.
+2. D-039 ratifie `6d959d7` : le préflight exige un manifeste `VALIDATED` avec
+   empreintes ([gate corpus et tokenizer](docs/model/corpus-and-tokenizer-gate.md))
+   et ne lit plus `core-v1-source-policy.approved.json` ; une version de
+   corpus est autorisée dès qu'une politique automatique versionnée et auditée
+   produit ce manifeste. Cette politique n'est pas désignée dans le dépôt et
+   doit être livrée par PR revue. D-040 admet les incréments synthétiques de
+   l'arène générés par Qwen2.5-Coder, dans la limite de 20 % des tokens d'une
+   version de corpus, et demande l'alignement des validateurs :
+   `tools/validate_training_corpus_manifest.py` refuse encore ce matériau.
+3. D-042 : le tokenizer sera réentraîné sur le corpus final, avec le même
+   vocabulaire de 32 000, 4 tokens spéciaux et un contexte de 2 048, puis
+   accepté sur métriques mesurées.
+4. Le gate G4, benchmark CPU/NUMA reproductible, reste ouvert : aucune durée
    d'entraînement n'est annoncée. Son périmètre après D-034 reste à préciser
    par le propriétaire.
 
@@ -141,7 +156,7 @@ contourner le préflight. Un refus de gate est le comportement attendu.
 - aucun GPU, CUDA, ROCm ou TPU dans le chemin V1 ;
 - calcul principal sur le **HPE ProLiant ML350 Gen9**, CPU-only, sous Proxmox ; l'inventaire mesuré et les divergences avec la fiche initiale restent suivis séparément ;
 - **Synology RS3617xs+** : stockage long terme, archives, datasets, modèles validés, checkpoints importants, connaissances et sauvegardes — pas d'entraînement principal ;
-- **DL380p Gen8** : D-006, qui l'excluait de la V1, est SUPERSEDED par D-034. Aucune fonction CORE ni aucun entraînement ne lui est confié ; le relevé de promotion du 2026-09-10 y place l'agent de programmation Qwen-Coder, nœud physique séparé au sens de D-034. `AGENTS.md` indique encore « Le DL380p Gen8 ne reçoit aucun service V1 » : cette ligne contredit D-034 et attend sa modification par le propriétaire, seul à éditer ce fichier ;
+- **DL380p Gen8** : D-006, qui l'excluait de la V1, est SUPERSEDED par D-034. Aucune fonction CORE ni aucun entraînement ne lui est confié ; le relevé de promotion du 2026-09-10 y place l'agent de programmation Qwen-Coder, nœud physique séparé au sens de D-034, sans privilège d'administration du cluster ;
 - la future zone **IA-CORE ne doit avoir aucun accès Internet direct** ; le blocage réseau et son test négatif restent un gate obligatoire, distinct des refus applicatifs déjà codés ;
 - toute donnée externe est non fiable et entre par un collecteur, une quarantaine, une validation, puis un import contrôlé ;
 - une recherche brute n'est jamais automatiquement une connaissance validée ;
@@ -266,9 +281,11 @@ Les variables `SOVEREIGN_*` lues par la passerelle Web sont décrites, avec
 leurs valeurs par défaut, dans [services/web/README.md](services/web/README.md) ;
 celles des composants de connaissance dans
 [services/knowledge/README.md](services/knowledge/README.md). La variable
-`SOVEREIGN_ACTIONS_ENABLED`, annoncée par un message de commit, n'existe pas
-dans le code. Les approbations de paquets, de profils et d'incréments de corpus
-sont des fichiers JSON non signés.
+`SOVEREIGN_ACTIONS_ENABLED` (D-035, `c0b169e`) laisse les actions du chat
+désactivées sauf valeur exacte `1`. D-036 décide de sortir du dépôt les
+adresses et identifiants internes que le code contient encore, vers une
+configuration privée hors Git installée avant le déploiement du code
+correspondant.
 
 ## Commencer correctement
 
@@ -276,7 +293,7 @@ sont des fichiers JSON non signés.
    Pour reprendre avec un autre agent, consulter aussi le
    [handoff Claude Code](docs/project/claude-code-handoff.md).
 2. Consulter la [matrice des capacités](docs/project/current-capabilities.md) et le niveau de preuve de chaque ligne ; au retour du serveur, relever l'état installé avant toute nouvelle affirmation.
-3. Revoir le catalogue RAW et approuver explicitement un sous-échantillon ; la forme de l'approbation d'entraînement attend la ratification du propriétaire.
+3. Constituer le corpus selon D-039 (politique automatique versionnée), D-040 (incréments synthétiques plafonnés) et D-041 (environ 40 % de français technique), puis réentraîner le tokenizer selon D-042.
 4. Valider la topologie réseau, les flux, le stockage, l'identité, les sauvegardes et les politiques de données.
 5. Mesurer le ML350 : CPU, RAM, NUMA, disque, threads et tokens/seconde sur un mini-modèle.
 6. Produire les ADR et figer une pile minimale avant toute implémentation de production.
@@ -288,7 +305,8 @@ Le code de `main` contient un client en boucle locale pour
 Qwen3-Embedding-0.6B et une recherche hybride SQLite avec repli lexical
 (`d7cc78c`) : **code présent, déploiement non vérifié**. Aucun lock, licence ni
 empreinte de ce modèle n'est versionné et aucune entrée du registre ne le
-désigne : décision du propriétaire en attente. Le reranker et le moteur d'index
+désigne : composant à régulariser selon `AGENTS.md`, décision du propriétaire
+en attente. Le reranker et le moteur d'index
 restent à valider par benchmark (P-004). SMB est utilisé pour les essais de
 stockage actuels ; son rôle définitif reste soumis à décision. Les options
 devront être comparées sur les contraintes réelles, puis consignées dans le
@@ -317,4 +335,4 @@ Voir [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Aucune licence n'est ajoutée tant que le propriétaire n'a pas choisi les droits
 de réutilisation. L'absence de licence signifie qu'aucun droit de réutilisation
-n'est accordé implicitement ; ce choix reste à traiter pendant la découverte.
+n'est accordé implicitement ; ce choix reste à traiter par le propriétaire.

@@ -2,14 +2,17 @@
 
 - Statut : **PROPOSÉ**. Aucune étape n'a été exécutée : chacune est **à
   exécuter, non mesuré**.
-- Rédaction : 2026-09-26, contre `main` à `db9414d`, serveur de calcul hors
-  ligne depuis le 2026-09-14 environ. Dernier relevé en direct : 2026-09-09 ;
-  dernier relevé versionné : 2026-09-10.
+- Rédaction : 2026-09-26, mise à jour le 2026-09-27 contre `main` à `c0b169e`
+  (registre jusqu'à D-042, phase 1 selon D-038, interrupteur D-035 et
+  contrôleur de disponibilité du NAS sur `main`, non déployés), serveur de
+  calcul hors ligne depuis le 2026-09-14 environ. Dernier relevé en direct :
+  2026-09-09 ; dernier relevé versionné : 2026-09-10.
 - Portée : ce document ordonne tous les travaux qui exigent le matériel réel,
-  recensés par le tri de la phase 0 du 2026-09-26. Il ne prend aucune décision
-  du propriétaire, n'autorise aucun déploiement et ne présente aucune mesure :
-  il décrit, pour chaque étape, ses prérequis et la preuve qu'elle doit
-  produire.
+  recensés par le tri du 2026-09-26, établi avant le passage en phase 1. Il ne
+  prend aucune décision du propriétaire, n'autorise aucun déploiement et ne
+  présente aucune mesure : il décrit, pour chaque étape, ses prérequis et la
+  preuve qu'elle doit produire. Il applique les règles « Exploitation de
+  l'infrastructure » d'`AGENTS.md`.
 
 ## Pourquoi cet ordre
 
@@ -47,6 +50,13 @@
    - toutes les autres étapes restent en lecture seule sur l'état installé et
      n'écrivent que leurs relevés et preuves, ainsi que le lock candidat de
      l'étape 3.
+
+   Après cette fenêtre, une reprise de calcul suit `AGENTS.md` : stockage
+   durable vérifié au préalable selon
+   [le runbook de préparation du Synology](synology-restart-readiness.md) et
+   son contrôleur en lecture seule `tools/check_synology_readiness.py` ;
+   calcul en cours laissé à sa fin, jamais interrompu pour une opération de
+   confort.
 2. **Aucun réseau nouveau.** Aucun port ouvert, aucun appel à un fournisseur,
    aucun téléchargement. Les tests du dépôt s'exécutent sans réseau.
 3. **Expurgation.** Les relevés versionnés ne contiennent ni adresse IP, ni nom
@@ -69,12 +79,19 @@
 ## Avant le redémarrage : question au propriétaire
 
 Au redémarrage, les services activés peuvent reprendre d'eux-mêmes : démon de
-l'arène, service périodique de promotion du corpus (toutes les deux minutes,
-en root, sur des approbations JSON non signées) et, selon son état, la bascule
-« chat rapide ». **Décision du propriétaire** : les laisser reprendre, ou les
+l'arène, service périodique de promotion des incréments et, selon son état, la
+bascule « chat rapide ». L'arène et la boucle d'auto-entraînement figurent
+parmi les composants à régulariser d'`AGENTS.md` ; le détail de leurs écarts
+reste hors dépôt. **Décision du propriétaire** : les laisser reprendre, ou les
 garder arrêtés jusqu'à la fin des étapes 1 et 4. Proposition, **PROPOSÉ** et
-non décidée : les garder arrêtés, pour que le relevé décrive l'état figé et
-qu'aucun paquet ne soit produit sur la suite par défaut avant l'audit.
+non décidée : garder arrêtés l'arène et la promotion périodique jusqu'au
+relevé, pour qu'il décrive l'état figé et qu'aucun paquet ne soit produit sur
+la suite par défaut avant l'audit.
+
+D-035 accepte que la passerelle installée garde son comportement actuel pour
+`run_python` et `write_file` jusqu'au déploiement de l'interrupteur
+`SOVEREIGN_ACTIONS_ENABLED`, présent sur `main` depuis `c0b169e` ; ce runbook
+ne propose donc aucun arrêt à ce titre.
 
 ## Vue d'ensemble
 
@@ -90,7 +107,7 @@ qu'aucun paquet ne soit produit sur la suite par défaut avant l'audit.
 | 8 | Tests réseau négatifs (issue #4) | 1 | à exécuter, non mesuré |
 | 9 | Inventaire interne du ML350 (issue #2) | 1 | à exécuter, non mesuré |
 | 10 | Protocole NUMA étendu (G4) | 5, 6, 9 | à exécuter, non mesuré |
-| 11 | Évaluation du tokenizer | 2 | à exécuter, non mesuré |
+| 11 | Évaluation du tokenizer réentraîné (D-042) | 2, 13 | à exécuter, non mesuré |
 | 12 | Benchmark de recherche au volume réel | 3, 7 | à exécuter, non mesuré |
 | 13 | Split par paquet et sous-échantillon du catalogue RAW | 2 | à exécuter, non mesuré |
 | 14 | Évaluations de référence des moteurs | 1, 2, 4 | à exécuter, non mesuré |
@@ -123,7 +140,8 @@ Actions, en lecture seule :
   l'auto-test du bac à sable sous l'unité réellement installée, qui confirme ou
   infirme l'HYPOTHÈSE `PrivateDevices`/`AF_NETLINK` ;
 - valeurs effectives de `SOVEREIGN_ARENA_SUITE` pour l'arène et de
-  `SOVEREIGN_TOOLS_ENABLED` pour la passerelle. Une suite est rapportée au
+  `SOVEREIGN_TOOLS_ENABLED` pour la passerelle ; si le code de `c0b169e` est
+  installé, état `actions_enabled` exposé par `GET /v1/health`. Une suite est rapportée au
   fichier du dépôt dont elle porte l'empreinte SHA-256, jamais par son chemin
   d'hôte ;
 - nombre de paquets de l'arène par état, nombre d'incréments RAW et
@@ -163,6 +181,11 @@ Preuve attendue : un résumé daté (nombre de tests, échecs, erreurs, sauts et
 leur cause) qui remplace les comptes tirés des messages de commit et les
 exécutions Windows non représentatives. Aucun fichier ne subsiste hors des
 dossiers temporaires.
+
+L'intégration continue hébergée décidée par D-037, pas encore versionnée,
+exécute la même suite sur un runner Linux générique ; elle ne remplace pas
+cette étape, qui vérifie la suite sur le nœud de calcul avec `bwrap`, NumPy et
+le bundle PyTorch hors ligne réellement installés.
 
 ### Étape 3 — Relecture du modèle d'embeddings et lock
 
@@ -244,8 +267,9 @@ Prérequis :
 - étape 1, pour l'état de la bascule « chat rapide » ;
 - sections de métriques système du protocole G4, au statut PROVISOIRE,
   fusionnées dans `docs/model/core-mini-numa-protocol.md` ;
-- hôte au repos : CORE-30M, agent de programmation, moteur de chat et arène
-  arrêtés, avec l'**accord du propriétaire** pour ces arrêts.
+- hôte au repos : aucun calcul en cours, un calcul en cours étant laissé à sa
+  fin (`AGENTS.md`, « Exploitation ») ; agent de programmation, moteur de
+  chat et arène arrêtés, avec l'**accord du propriétaire** pour ces arrêts.
 
 Actions : dans l'invité CORE non privilégié, sur un processus synthétique,
 vérifier la lisibilité et la plausibilité de `getrusage` (`ru_maxrss`, temps
@@ -361,20 +385,30 @@ métriques système présentes et plausibles. Aucune durée n'est publiée sans
 approbation de l'extrapolation ; G4 n'est fermé que par une décision du
 propriétaire.
 
-### Étape 11 — Évaluation du tokenizer
+### Étape 11 — Évaluation du tokenizer réentraîné (D-042)
 
 Statut : **à exécuter, non mesuré**.
 
-Prérequis : étape 2 ; `tools/evaluate_tokenizer.py` et
-`docs/model/tokenizer-experiments-protocol.md` fusionnés sur `main`.
+Prérequis :
 
-Actions : en lecture seule, sur les splits validation et test de pilote-v3,
-évaluer les artefacts candidats et leurs variantes de vocabulaire, en deux
-exécutions.
+- étape 2 ; `tools/evaluate_tokenizer.py` et
+  `docs/model/tokenizer-experiments-protocol.md` fusionnés sur `main` ;
+- corpus final issu de l'étape 13 et de sa version autorisée selon D-039 ;
+- tokenizer réentraîné sur ce corpus, produit avant cette étape par un outil
+  fusionné sur `main` : D-042 décide ce réentraînement, avec vocabulaire de
+  32 000, 4 tokens spéciaux et contexte de 2 048, plutôt que de conserver le
+  candidat entraîné sur 44 documents.
+
+Actions : en lecture seule, sur les splits de validation et de test du corpus
+final, évaluer le tokenizer réentraîné, avec le candidat actuel comme
+référence, en deux exécutions ; mesurer les métriques d'acceptation de D-042 :
+octets par token et tokens par mot en français, en anglais et en code, et
+aller-retour exact.
 
 Preuve attendue : rapport haché, identique sur les deux exécutions ; seules
-les métriques et les empreintes sont publiées, sans contenu de corpus ; aucun
-seuil n'est décidé, ce choix relevant du gate G3.
+les métriques et les empreintes sont publiées, sans contenu de corpus.
+L'acceptation sur ces métriques relève du propriétaire ; la lignée CORE-30M
+reste attachée à l'ancien tokenizer.
 
 ### Étape 12 — Benchmark de recherche au volume réel
 
@@ -395,16 +429,28 @@ extrapolation présentée comme mesure.
 
 Statut : **à exécuter, non mesuré**.
 
-Prérequis : étape 2 ; `tools/build_package_level_splits.py` et
-`tools/plan_corpus_subsample.py` fusionnés sur `main` ; **décisions du
-propriétaire** du gate G3 sur les proportions du corpus et la politique de
-traitement.
+Prérequis :
+
+- étape 2 ; `tools/build_package_level_splits.py` et
+  `tools/plan_corpus_subsample.py` fusionnés sur `main` ;
+- décidé au registre : D-041 fixe la cible d'environ 40 % de français
+  technique, le reste réparti entre code et anglais technique par un plan
+  d'échantillonnage déterministe versionné ; D-039 remplace l'approbation par
+  version par une politique automatique versionnée et auditée, qui doit être
+  fusionnée sur `main` ; D-040 plafonne le synthétique de l'arène à 20 % des
+  tokens d'une version ;
+- sources françaises sous licence admise acquises par le flux contrôlé
+  (D-041) : le catalogue RAW actuel n'en contient que 0,42 % ;
+- **décisions du propriétaire** encore ouvertes du gate G3 : politique de
+  traitement (split par paquet, quasi-doublons, données personnelles,
+  identification de langue) et taille du sous-échantillon.
 
 Actions : appliquer le split et le plan au catalogue RAW, du stockage durable
 vers le nœud de calcul, sans écriture dans RAW ni VALIDATED.
 
-Preuve attendue : manifeste candidat `pending_owner_approval` avec empreintes
-par split et fuite de holdout nulle. Aucun entraînement n'est lancé.
+Preuve attendue : manifeste candidat avec empreintes par split et fuite de
+holdout nulle, soumis à la politique automatique de D-039 ; aucune décision de
+cette politique n'est simulée à la main. Aucun entraînement n'est lancé.
 
 ### Étape 14 — Évaluations de référence des moteurs
 
@@ -451,10 +497,13 @@ Prérequis :
 - **décision du propriétaire** sur la politique d'ingress : rejet ou
   signalement par catégorie de secret, et contrat des conversations ;
 - scanner de secrets fusionné, puis raccordé après cette décision en
-  coordination avec Codex.
+  coordination avec Codex ;
+- si le code à déployer met en œuvre D-036, configuration privée hors Git
+  installée et vérifiée avant le déploiement ; sans elle, le service doit
+  refuser de démarrer.
 
-Actions : déployer par archive versionnée, puis vérifier de bout en bout avec
-des entrées synthétiques.
+Actions : déployer par archive versionnée, avec l'accord du propriétaire,
+puis vérifier de bout en bout avec des entrées synthétiques.
 
 Preuve attendue : réponse 422 pour chaque classe de secret synthétique, aucun
 fichier RAW pour un corps rejeté, `already_imported` au renvoi, révision
@@ -466,7 +515,8 @@ Statut : **à exécuter, non mesuré**.
 
 Prérequis : étape 8b, avec les flux F0 et F1 dans la matrice approuvée ;
 ADR-0006 accepté par le propriétaire ; politique d'URL statique fusionnée sur
-`main`.
+`main` ; pour tout code déployé qui met en œuvre D-036, configuration privée
+hors Git installée avant lui.
 
 Actions : pour le composant qui déréférence les URL, épinglage du résolveur,
 défense contre le rebinding DNS, politique de redirection, proxy de sortie et
@@ -478,7 +528,19 @@ route de la Gateway ou du collecteur vers IA-CORE, perte de la Gateway sans
 ouverture d'Internet pour IA-CORE ; résultats consignés contre le cas d'abus
 T09 du modèle de menace.
 
-## Correspondance avec le tri de la phase 0
+## Déploiements décidés hors du tri
+
+Le code de D-035 (interrupteur `SOVEREIGN_ACTIONS_ENABLED`) est sur `main`
+depuis `c0b169e` ; celui de D-036 (configuration privée hors Git) ne l'est pas
+encore. Leur déploiement ne figure pas au tri et n'est pas ordonné ici. Il
+suit les mêmes règles que les étapes 16 et 17 : après les étapes 1 et 2, par
+archive versionnée de l'arborescence complète, avec l'accord du propriétaire,
+et configuration privée installée avant le code qui l'exige. Pour D-035,
+`infra/gateway/README.md` décrit la vérification attendue après
+redémarrage ; une fois ce code déployé, les actions sont coupées sauf
+décision distincte.
+
+## Correspondance avec le tri du 2026-09-26
 
 Chaque travail matériel du tri figure une seule fois :
 
@@ -494,7 +556,7 @@ Chaque travail matériel du tri figure une seule fois :
 | Issue #4 : matrice des flux réelle, tests négatifs après démarrage, restauration et changement | 8 |
 | Issue #2 : inventaire ML350, NUMA/DIMM et RAM visible par nœud | 9 |
 | Protocole NUMA étendu et clôture de G4 | 10 |
-| Évaluation du tokenizer sur pilote-v3 | 11 |
+| Évaluation du tokenizer, recentrée par D-042 sur le tokenizer réentraîné | 11 |
 | Benchmark de recherche au volume réel et état du réencodage | 12 |
 | Split par paquet et sous-échantillon appliqués au catalogue RAW | 13 |
 | Évaluations de référence E0/E1/E2, cas d'usage et sûreté | 14 |

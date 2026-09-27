@@ -1,7 +1,8 @@
 # Interface Web interne
 
-> Mise à jour documentaire du 2026-09-26, contre `main` à `db9414d`. Ce
-> document décrit le code de la passerelle, pas l'état installé : le serveur de
+> Mise à jour documentaire du 2026-09-27, contre `main` à `c0b169e`
+> (interrupteur D-035 inclus, registre jusqu'à D-042). Ce document décrit le
+> code de la passerelle, pas l'état installé : le serveur de
 > calcul est hors ligne et le dernier relevé en direct date du 2026-09-09. Le
 > niveau de preuve de chaque capacité figure dans
 > [`docs/project/current-capabilities.md`](../../docs/project/current-capabilities.md).
@@ -35,15 +36,18 @@ encore `QWEN-CODER`.
 
 | Moteur | Client | Condition d'emploi | Remarque |
 | --- | --- | --- | --- |
-| `BOOTSTRAP` | `bootstrap_client.py` : HTTP loopback seulement, sans proxy ni redirection | Toujours tenté ; moteur par défaut | L'interface et `/sante` le libellent « CHAT-14B · Qwen2.5-14B », alors que le dépôt ne verrouille que Qwen2.5-1.5B (lock et unité avec `--no-agent`). Aucun lock, licence, unité ni entrée du registre pour un 14B : décision du propriétaire en attente. |
+| `BOOTSTRAP` | `bootstrap_client.py` : HTTP loopback seulement, sans proxy ni redirection | Toujours tenté ; moteur par défaut | L'interface et `/sante` le libellent « CHAT-14B · Qwen2.5-14B », alors que le dépôt ne verrouille que Qwen2.5-1.5B (lock et unité avec `--no-agent`). Aucun lock, licence, unité ni entrée du registre pour un 14B : composant à régulariser selon `AGENTS.md`, décision du propriétaire en attente. |
 | `QWEN-CODER` | `qwen_client.py` : point d'accès privé épinglé par égalité exacte | `SOVEREIGN_QWEN_TOKEN` d'au moins 32 caractères ; sinon le moteur est « non configuré » et la route répond 503 | Promu le 2026-09-10 (D-034, ADR-0005). |
 | `CORE-700M` | `core_client.py` : point d'accès privé épinglé par égalité exacte | `SOVEREIGN_CORE_TOKEN` d'au moins 32 caractères ; sinon moteur indisponible | Expérimental ; voie archivée par D-034, aucun palier long. |
 
-L'épinglage des clients CORE et Qwen est un contrôle de sécurité : toute autre
-valeur de `SOVEREIGN_CORE_ENDPOINT` ou `SOVEREIGN_QWEN_ENDPOINT` fait échouer
-le démarrage de la passerelle. Les valeurs épinglées sont des adresses privées
-codées dans le client ; elles ne sont pas recopiées ici et leur présence dans
-le dépôt public attend un arbitrage du propriétaire.
+L'épinglage des clients CORE et Qwen est un contrôle de sécurité. Lorsque le
+jeton correspondant est fourni (au moins 32 caractères), toute autre valeur de
+`SOVEREIGN_CORE_ENDPOINT` ou `SOVEREIGN_QWEN_ENDPOINT` fait échouer le
+démarrage de la passerelle ; sans ce jeton, la variable n'est pas lue et le
+moteur reste indisponible ou non configuré. Les valeurs épinglées sont des
+adresses privées codées dans le client, non recopiées ici. D-036 décide de les
+sortir du dépôt vers une configuration privée hors Git, avec échec fermé et
+épinglage exact conservé ; ce code n'est pas encore livré.
 
 ## Connaissances, documents et embeddings
 
@@ -58,20 +62,23 @@ modèle comme des données non exécutables.
   lexical. Le client d'embeddings n'accepte que la boucle locale avec un port
   explicite. D-028 autorise un petit moteur d'embeddings sous réserve de
   licence et d'empreinte vérifiées, mais aucun lock de Qwen3-Embedding-0.6B
-  n'est versionné : décision du propriétaire en attente. Le champ `rag_mode`
+  n'est versionné : composant à régulariser selon `AGENTS.md`, décision du
+  propriétaire en attente. Le champ `rag_mode`
   de `/v1/session` et des métadonnées de flux reste fixé à `lexical` (ou
   `tools`), même quand la recherche est hybride.
 - **Documents partagés** (`010706c`, `5c917de`, code seul) : `POST
   /v1/documents` accepte au plus 25 Mio. L'original est conservé sous
   `SOVEREIGN_DOCUMENTS_DIR`. Le texte est extrait en Python pour le texte et le
   `.docx`, et par sous-processus `pdftotext`/`pdftoppm` (poppler) et
-  `tesseract` pour le PDF et l'OCR, **sans bac à sable**. La présence de ces
-  outils sur le serveur n'est pas consignée. `POST /v1/documents/analyze`
-  produit une analyse map-reduce bornée à 30 passages.
+  `tesseract` pour le PDF et l'OCR. La présence de ces outils sur le serveur
+  n'est pas consignée. `POST /v1/documents/analyze` produit une analyse
+  map-reduce bornée à 30 passages.
 - **Frontière de confiance** : les passages déposés entrent par
   `HybridKnowledgeIndex.upsert_validated` dans la même table que le manifeste
-  approuvé, sans trace d'approbation. C'est en tension avec « `RAW` n'est pas
-  `VALIDATED` » ; sans décision au registre.
+  approuvé. Sans décision au registre : `AGENTS.md` range l'analyse et le
+  téléversement de documents parmi les composants à régulariser, et leur
+  niveau de confiance comme l'isolement des extracteurs relèvent du
+  propriétaire.
 
 ## Outils et actions du chat
 
@@ -82,28 +89,35 @@ modèle comme des données non exécutables.
   seulement sur `BOOTSTRAP`, en réponse `text/event-stream`, et tant que
   `SOVEREIGN_TOOLS_ENABLED` n'est pas désactivé. Elle exige un serveur
   llama.cpp lancé avec `--jinja`, dont l'unité n'est pas versionnée. D-024
-  exclut outil, agent et RAG pour BOOTSTRAP ; sans décision au registre.
+  exclut outil, agent et RAG pour BOOTSTRAP ; sans décision au registre, à
+  régulariser selon `AGENTS.md`.
 - **Actions** (`04473fe`, `3410b36`, code seul) : `run_python` dans le bac à
   sable bwrap et `write_file` dans l'espace de travail. Le modèle ne fait que
   proposer ; rien ne s'exécute avant une confirmation humaine à usage unique
   par `POST /v1/chat/confirm`. Une proposition en attente expire après
   15 minutes et 100 au plus sont conservées. Les fichiers produits sont listés
   par `GET /v1/workspace` et téléchargeables par `GET /v1/workspace/<chemin>`.
-- **Interrupteurs réels.** La variable `SOVEREIGN_ACTIONS_ENABLED`, annoncée
-  par le message de `04473fe`, **n'existe pas** : `actions_enabled` est une
-  valeur par défaut codée à `True` dans `WebState`, jamais lue depuis
-  l'environnement. Les actions dépendent en réalité de trois conditions :
-  1. `SOVEREIGN_TOOLS_ENABLED`, qui coupe toute la boucle d'outils, actions
+- **Interrupteur D-035** (`c0b169e`, code seul, non déployé) : les actions
+  sont désactivées par défaut et ne s'activent qu'avec
+  `SOVEREIGN_ACTIONS_ENABLED=1` ; détail dans la section « Actions du chat »
+  plus bas. D-035 accepte que l'installation en service garde son
+  comportement antérieur jusqu'au déploiement de ce code ; leur réactivation
+  exige une décision distincte.
+- **Conditions dans le code.** Une action n'est offerte au modèle que si
+  toutes ces conditions sont réunies :
+  1. `SOVEREIGN_ACTIONS_ENABLED=1` au démarrage (D-035) ;
+  2. `SOVEREIGN_TOOLS_ENABLED`, qui coupe toute la boucle d'outils, actions
      comprises ;
-  2. l'auto-test du bac à sable : `run_python` n'est proposé que si une
-     exécution réelle réussit, verdict mis en cache ;
-  3. le dossier de travail : `write_file` est proposé dès qu'un dossier est
-     configuré, ce que `main()` fait toujours.
+  3. pour `run_python`, l'auto-test du bac à sable : l'action n'est proposée
+     que si une exécution réelle réussit, verdict mis en cache ; interrupteur
+     coupé, cet auto-test n'est pas lancé ;
+  4. pour `write_file`, un dossier de travail configuré, ce que `main()` fait
+     toujours.
 - **HYPOTHÈSE à vérifier sur le serveur** : l'unité versionnée
   `infra/gateway/sovereign-gateway-web.service` garde `PrivateDevices=yes` et
   n'autorise pas `AF_NETLINK`, contrairement à l'unité de l'arène qui les
-  écarte pour bwrap ; sous cette unité, l'auto-test échouerait et `run_python`
-  ne serait pas proposé.
+  écarte pour bwrap ; interrupteur activé, l'auto-test échouerait sous cette
+  unité et `run_python` ne serait pas proposé.
 
 ## Profils
 
@@ -113,9 +127,10 @@ le chat. Le moteur suit la famille : `development` utilise `QWEN-CODER` (10
 profils), les autres `BOOTSTRAP` avec boucle d'outils (49 profils). Les gates
 d'évaluation par profil ne sont pas appliqués ; seul le commentaire de
 `catalog_profiles.py` l'attribue à un choix du propriétaire, et le registre
-garde les 60 profils en `draft` : sans décision au registre. La description du
-profil `coordination` dans `app.py` affirme encore que les profils du
-catalogue restent désactivés, ce que le code contredit.
+garde les 60 profils en `draft` : sans décision au registre, à régulariser
+selon `AGENTS.md`. La description du profil `coordination` dans `app.py`
+affirme encore que les profils du catalogue restent désactivés, ce que le
+code contredit.
 
 ## Arène et corpus
 
@@ -128,14 +143,15 @@ catalogue restent désactivés, ce que le code contredit.
   2 minutes) vérifie l'identifiant, l'empreinte du contenu et la présence d'un
   approbateur, puis promeut l'incrément RAW vers VALIDATED en reportant son
   plafond de part synthétique, 20 % par défaut. La passerelle n'écrit jamais le
-  corpus et rien ne déclenche d'entraînement.
-- **Les approbations ne sont pas signées.** Ce sont des fichiers JSON
-  (`schema_version`, `kind`, `target_id`, `target_sha256` le cas échéant,
-  `approved_by` issu de la session, `approved_at`) créés en exclusif avec le
-  mode `0640`, sans signature ni HMAC. Les docstrings d'`app.py` les
-  qualifient de « signed » à tort. Leur confiance repose sur les permissions
-  des répertoires de dépôt, et l'unité de l'applicateur ne fixe pas `User=`,
-  donc s'exécute en root : sans décision au registre.
+  corpus et rien ne déclenche d'entraînement. D-040 plafonne le synthétique à
+  20 % des tokens d'une version de corpus et n'admet que le code généré par
+  Qwen2.5-Coder ; les validateurs de corpus ne sont pas encore alignés sur
+  cette règle.
+- **Format des approbations.** Ce sont des fichiers JSON (`schema_version`,
+  `kind`, `target_id`, `target_sha256` le cas échéant, `approved_by` issu de la
+  session, `approved_at`) créés en exclusif avec le mode `0640`. Leur modèle
+  de confiance relève de la régularisation de l'arène et de la boucle
+  d'auto-entraînement demandée par `AGENTS.md`.
 
 ## Interface et routes
 
@@ -177,6 +193,7 @@ sont celles du code ; `<état>` désigne la valeur de `SOVEREIGN_WEB_STATE`.
 | `SOVEREIGN_QWEN_ENDPOINT` | adresse privée épinglée, non recopiée | Toute autre valeur fait échouer le démarrage si le jeton Qwen est fourni. |
 | `SOVEREIGN_EMBED_ENDPOINT` | `http://127.0.0.1:8082` | Runtime d'embeddings en boucle locale ; une valeur vide désactive le client et laisse la recherche lexicale. |
 | `SOVEREIGN_TOOLS_ENABLED` | `1` | Boucle d'outils et actions ; désactivée seulement par `0`, `false`, `no` ou une valeur vide, sensible à la casse. |
+| `SOVEREIGN_ACTIONS_ENABLED` | absente : actions désactivées | Interrupteur D-035, lu une fois au démarrage ; seule la valeur exacte `1` active `run_python` et `write_file`. |
 | `SOVEREIGN_DOCUMENTS_DIR` | `<état>/documents` | Originaux et texte extrait des documents déposés ; créé au démarrage. |
 | `SOVEREIGN_WORKSPACE_DIR` | `<état>/workspace` | Espace de travail de `write_file` ; créé au démarrage. |
 | `SOVEREIGN_CORPUS_INBOX` | `<état>/corpus-inbox` | Dépôt des approbations d'incréments pour l'applicateur ; créé au démarrage. |
@@ -191,8 +208,7 @@ passerelle, défini par `CONTAINER_SHARE` dans
 `services/knowledge/corpus_paths.py`. `tools/reembed_validated_chunks.py` lit
 aussi `SOVEREIGN_WEB_STATE` et `SOVEREIGN_EMBED_ENDPOINT`, avec les mêmes
 défauts. Les variables propres au démon de l'arène (`SOVEREIGN_ARENA_SUITE`,
-etc.) ne sont pas lues par la passerelle. `SOVEREIGN_ACTIONS_ENABLED` n'existe
-pas.
+etc.) ne sont pas lues par la passerelle.
 
 ## Actions du chat : `SOVEREIGN_ACTIONS_ENABLED` (D-035)
 
