@@ -64,6 +64,11 @@ BACKUP_KINDS = (
 )
 BACKUP_MANIFEST_SCHEMAS = frozenset({"private-memory-backup.v1", "knowledge-index-backup.v1"})
 BACKUP_MANIFEST_KEYS = frozenset({"schema_version", "artifact", "sha256", "bytes"})
+# ``services/memory/durable_backup.py`` writes the manifest next to the
+# artifact, under the artifact name with ``.sqlite3`` replaced by ``.json``.
+BACKUP_ARTIFACT_SUFFIX = ".sqlite3"
+BACKUP_MANIFEST_SUFFIX = ".json"
+# Number of newest artifacts of each kind verified against their manifest.
 BACKUP_MANIFESTS_PER_KIND = 3
 SIDECAR_SUFFIX = ".sha256"
 SMALL_DOCUMENT_MAX_BYTES = 4096
@@ -114,6 +119,9 @@ REASON_SEVERITY = {
     "sha256_budget_exhausted": STATUS_ATTENTION,
     "sha256_backup_budget_exhausted": STATUS_NOT_READY,
     "sha256_nothing_to_verify": STATUS_ATTENTION,
+    "backup_manifest_missing": STATUS_NOT_READY,
+    "backup_manifest_unverifiable": STATUS_NOT_READY,
+    "backup_newest_unverified": STATUS_NOT_READY,
     "internal_error": STATUS_NOT_READY,
 }
 
@@ -235,7 +243,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--min-free-gib", type=_bounded_int(0, 1048576), default=100)
     parser.add_argument("--max-backup-age-hours", type=_bounded_int(1, 87600), default=24)
-    parser.add_argument("--verify-sha256", action="store_true", help="verify *.sha256 sidecars and recent backup manifests")
+    parser.add_argument(
+        "--verify-sha256",
+        action="store_true",
+        help="verify the newest backup artifacts of each kind against their manifest, then *.sha256 sidecars",
+    )
     parser.add_argument("--max-hash-files", type=_bounded_int(1, 100000), default=64)
     parser.add_argument("--max-hash-gib", type=_bounded_int(1, 16384), default=32)
     parser.add_argument("--max-entries", type=_bounded_int(1, 5000000), default=200000)
@@ -407,7 +419,10 @@ class _Walk:
             "kinds": {kind: {"files": 0, "newest": None} for kind, _ in BACKUP_KINDS},
         }
         self.sidecars = []
-        self.manifests = {kind: [] for kind, _ in BACKUP_KINDS}
+        # Recognised backup artifacts, as (mtime, directory, name, identity).
+        # Verification starts from the artifacts, never from the manifests:
+        # a fresh artifact whose manifest is missing must not pass as ready.
+        self.backup_artifacts = {kind: [] for kind, _ in BACKUP_KINDS}
 
     def _out_of_budget(self) -> bool:
         return self.entries >= self.options.max_entries or time.monotonic() > self.deadline
@@ -506,14 +521,12 @@ class _Walk:
                 bucket["files"] += 1
                 if bucket["newest"] is None or mtime > bucket["newest"]:
                     bucket["newest"] = mtime
+                if self.options.verify_sha256:
+                    self.backup_artifacts[kind].append((mtime, directory, name, _identity(metadata)))
         if not self.options.verify_sha256 or temporary:
             return
         if name.lower().endswith(SIDECAR_SUFFIX) and len(name) > len(SIDECAR_SUFFIX):
             self.sidecars.append((mtime, directory, name, _identity(metadata)))
-        elif in_backup and name.endswith(".json"):
-            kind = _backup_kind(name[: -len(".json")] + ".sqlite3")
-            if kind is not None:
-                self.manifests[kind].append((mtime, directory, name, _identity(metadata)))
 
 
 def _open_regular(path: str, identity: tuple):
@@ -637,8 +650,38 @@ def _parse_manifest(payload: bytes, artifact_name: str) -> tuple:
     return digest, size
 
 
+def _manifest_name(artifact_name: str) -> str:
+    return artifact_name[: -len(BACKUP_ARTIFACT_SUFFIX)] + BACKUP_MANIFEST_SUFFIX
+
+
+# Counters incremented for each verification outcome.  A sidecar that cannot
+# be checked only calls for attention; a backup manifest that cannot be
+# checked leaves the backup unproven, which blocks the restart.
+_SIDECAR_COUNTERS = {
+    "verified": ("verified",),
+    "mismatched": ("mismatched",),
+    "target_missing": ("missing_targets",),
+    "budget": ("skipped_budget",),
+    "document_invalid": ("invalid_documents",),
+    "target_refused": ("refused_targets",),
+    "unreadable": ("unreadable",),
+    "changed_during_read": ("changed_during_read",),
+}
+_MANIFEST_COUNTERS = {
+    "verified": ("verified", "manifests_verified"),
+    "mismatched": ("mismatched",),
+    "target_missing": ("missing_targets",),
+    "budget": ("skipped_budget", "manifests_skipped_budget"),
+    "document_invalid": ("manifests_unverifiable",),
+    "target_refused": ("manifests_unverifiable",),
+    "unreadable": ("manifests_unverifiable",),
+    "changed_during_read": ("manifests_unverifiable",),
+}
+_COUNTERS = {"sidecar": _SIDECAR_COUNTERS, "manifest": _MANIFEST_COUNTERS}
+
+
 class _Verification:
-    """Verify sidecars and recent backup manifests within explicit budgets."""
+    """Verify the newest backup artifacts, then sidecars, within explicit budgets."""
 
     def __init__(self, options, root_device: int, deadline: float) -> None:
         self.options = options
@@ -646,102 +689,126 @@ class _Verification:
         self.deadline = deadline
         self.remaining_bytes = options.max_hash_gib * GIB
         self.remaining_files = options.max_hash_files
+        # For each kind that has artifacts: whether its newest one was verified.
+        self.newest_verified = {}
         self.counts = {
             "sidecars": 0,
-            "manifests": 0,
-            "manifests_not_selected": 0,
+            "backup_artifacts": 0,
+            "backup_artifacts_not_selected": 0,
             "verified": 0,
+            "manifests_verified": 0,
             "mismatched": 0,
             "missing_targets": 0,
             "invalid_documents": 0,
             "refused_targets": 0,
             "unreadable": 0,
             "changed_during_read": 0,
+            "manifests_missing": 0,
+            "manifests_unverifiable": 0,
+            "newest_unverified_kinds": 0,
             "skipped_budget": 0,
             "manifests_skipped_budget": 0,
             "bytes_hashed": 0,
         }
 
     def run(self, walk: _Walk) -> None:
-        # Backup manifests come first: a flood of sidecars must never use up
-        # the budget and leave a corrupt backup unverified.
+        # Backup artifacts come first: a flood of sidecars must never use up
+        # the budget and leave a corrupt backup unverified.  Each work item is
+        # (item kind, directory, document name, document identity, target
+        # name, expected target identity, backup kind whose newest artifact
+        # it is).
         work = []
         for kind, _ in BACKUP_KINDS:
-            candidates = sorted(walk.manifests[kind], key=lambda item: item[0], reverse=True)
-            self.counts["manifests_not_selected"] += max(0, len(candidates) - BACKUP_MANIFESTS_PER_KIND)
-            for mtime, directory, name, identity in candidates[:BACKUP_MANIFESTS_PER_KIND]:
-                self.counts["manifests"] += 1
-                work.append(("manifest", directory, name, identity))
+            candidates = sorted(walk.backup_artifacts[kind], key=lambda item: (item[0], item[2]), reverse=True)
+            self.counts["backup_artifacts_not_selected"] += max(0, len(candidates) - BACKUP_MANIFESTS_PER_KIND)
+            if candidates:
+                self.newest_verified[kind] = False
+            for position, (mtime, directory, name, identity) in enumerate(candidates[:BACKUP_MANIFESTS_PER_KIND]):
+                self.counts["backup_artifacts"] += 1
+                manifest_name = _manifest_name(name)
+                manifest_identity = self._locate_manifest(directory, manifest_name)
+                if manifest_identity is not None:
+                    newest_kind = kind if position == 0 else None
+                    work.append(("manifest", directory, manifest_name, manifest_identity, name, identity, newest_kind))
         for mtime, directory, name, identity in sorted(walk.sidecars, key=lambda item: item[0], reverse=True):
             self.counts["sidecars"] += 1
-            work.append(("sidecar", directory, name, identity))
+            work.append(("sidecar", directory, name, identity, name[: -len(SIDECAR_SUFFIX)], None, None))
         for index, item in enumerate(work):
             if self.remaining_files <= 0 or time.monotonic() > self.deadline:
                 for skipped in work[index:]:
-                    self._count_budget_skip(skipped[0])
-                return
+                    self._count(skipped[0], "budget")
+                break
             self.remaining_files -= 1
-            self._verify_one(*item)
+            item_kind, directory, document_name, document_identity, target_name, target_identity, newest_kind = item
+            outcome = self._verify_one(item_kind, directory, document_name, document_identity, target_name, target_identity)
+            self._count(item_kind, outcome)
+            if outcome == "verified" and newest_kind is not None:
+                self.newest_verified[newest_kind] = True
+        self.counts["newest_unverified_kinds"] = sum(1 for verified in self.newest_verified.values() if not verified)
 
-    def _count_budget_skip(self, kind: str) -> None:
-        self.counts["skipped_budget"] += 1
-        if kind == "manifest":
-            self.counts["manifests_skipped_budget"] += 1
+    def _count(self, item_kind: str, outcome: str) -> None:
+        for counter in _COUNTERS[item_kind][outcome]:
+            self.counts[counter] += 1
 
-    def _verify_one(self, kind: str, directory: str, name: str, identity: tuple) -> None:
+    def _locate_manifest(self, directory: str, manifest_name: str):
+        """Return the identity of an artifact's sibling manifest, or ``None`` once its refusal is counted."""
+
         try:
-            payload = _read_small_document(os.path.join(directory, name), identity)
-            if kind == "sidecar":
-                target_name = name[: -len(SIDECAR_SUFFIX)]
+            metadata = os.lstat(os.path.join(directory, manifest_name))
+        except FileNotFoundError:
+            self.counts["manifests_missing"] += 1
+            return None
+        except OSError:
+            self.counts["manifests_unverifiable"] += 1
+            return None
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_dev != self.root_device:
+            self.counts["manifests_unverifiable"] += 1
+            return None
+        return _identity(metadata)
+
+    def _verify_one(self, item_kind, directory, document_name, document_identity, target_name, target_identity) -> str:
+        """Check one sidecar or manifest against its target and return the outcome."""
+
+        try:
+            payload = _read_small_document(os.path.join(directory, document_name), document_identity)
+            if item_kind == "sidecar":
                 expected_digest = _parse_sidecar(payload, target_name)
                 expected_size = None
             else:
-                target_name = name[: -len(".json")] + ".sqlite3"
                 expected_digest, expected_size = _parse_manifest(payload, target_name)
         except _InvalidDocument:
-            self.counts["invalid_documents"] += 1
-            return
+            return "document_invalid"
         except _ChangedDuringRead:
-            self.counts["changed_during_read"] += 1
-            return
+            return "changed_during_read"
         except (_Refused, OSError):
-            self.counts["unreadable"] += 1
-            return
+            return "unreadable"
         target = os.path.join(directory, target_name)
         try:
             metadata = os.lstat(target)
         except FileNotFoundError:
-            self.counts["missing_targets"] += 1
-            return
+            return "target_missing"
         except OSError:
-            self.counts["unreadable"] += 1
-            return
+            return "unreadable"
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_dev != self.root_device:
-            self.counts["refused_targets"] += 1
-            return
+            return "target_refused"
+        if target_identity is not None and _identity(metadata) != target_identity:
+            # The artifact seen by the walk was replaced before verification.
+            return "changed_during_read"
         if expected_size is not None and metadata.st_size != expected_size:
-            self.counts["mismatched"] += 1
-            return
+            return "mismatched"
         try:
             digest, size = _hash_regular_file(target, _identity(metadata), self.remaining_bytes, self.deadline)
         except _BudgetExhausted:
-            self._count_budget_skip(kind)
-            return
+            return "budget"
         except _ChangedDuringRead:
-            self.counts["changed_during_read"] += 1
-            return
+            return "changed_during_read"
         except _Refused:
-            self.counts["refused_targets"] += 1
-            return
+            return "target_refused"
         except OSError:
-            self.counts["unreadable"] += 1
-            return
+            return "unreadable"
         self.remaining_bytes -= size
         self.counts["bytes_hashed"] += size
-        if digest == expected_digest:
-            self.counts["verified"] += 1
-        else:
-            self.counts["mismatched"] += 1
+        return "verified" if digest == expected_digest else "mismatched"
 
 
 def _check_share_root(root: str, options) -> tuple:
@@ -793,7 +860,7 @@ def _check_folders(root: str, options) -> tuple:
                 state = "not_directory"
             elif not os.access(path, required):
                 # Presence mode accepts a folder that exists but is closed to
-                # the running account, such as the inspection account.
+                # the running account, such as an account without data access.
                 state = "present" if options.access == "exists" else "not_readable"
             elif options.access == "read-write" and not os.access(path, writable):
                 state = "not_writable"
@@ -904,11 +971,17 @@ def _verification_reasons(counts: dict) -> list:
         reasons.append("sha256_unreadable")
     if counts["changed_during_read"]:
         reasons.append("sha256_changed_during_read")
+    if counts["manifests_missing"]:
+        reasons.append("backup_manifest_missing")
+    if counts["manifests_unverifiable"]:
+        reasons.append("backup_manifest_unverifiable")
+    if counts["newest_unverified_kinds"]:
+        reasons.append("backup_newest_unverified")
     if counts["manifests_skipped_budget"]:
         reasons.append("sha256_backup_budget_exhausted")
     if counts["skipped_budget"] > counts["manifests_skipped_budget"]:
         reasons.append("sha256_budget_exhausted")
-    if counts["sidecars"] + counts["manifests"] == 0:
+    if counts["sidecars"] + counts["backup_artifacts"] == 0:
         reasons.append("sha256_nothing_to_verify")
     return reasons
 
@@ -1080,8 +1153,15 @@ def main(argv=None) -> int:
     except Exception:  # fail closed without echoing a message that could hold a path
         report = _failure_report(time.time())
         encoded = json.dumps(report, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    sys.stdout.write(encoded + "\n")
-    sys.stdout.flush()
+    try:
+        sys.stdout.write(encoded + "\n")
+        sys.stdout.flush()
+    except Exception:  # BrokenPipeError, closed or missing stdout: nothing proves readiness
+        # The interpreter flushes stdout again at exit; dropping the stream
+        # keeps the exit code at EXIT_NOT_READY instead of 120 and a
+        # traceback on stderr.
+        sys.stdout = None
+        return EXIT_NOT_READY
     return EXIT_BY_OVERALL[report["overall"]]
 
 

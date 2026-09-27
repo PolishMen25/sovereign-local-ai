@@ -123,7 +123,8 @@ class SynologyReadinessTests(unittest.TestCase):
         self.assertEqual(backups["kinds"]["knowledge-index"]["files"], 1)
         self.assertAlmostEqual(backups["newest_age_hours"], 1.0, delta=0.2)
         sha = report["checks"]["sha256"]
-        self.assertEqual((sha["sidecars"], sha["manifests"], sha["verified"], sha["mismatched"]), (1, 2, 3, 0))
+        self.assertEqual((sha["sidecars"], sha["backup_artifacts"], sha["verified"], sha["mismatched"]), (1, 2, 3, 0))
+        self.assertEqual((sha["manifests_verified"], sha["manifests_missing"], sha["newest_unverified_kinds"]), (2, 0, 0))
         self.assert_path_free(stdout, share)
 
     def test_read_only_access_mode_accepts_a_read_only_account(self) -> None:
@@ -336,7 +337,8 @@ class SynologyReadinessTests(unittest.TestCase):
         document["bytes"] += 1
         manifest.write_text(json.dumps(document), encoding="utf-8")
         report = self.check(share, "--verify-sha256")
-        self.assertEqual(report["reasons"], ["sha256_mismatch"])
+        self.assertEqual(report["reasons"], ["backup_newest_unverified", "sha256_mismatch"])
+        self.assertEqual(report["overall"], "not_ready")
 
     def test_sidecar_without_target_is_not_ready(self) -> None:
         share = self.build_share()
@@ -345,21 +347,137 @@ class SynologyReadinessTests(unittest.TestCase):
         self.assertEqual(report["reasons"], ["sha256_target_missing"])
         self.assertEqual(report["overall"], "not_ready")
 
-    def test_malformed_documents_are_attention(self) -> None:
+    def test_malformed_sidecar_is_attention(self) -> None:
         share = self.build_share()
         (share / "models" / "synthetic-model.gguf.sha256").write_text("a" * 64 + "  another-file.gguf\n", encoding="ascii")
-        manifest = next((share / "backups").glob("memory-*.json"))
-        text = manifest.read_text(encoding="utf-8")
-        manifest.write_text(text[:-1] + ',"bytes":1}', encoding="utf-8")
         report = self.check(share, "--verify-sha256")
-        self.assertEqual(report["reasons"], ["sha256_document_invalid"])
-        self.assertEqual(report["checks"]["sha256"]["invalid_documents"], 2)
+        self.assertEqual((report["overall"], report["reasons"]), ("attention", ["sha256_document_invalid"]))
+        self.assertEqual(report["checks"]["sha256"]["invalid_documents"], 1)
 
     def test_oversized_sidecar_is_invalid(self) -> None:
         share = self.build_share()
         (share / "models" / "synthetic-model.gguf.sha256").write_bytes(b"a" * 5000)
         report = self.check(share, "--verify-sha256")
         self.assertEqual(report["reasons"], ["sha256_document_invalid"])
+
+    # Backup manifests: verification starts from the artifacts --------------------------
+
+    def memory_manifest(self, share: Path) -> Path:
+        return next((share / "backups").glob("memory-*.json"))
+
+    def assert_backup_unverifiable(self, report: dict) -> None:
+        self.assertEqual(report["overall"], "not_ready")
+        self.assertEqual(report["reasons"], ["backup_manifest_unverifiable", "backup_newest_unverified"])
+        sha = report["checks"]["sha256"]
+        self.assertEqual((sha["manifests_unverifiable"], sha["manifests_verified"], sha["newest_unverified_kinds"]), (1, 1, 1))
+        for generic in ("invalid_documents", "unreadable", "refused_targets", "changed_during_read"):
+            self.assertEqual(sha[generic], 0, generic)
+
+    def test_fresh_artifact_without_manifest_is_not_ready(self) -> None:
+        share = self.build_share(backup_age_hours=0.1)
+        manifest = self.memory_manifest(share)
+        # The producer renames the artifact before it writes the manifest.
+        staged = manifest.with_name(manifest.name + ".tmp")
+        manifest.rename(staged)
+        code, stdout, _ = self.cli(["--share-root", str(share), "--min-free-gib", "0", "--verify-sha256"])
+        report = json.loads(stdout)
+        self.assertEqual(code, 2)
+        self.assertEqual(report["overall"], "not_ready")
+        self.assertEqual(
+            report["reasons"], ["backup_manifest_missing", "backup_newest_unverified", "temporary_files_present"]
+        )
+        self.assertEqual(report["checks"]["backups"]["status"], "ok")
+        sha = report["checks"]["sha256"]
+        self.assertEqual((sha["backup_artifacts"], sha["manifests_missing"], sha["manifests_verified"]), (2, 1, 1))
+        self.assert_path_free(stdout, share)
+
+    def test_newest_unverified_while_older_verified_is_not_ready(self) -> None:
+        share = self.build_share(backup_age_hours=2)
+        newest, manifest = _write_backup(
+            share / "backups", "memory", "private-memory-backup.v1", b"newest memory", time.time() - 60
+        )
+        manifest.unlink()
+        code, stdout, _ = self.cli(["--share-root", str(share), "--min-free-gib", "0", "--verify-sha256"])
+        report = json.loads(stdout)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(report["overall"], "not_ready")
+        self.assertIn("backup_newest_unverified", report["reasons"])
+        self.assertIn("backup_manifest_missing", report["reasons"])
+        sha = report["checks"]["sha256"]
+        # The older memory backup and the knowledge-index backup still verify.
+        self.assertEqual((sha["backup_artifacts"], sha["manifests_verified"], sha["newest_unverified_kinds"]), (3, 2, 1))
+        self.assertTrue(newest.is_file())
+
+    def test_newest_unverified_blocks_even_without_another_reason(self) -> None:
+        options = readiness.parse_arguments(["--share-root", str(self.root)])
+        counts = {key: 0 for key in readiness._Verification(options, 0, 0.0).counts}
+        counts.update(backup_artifacts=2, manifests_verified=1, verified=1, newest_unverified_kinds=1)
+        reasons = readiness._verification_reasons(counts)
+        self.assertEqual(reasons, ["backup_newest_unverified"])
+        self.assertEqual(readiness._status_for(reasons), "not_ready")
+
+    def test_invalid_backup_manifest_is_not_ready(self) -> None:
+        share = self.build_share()
+        manifest = self.memory_manifest(share)
+        text = manifest.read_text(encoding="utf-8")
+        manifest.write_text(text[:-1] + ',"bytes":1}', encoding="utf-8")
+        self.assert_backup_unverifiable(self.check(share, "--verify-sha256"))
+
+    def test_unreadable_backup_manifest_is_not_ready(self) -> None:
+        share = self.build_share()
+        name = self.memory_manifest(share).name
+        real_read = readiness._read_small_document
+
+        def refuse(path, identity):
+            if os.path.basename(path) == name:
+                raise PermissionError("synthetic")
+            return real_read(path, identity)
+
+        with mock.patch.object(readiness, "_read_small_document", side_effect=refuse):
+            self.assert_backup_unverifiable(self.check(share, "--verify-sha256"))
+
+    def test_backup_manifest_that_is_not_a_regular_file_is_not_ready(self) -> None:
+        share = self.build_share()
+        manifest = self.memory_manifest(share)
+        manifest.unlink()
+        manifest.mkdir()
+        self.assert_backup_unverifiable(self.check(share, "--verify-sha256"))
+
+    def test_symlinked_backup_manifest_is_not_ready(self) -> None:
+        share = self.build_share()
+        manifest = self.memory_manifest(share)
+        outside = _write(self.root / "outside" / manifest.name, manifest.read_bytes())
+        manifest.unlink()
+        _symlink_or_skip(self, outside, manifest, directory=False)
+        report = self.check(share, "--verify-sha256")
+        self.assertEqual(report["overall"], "not_ready")
+        self.assertIn("backup_manifest_unverifiable", report["reasons"])
+        self.assertEqual(report["checks"]["sha256"]["manifests_unverifiable"], 1)
+
+    def test_refused_backup_target_is_not_ready(self) -> None:
+        share = self.build_share()
+        real_hash = readiness._hash_regular_file
+
+        def refuse(path, *args):
+            if os.path.basename(path).startswith("memory-"):
+                raise readiness._Refused("synthetic")
+            return real_hash(path, *args)
+
+        with mock.patch.object(readiness, "_hash_regular_file", side_effect=refuse):
+            self.assert_backup_unverifiable(self.check(share, "--verify-sha256"))
+
+    def test_backup_manifest_changed_during_read_is_not_ready(self) -> None:
+        share = self.build_share()
+        name = self.memory_manifest(share).name
+        real_read = readiness._read_small_document
+
+        def changing(path, identity):
+            if os.path.basename(path) == name:
+                raise readiness._ChangedDuringRead("synthetic")
+            return real_read(path, identity)
+
+        with mock.patch.object(readiness, "_read_small_document", side_effect=changing):
+            self.assert_backup_unverifiable(self.check(share, "--verify-sha256"))
 
     def test_hash_budget_and_empty_verification_are_attention(self) -> None:
         share = self.build_share()
@@ -369,13 +487,16 @@ class SynologyReadinessTests(unittest.TestCase):
         self.assertEqual((sha["verified"], sha["skipped_budget"], sha["manifests_skipped_budget"]), (2, 1, 0))
         starved = self.check(share, "--verify-sha256", "--max-hash-files", "1")
         self.assertEqual(starved["overall"], "not_ready")
-        self.assertEqual(starved["reasons"], ["sha256_backup_budget_exhausted", "sha256_budget_exhausted"])
+        self.assertEqual(
+            starved["reasons"], ["backup_newest_unverified", "sha256_backup_budget_exhausted", "sha256_budget_exhausted"]
+        )
         self.assertEqual(starved["checks"]["sha256"]["manifests_skipped_budget"], 1)
         (share / "models" / "synthetic-model.gguf.sha256").unlink()
-        for manifest in (share / "backups").rglob("*.json"):
-            manifest.unlink()
+        shutil.rmtree(share / "backups")
+        (share / "backups").mkdir()
         nothing = self.check(share, "--verify-sha256")
-        self.assertEqual(nothing["reasons"], ["sha256_nothing_to_verify"])
+        self.assertEqual(nothing["reasons"], ["backup_missing", "sha256_nothing_to_verify"])
+        self.assertEqual(nothing["overall"], "attention")
 
     def test_sidecar_flood_cannot_hide_a_corrupt_backup(self) -> None:
         share = self.build_share()
@@ -392,13 +513,19 @@ class SynologyReadinessTests(unittest.TestCase):
         self.assertEqual((sha["mismatched"], sha["manifests_skipped_budget"]), (1, 0))
         self.assertEqual(sha["skipped_budget"], 71 + 2 - 64)
 
-    def test_only_recent_backup_manifests_are_hashed(self) -> None:
+    def test_only_recent_backup_artifacts_are_hashed(self) -> None:
         share = self.build_share()
         for age in range(2, 7):
-            _write_backup(share / "backups", "memory", "private-memory-backup.v1", f"older {age}".encode(), time.time() - age * HOUR)
+            artifact, manifest = _write_backup(
+                share / "backups", "memory", "private-memory-backup.v1", f"older {age}".encode(), time.time() - age * HOUR
+            )
+            if age >= 4:
+                # Older than the three newest: never selected, so its missing manifest is not examined.
+                manifest.unlink()
         report = self.check(share, "--verify-sha256")
         sha = report["checks"]["sha256"]
-        self.assertEqual((sha["manifests"], sha["manifests_not_selected"], sha["verified"]), (4, 3, 5))
+        self.assertEqual((sha["backup_artifacts"], sha["backup_artifacts_not_selected"], sha["verified"]), (4, 3, 5))
+        self.assertEqual(sha["manifests_missing"], 0)
         self.assertEqual(report["overall"], "ready")
 
     # Symbolic links ------------------------------------------------------------------
@@ -480,6 +607,43 @@ class SynologyReadinessTests(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assert_path_free(stdout, share)
 
+    def test_failed_report_write_is_not_ready(self) -> None:
+        share = self.build_share()
+
+        class BrokenStdout(io.StringIO):
+            def write(self, text):
+                raise BrokenPipeError(32, "synthetic")
+
+        broken = BrokenStdout()
+        with contextlib.redirect_stdout(broken):
+            code = readiness.main(["--share-root", str(share), "--min-free-gib", "0"])
+        self.assertEqual(code, 2)
+        self.assertIsNot(sys.stdout, None)
+
+    def test_closed_standard_output_exits_not_ready_without_traceback(self) -> None:
+        share = self.build_share()
+        process = subprocess.Popen(
+            [sys.executable, "-B", "-", "--share-root", str(share), "--min-free-gib", "0"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            # The reader goes away before the script is even read: the report
+            # can only hit a closed pipe.
+            process.stdout.close()
+            process.stdin.write(TOOL_PATH.read_bytes())
+            process.stdin.close()
+            stderr = process.stderr.read()
+            code = process.wait(timeout=120)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            process.stderr.close()
+        self.assertEqual(code, 2)
+        self.assertEqual(stderr, b"")
+
     def test_usage_errors_exit_64_without_echoing_values(self) -> None:
         secret = str(self.root / "secret-location")
         cases = (
@@ -543,7 +707,7 @@ class SynologyReadinessTests(unittest.TestCase):
         self.assertEqual(report["checks"]["backups"]["status"], "skipped")
         self.assertFalse(report["limits"]["backup_check"])
         verified = self.check(share, "--expected-folders", "raw,validated,models", "--no-backup-check", "--verify-sha256")
-        self.assertEqual(verified["checks"]["sha256"]["manifests"], 0)
+        self.assertEqual(verified["checks"]["sha256"]["backup_artifacts"], 0)
         self.assertEqual(verified["checks"]["sha256"]["verified"], 1)
 
     def test_source_stays_python_38_compatible(self) -> None:
