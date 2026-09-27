@@ -83,6 +83,11 @@ Codes de sortie : `0` rapport écrit, `1` entrée refusée ou rapport impossible
 pas de chemin : une erreur du système de fichiers ou de l'index n'est signalée
 que par sa classe.
 
+Le moteur d'embeddings en service fait partie des composants à régulariser
+(`AGENTS.md`, phase 1 : autorisé dans son principe par D-028, sans lock ni reçu
+de promotion). L'outil ne l'active, ne l'étend ni ne le régularise ; une mesure
+faite avec lui ne vaut pas décision.
+
 Aucun seuil ni poids recommandé n'est fixé. Le choix du reranker et de l'index
 (P-004) reste au propriétaire. Il suppose une mesure au volume réel sur le nœud
 de calcul, avec un jeu d'or privé non versionné, qui n'a pas encore eu lieu.

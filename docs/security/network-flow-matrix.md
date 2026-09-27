@@ -1,13 +1,15 @@
 # Matrice des flux réseau interzones
 
-**Statut : PROPOSÉ — phase 0.** Ce document prépare l'issue #4 (cartographie
+**Statut : PROPOSÉ — rédigé en phase 0 ; le passage en phase 1 (D-038) ne
+change pas ce statut.** Ce document prépare l'issue #4 (cartographie
 réseau et preuve de l'isolement d'IA-CORE). Il fournit un modèle de zones
 abstraites, un contrat JSON à refus par défaut, un validateur statique, un
 exemple synthétique et une procédure de tests négatifs. Il ne propose pas et
 n'approuve pas de matrice réelle. Il ne décrit ni topologie, ni adresse, ni nom
 d'hôte, ni port, ni équipement.
 
-Le serveur de calcul est hors ligne : rien n'a été vérifié sur le réseau réel.
+Le serveur de calcul était hors ligne lors de la rédaction : rien n'a été
+vérifié sur le réseau réel.
 Aucune phrase de ce document ne décrit un état déployé. Produire la matrice
 réelle, la faire approuver et exécuter les tests négatifs exige le réseau réel.
 
@@ -25,7 +27,8 @@ Ce document couvre :
 Il ne couvre pas :
 
 - les adresses, VLAN, ports, règles de pare-feu et équipements. Ces valeurs
-  restent dans l'inventaire interne, hors du dépôt public ;
+  restent dans l'inventaire interne et la configuration privée, hors du dépôt
+  public (D-036) ;
 - le choix entre Research Gateway et dépôt direct (issue #5) ;
 - le mécanisme du sas de transfert (question 4 de la section « Réseau et
   frontière de sécurité » du questionnaire de découverte) ;

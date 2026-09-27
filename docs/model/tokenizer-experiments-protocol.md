@@ -1,14 +1,24 @@
 # Protocole d'expériences tokenizer
 
-**Statut : PROPOSÉ — phase 0.** Ce document répond au critère de l'issue #7
+**Statut : PROPOSÉ — rédigé en phase 0 ; le passage en phase 1 (D-038) ne
+change pas ce statut.** Ce document répond au critère de l'issue #7
 « expériences tokenizer avec métriques et corpus d'évaluation ». Il fournit un
 outil de mesure hors ligne, une fixture synthétique et un plan d'expériences.
 **Aucun seuil n'est décidé** : l'outil décrit, il ne classe pas et ne promeut
 rien. Le choix d'un artefact, de ses seuils et de sa promotion reste une
 décision du propriétaire au gate G3.
 
+Depuis la rédaction, D-042 a tranché une partie du cadre : le tokenizer est
+réentraîné sur le corpus final, avec un vocabulaire de 32 000, quatre tokens
+spéciaux et un contexte de 2 048 ; son acceptation se fait sur métriques
+mesurées (octets par token et tokens par mot en français, en anglais et sur le
+code, aller-retour exact). Ce sont les métriques que mesure l'outil. D-042 ne
+fixe aucune valeur de seuil. D-041 fixe environ 40 % de français technique
+dans le corpus cible.
+
 Aucun résultat sur un artefact réel n'est consigné ici. Le serveur de calcul
-est hors ligne ; rien n'a été exécuté sur les splits de pilote-v3.
+était hors ligne lors de la rédaction ; rien n'a été exécuté sur les splits de
+pilote-v3.
 
 ## 1. Situation de départ
 
@@ -151,7 +161,7 @@ les empreintes, jamais le contenu du corpus.
 | E-T1 | Les deux lignées 32k documentées se valent-elles ? | artefact | split `validation` de pilote-v3 |
 | E-T2 | Quel effet a la taille du vocabulaire ? | 16k, 24k, 32k, même split `train`, même seuil | split `validation` |
 | E-T3 | Quel effet a le seuil de fréquence ? | `minimum_frequency` 1 ou 2 | split `validation` |
-| E-T4 | Le corpus bilingue final change-t-il le constat ? | réentraînement après décision sur les proportions | splits du nouveau manifeste |
+| E-T4 | Le corpus bilingue final change-t-il le constat ? | réentraînement décidé par D-042, sur un corpus d'environ 40 % de français technique (D-041) | splits du nouveau manifeste |
 
 Règles communes :
 
@@ -161,9 +171,9 @@ Règles communes :
   du split, celle du manifeste et le commit de l'outil ;
 - chaque rapport est produit deux fois et les deux empreintes doivent être
   identiques ;
-- une variante de 48k unités dépasse la borne actuelle de 32 768 du module
-  runtime. L'évaluer exigerait de modifier cette borne, avec tests, et relève
-  d'une décision : **OUVERT**.
+- D-042 conserve un vocabulaire de 32 000. E-T2 reste descriptif et ne rouvre
+  pas ce choix. Une variante de 48k unités dépasserait en outre la borne
+  actuelle de 32 768 du module runtime ; elle sort du cadre de D-042.
 
 ## 6. Étiquetage langue et type : OUVERT
 
@@ -180,6 +190,10 @@ Options à arbitrer :
    langue et à un type ;
 3. accepter la seule mesure agrégée.
 
+D-042 fonde l'acceptation sur des métriques par langue et sur le code :
+l'option 3 ne suffit donc plus à elle seule. Le choix entre les options 1 et 2
+reste **OUVERT**.
+
 ## 7. Ce que l'outil ne fait pas
 
 - Il ne mesure aucun temps. Le coût de l'encodeur runtime croît avec le nombre
@@ -194,13 +208,17 @@ Options à arbitrer :
 
 Ces points relèvent du gate G3 (issue #7). Ce document n'en tranche aucun :
 
-1. l'artefact 32k canonique ;
-2. les critères d'acceptation, par exemple l'écart admissible de
-   `bytes_per_token` entre français et anglais, à fixer **après** les mesures ;
-3. le réentraînement éventuel sur le corpus bilingue final ;
-4. la confirmation des quatre tokens spéciaux, qui sont aujourd'hui le contrat
-   du code (`SPECIAL_TOKENS` de
-   [`services/inference/tokenizer.py`](../../services/inference/tokenizer.py))
-   et non une décision d'ADR, et du contexte candidat de 2 048 tokens
-   ([ADR-0004](../architecture/adr-0004-core-700m-and-zone-split.md), point 1) ;
-5. une éventuelle promotion `approved_core_v1`.
+1. l'artefact 32k canonique, issu du réentraînement décidé par D-042 ;
+2. les valeurs des seuils d'acceptation, par exemple l'écart admissible de
+   `bytes_per_token` entre français et anglais, à fixer **après** les mesures.
+   D-042 désigne les métriques, pas leurs valeurs ;
+3. une éventuelle promotion `approved_core_v1`.
+
+Points tranchés depuis la rédaction, rappelés pour mémoire :
+
+- le réentraînement sur le corpus final (D-042) ;
+- les quatre tokens spéciaux, qui sont le contrat du code (`SPECIAL_TOKENS` de
+  [`services/inference/tokenizer.py`](../../services/inference/tokenizer.py)),
+  et le contexte de 2 048 tokens
+  ([ADR-0004](../architecture/adr-0004-core-700m-and-zone-split.md), point 1),
+  tous deux conservés par D-042.
