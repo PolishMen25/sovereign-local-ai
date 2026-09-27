@@ -22,7 +22,7 @@ class BatchBuildTests(unittest.TestCase):
         self.raw_root = self.base / "raw" / "corpus" / "arena"
         (self.base / "raw").mkdir()
         self.suite = self.base / "suite.json"
-        self.suite.write_text(json.dumps({"tasks": [{"id": "t1", "prompt": "Écris f()"}]}), encoding="utf-8")
+        self.suite.write_text(json.dumps({"tasks": [{"id": "t1", "function_name": "f", "prompt": "Écris f()"}]}), encoding="utf-8")
 
     def _packet(self, packet_id: str, *, approved: bool, status: str = "awaiting_owner_approval") -> Path:
         packet = self.packets / packet_id

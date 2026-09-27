@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.local-ai.invalid/evaluation-grid/v1/schema.json",
+  "title": "Grille d'évaluation V1 lisible par machine",
+  "description": "Contrat structurel de la grille candidate. Le validateur tools/validate_evaluation_grid.py applique en plus les règles que ce schéma ne peut pas exprimer : existence des chemins dans le dépôt, décisions présentes et non remplacées dans le registre, date d'approbation non future, empreinte SHA-256 de la grille recalculée (entrées de la grille et octets des fichiers de fixture, fins de ligne CRLF lues comme LF) et consignée dans la ligne du registre de la décision d'approbation, chemins de fixture limités à des fichiers réguliers, cohérence des gates avec gate_links et couverture des huit axes. Ce contrat n'approuve aucun seuil.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "grid_id", "status", "source_document", "axes", "metrics", "gate_links"],
+  "properties": {
+    "schema_version": { "const": "evaluation-grid.v1" },
+    "grid_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,62}$" },
+    "status": { "const": "candidate_owner_review_required" },
+    "source_document": { "$ref": "#/$defs/repositoryPath" },
+    "axes": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "title": { "$ref": "#/$defs/title" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/metric" }
+    },
+    "gate_links": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"],
+      "properties": {
+        "G0": { "$ref": "#/$defs/gateLinkRow" },
+        "G1": { "$ref": "#/$defs/gateLinkRow" },
+        "G2": { "$ref": "#/$defs/gateLinkRow" },
+        "G3": { "$ref": "#/$defs/gateLinkRow" },
+        "G4": { "$ref": "#/$defs/gateLinkRow" },
+        "G5": { "$ref": "#/$defs/gateLinkRow" },
+        "G6": { "$ref": "#/$defs/gateLinkRow" },
+        "G7": { "$ref": "#/$defs/gateLinkRow" },
+        "G8": { "$ref": "#/$defs/gateLinkRow" }
+      }
+    }
+  },
+  "$defs": {
+    "title": { "type": "string", "minLength": 3, "maxLength": 160 },
+    "text": { "type": "string", "minLength": 3, "maxLength": 1500 },
+    "repositoryPath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$",
+      "not": { "pattern": "(^|/)\\.{1,2}(/|$)|//" }
+    },
+    "repositoryPaths": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/repositoryPath" }
+    },
+    "decisionId": { "type": "string", "pattern": "^D-[0-9]{3}$" },
+    "gGate": { "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"] },
+    "aGate": { "enum": ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"] },
+    "linkLevel": { "enum": ["required", "partial", "none"] },
+    "gateLinkRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"],
+      "properties": {
+        "A0": { "$ref": "#/$defs/linkLevel" },
+        "A1": { "$ref": "#/$defs/linkLevel" },
+        "A2": { "$ref": "#/$defs/linkLevel" },
+        "A3": { "$ref": "#/$defs/linkLevel" },
+        "A4": { "$ref": "#/$defs/linkLevel" },
+        "A5": { "$ref": "#/$defs/linkLevel" },
+        "A6": { "$ref": "#/$defs/linkLevel" },
+        "A7": { "$ref": "#/$defs/linkLevel" },
+        "A8": { "$ref": "#/$defs/linkLevel" }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "paths", "description"],
+      "properties": {
+        "status": { "enum": ["present", "partial", "missing", "runtime_artifact"] },
+        "paths": { "$ref": "#/$defs/repositoryPaths" },
+        "description": { "$ref": "#/$defs/text" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["present", "partial"] } } },
+          "then": { "properties": { "paths": { "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["missing", "runtime_artifact"] } } },
+          "then": { "properties": { "paths": { "maxItems": 0 } } }
+        }
+      ]
+    },
+    "procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "paths"],
+      "properties": {
+        "description": { "$ref": "#/$defs/text" },
+        "paths": { "$ref": "#/$defs/repositoryPaths" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "approved_on", "grid_sha256", "previous_status"],
+      "properties": {
+        "decision_id": { "$ref": "#/$defs/decisionId" },
+        "approved_on": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "grid_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "previous_status": { "enum": ["proposed", "pending_measurement", "confirmed"] }
+      }
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "statement", "decisions"],
+      "properties": {
+        "status": { "enum": ["proposed", "pending_measurement", "confirmed", "approved"] },
+        "statement": { "$ref": "#/$defs/text" },
+        "decisions": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/decisionId" }
+        },
+        "approval": { "$ref": "#/$defs/approval" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "approved" } } },
+          "then": { "required": ["approval"] },
+          "else": { "not": { "required": ["approval"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "confirmed" } } },
+          "then": { "properties": { "decisions": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "axis", "title", "fixture", "procedure", "threshold", "responsible", "g_gates", "a_gates"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^M[1-8]\\.[1-9][0-9]?$" },
+        "axis": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "title": { "$ref": "#/$defs/title" },
+        "fixture": { "$ref": "#/$defs/fixture" },
+        "procedure": { "$ref": "#/$defs/procedure" },
+        "threshold": { "$ref": "#/$defs/threshold" },
+        "responsible": { "enum": ["project_owner"] },
+        "g_gates": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/gGate" } },
+        "a_gates": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/aGate" } }
+      }
+    }
+  }
+}

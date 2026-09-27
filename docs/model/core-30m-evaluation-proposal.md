@@ -57,7 +57,8 @@ Le checkpoint final du pilote pré-entraîné a été soumis à E1 avec le contr
 corpus, tokenizer et préflight correspondant. Le runtime a refusé une sortie
 répétitive pendant le garde E0 ; aucun paquet de réponses ni modèle de revue E1
 n'a donc été créé. Ce résultat interdit de présenter cette lignée comme un chat
-ou assistant de programmation utilisable. Il ne justifie ni un contournement du+garde ni une nouvelle estimation de qualité : les prochaines données doivent
+ou assistant de programmation utilisable. Il ne justifie ni un contournement du
+garde ni une nouvelle estimation de qualité : les prochaines données doivent
 être des paires instruction-réponse assainies et des tâches de code validées par
 des tests externes.
 
@@ -75,7 +76,12 @@ d'entraînement ni file d'apprentissage.
 
 Le socle candidat est versionné dans
 [`core-python-e2.candidate.json`](../../configs/evaluation/core-python-e2.candidate.json).
-Il contient dix tâches Python statiques. Le lanceur
+Il contient 50 tâches Python statiques, dont 14 recouvrent par leur nom de
+fonction la suite d'entraînement de l'arène. D-044 l'étiquette « contaminée »
+et la remplace par une suite E2-v2 scellée, hors du dépôt public, dont seule
+l'empreinte est versionnée ; voir la
+[grille d'évaluation V1 proposée](v1-evaluation-grid.md#séparation-évaluation--entraînement).
+Le lanceur
 [`run_code_evaluation.py`](../../tools/run_code_evaluation.py) exige `bubblewrap`
 sur Linux, crée une instance jetable sans réseau ni montage hôte accessible en
 écriture, applique les limites CPU, mémoire, sortie et durée, puis n'écrit qu'un

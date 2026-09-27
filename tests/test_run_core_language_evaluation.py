@@ -9,6 +9,7 @@ from tools.run_core_language_evaluation import (
     RECEIPT_NAME,
     RESULTS_NAME,
     REVIEW_NAME,
+    load_candidate_suite,
     run_evaluation,
 )
 
@@ -57,6 +58,28 @@ class CoreLanguageEvaluationTests(unittest.TestCase):
             self.assertTrue(all(item["decision"] is None for item in review["decisions"]))
             written = json.loads((paths["output"] / RECEIPT_NAME).read_text(encoding="utf-8"))
             self.assertEqual(written["responses_sha256"], receipt["responses_sha256"])
+
+    def test_refuses_a_smaller_or_retargeted_suite_before_runtime(self):
+        document = json.loads(SUITE.read_text(encoding="utf-8"))
+        reduced = dict(document, prompts=[item for item in document["prompts"] if item["id"].endswith("-01")])
+        self.assertEqual(10, len(reduced["prompts"]))
+        retargeted = dict(document, model_name="CORE-700M")
+        for name, variant, pattern in (("reduced", reduced, "expected count"), ("core-700m", retargeted, "target")):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory, \
+                    patch("tools.run_core_language_evaluation.LocalInferenceRuntime") as runtime:
+                paths = self.inputs(Path(directory))
+                paths["suite"] = Path(directory) / "suite.json"
+                paths["suite"].write_text(json.dumps(variant), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, pattern):
+                    load_candidate_suite(paths["suite"])
+                with self.assertRaisesRegex(ValueError, pattern):
+                    run_evaluation(
+                        suite_path=paths["suite"], checkpoint_path=paths["checkpoint"], config_path=paths["config"],
+                        tokenizer_path=paths["tokenizer"], manifest_path=paths["manifest"], preflight_path=paths["preflight"],
+                        output_dir=paths["output"], seed=7, max_new_tokens=12,
+                    )
+                self.assertFalse(paths["output"].exists())
+                runtime.assert_not_called()
 
     def test_refuses_preexisting_destination_before_runtime(self):
         with tempfile.TemporaryDirectory() as directory, patch("tools.run_core_language_evaluation.LocalInferenceRuntime") as runtime:

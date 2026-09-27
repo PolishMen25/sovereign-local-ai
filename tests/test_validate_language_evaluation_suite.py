@@ -1,6 +1,9 @@
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -13,12 +16,36 @@ SPEC.loader.exec_module(MODULE)
 SUITE_PATH = PROJECT_ROOT / "configs" / "evaluation" / "core-30m-e1.candidate.json"
 
 
+def synthetic_suite(model_name: str, per_cell: int) -> dict:
+    prompts = [
+        {
+            "id": f"{language}-{category}-{index:02d}",
+            "language": language,
+            "category": category,
+            "prompt": f"Synthetic {language} {category} prompt number {index}.",
+        }
+        for language in MODULE.LANGUAGES
+        for category in MODULE.CATEGORIES
+        for index in range(1, per_cell + 1)
+    ]
+    return {
+        "schema_version": MODULE.SUITE_SCHEMA,
+        "status": MODULE.STATUS,
+        "model_name": model_name,
+        "evaluation_mode": "owner_blind_review",
+        "languages": list(MODULE.LANGUAGES),
+        "categories": list(MODULE.CATEGORIES),
+        "prompts": prompts,
+    }
+
+
 class LanguageEvaluationSuiteTests(unittest.TestCase):
     def setUp(self) -> None:
         self.document = json.loads(SUITE_PATH.read_text(encoding="utf-8"))
 
     def test_candidate_suite_is_complete_and_balanced(self) -> None:
         MODULE.validate(self.document)
+        MODULE.validate(self.document, model_name="CORE-30M", prompt_count=50)
         self.assertEqual(50, len(self.document["prompts"]))
         self.assertEqual("candidate_owner_review_required", self.document["status"])
 
@@ -41,6 +68,74 @@ class LanguageEvaluationSuiteTests(unittest.TestCase):
         changed["evaluation_mode"] = "automatic"
         with self.assertRaisesRegex(ValueError, "target"):
             MODULE.validate(changed)
+
+    def test_another_balanced_size_is_accepted_only_when_pinned(self) -> None:
+        document = synthetic_suite("CORE-30M", per_cell=8)
+        MODULE.validate(document, prompt_count=80)
+        MODULE.validate(document, model_name="CORE-30M", prompt_count=80)
+        with self.assertRaisesRegex(ValueError, "expected count"):
+            MODULE.validate(document)
+
+    def test_default_refuses_a_smaller_balanced_suite(self) -> None:
+        reduced = json.loads(json.dumps(self.document))
+        reduced["prompts"] = [item for item in reduced["prompts"] if item["id"].endswith("-01")]
+        self.assertEqual(10, len(reduced["prompts"]))
+        with self.assertRaisesRegex(ValueError, "expected count"):
+            MODULE.validate(reduced)
+
+    def test_unsupported_or_superseded_model_is_refused(self) -> None:
+        # D-034 superseded CORE-700M (D-026); adding a target takes an owner decision.
+        for name in ("CORE-700M", "CORE-80M", "Qwen2.5-1.5B", "", None):
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "target"):
+                MODULE.validate(synthetic_suite(name, per_cell=5))
+        with self.assertRaisesRegex(ValueError, "target"):
+            MODULE.validate(synthetic_suite("CORE-700M", per_cell=5), model_name="CORE-700M")
+
+    def test_expected_model_or_count_mismatch_is_refused(self) -> None:
+        with self.assertRaisesRegex(ValueError, "expected model"):
+            MODULE.validate(self.document, model_name="CORE-700M")
+        with self.assertRaisesRegex(ValueError, "expected count"):
+            MODULE.validate(self.document, prompt_count=60)
+        with self.assertRaisesRegex(ValueError, "expected count"):
+            MODULE.validate(self.document, prompt_count=None)
+
+    def test_unbalanced_or_unbounded_size_is_refused(self) -> None:
+        document = synthetic_suite("CORE-30M", per_cell=3)
+        document["prompts"] = document["prompts"][:-1]
+        with self.assertRaisesRegex(ValueError, "multiple"):
+            MODULE.validate(document, prompt_count=29)
+        with self.assertRaisesRegex(ValueError, "multiple|bounded"):
+            MODULE.validate(synthetic_suite("CORE-30M", per_cell=0), prompt_count=0)
+        with self.assertRaisesRegex(ValueError, "bounded"):
+            MODULE.validate(synthetic_suite("CORE-30M", per_cell=100), prompt_count=1000)
+        document = synthetic_suite("CORE-30M", per_cell=2)
+        moved = next(item for item in document["prompts"] if item["id"] == "fr-general-02")
+        moved.update({"id": "fr-systems-03", "category": "systems"})
+        with self.assertRaisesRegex(ValueError, "id"):
+            MODULE.validate(document, prompt_count=20)
+
+    def test_prompt_index_beyond_the_cell_size_is_refused(self) -> None:
+        document = synthetic_suite("CORE-30M", per_cell=2)
+        document["prompts"][1]["id"] = "fr-general-03"
+        with self.assertRaisesRegex(ValueError, "id"):
+            MODULE.validate(document, prompt_count=20)
+
+    def test_command_line_reports_and_pins_the_target(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(0, MODULE.main([str(SUITE_PATH), "--model", "CORE-30M", "--prompt-count", "50"]))
+        self.assertIn("valid", output.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, MODULE.main([str(SUITE_PATH)]))
+        with contextlib.redirect_stderr(io.StringIO()) as error:
+            self.assertEqual(1, MODULE.main([str(SUITE_PATH), "--prompt-count", "60"]))
+        self.assertIn("invalid language evaluation suite", error.getvalue())
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            MODULE.main([str(SUITE_PATH), "--model", "CORE-700M"])
+        with tempfile.TemporaryDirectory() as directory:
+            broken = Path(directory) / "suite.json"
+            broken.write_bytes(b"{not json")
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(1, MODULE.main([str(broken)]))
 
 
 if __name__ == "__main__":
