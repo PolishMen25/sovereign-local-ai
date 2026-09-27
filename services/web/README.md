@@ -47,6 +47,30 @@ Une réponse de chat peut être demandée avec `Accept: text/event-stream` : le
 serveur publie l'état de génération puis la réponse finale. BOOTSTRAP ne diffuse
 pas encore les tokens individuellement.
 
+## Actions du chat : `SOVEREIGN_ACTIONS_ENABLED` (D-035)
+
+Les actions sont les outils à effet de bord : `run_python` (bac à sable hors
+ligne) et `write_file` (dossier de travail de la passerelle). Elles sont
+**désactivées par défaut**. La variable est lue une seule fois au démarrage :
+seule la valeur exacte `1` les active ; absente, vide ou `0` les désactive ;
+toute autre valeur (`true`, `yes`, ` 1`…) les désactive et journalise un
+avertissement qui ne recopie pas la valeur.
+
+Désactivées, les actions ne sont ni annoncées ni offertes au modèle ; toute
+proposition, confirmation (`POST /v1/chat/confirm` répond `403
+actions_disabled`, y compris pour une action en attente ou un identifiant
+forgé) ou exécution est refusée et journalisée sans contenu. `GET /v1/session`
+et `GET /v1/health` exposent le booléen `actions_enabled`. Les outils en lecture
+seule (recherche, documents, heure, liste du dossier de travail) ne changent pas.
+Activées, une action approuvée qui échoue côté système (erreur d'écriture, bac à
+sable introuvable) renvoie au modèle un texte fixe, sans chemin du serveur ; le
+journal n'en garde que la classe d'erreur (`event=action_failed`).
+
+Déploiement : l'installation en service garde son comportement actuel tant que
+ce code n'est pas déployé. Une fois déployé, les actions sont coupées ; les
+conserver exige `SOVEREIGN_ACTIONS_ENABLED=1` dans l'environnement hors dépôt de
+l'unité systemd de la passerelle, ce que D-035 soumet à une décision distincte.
+
 ## Reconstruction contrôlée de l'index
 
 `tools.build_project_knowledge_index` n'indexe plus récursivement un dossier au

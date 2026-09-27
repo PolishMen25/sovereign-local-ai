@@ -24,6 +24,8 @@ class FakeState:
         self.knowledge = kwargs.get("knowledge")
         self.workspace_dir = kwargs.get("workspace_dir")
         self.tools_enabled = kwargs.get("tools_enabled", True)
+        if "actions_enabled" in kwargs:
+            self.actions_enabled = kwargs["actions_enabled"]
 
     def arena_overview(self):
         return {"available": True, "matches": 12}
@@ -77,6 +79,12 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual((snapshot["corpus"]["total"], snapshot["corpus"]["validated"]), (2, 1))
         self.assertTrue(snapshot["workspace"]["configured"])
         self.assertTrue(snapshot["actions"]["sandbox"])
+        self.assertFalse(snapshot["actions"]["actions_enabled"])  # D-035: absent means disabled
+
+    def test_actions_enabled_is_a_strict_boolean(self):
+        self.assertTrue(health.snapshot(FakeState(actions_enabled=True))["actions"]["actions_enabled"])
+        for value in (False, "1", 1, None):
+            self.assertIs(health.snapshot(FakeState(actions_enabled=value))["actions"]["actions_enabled"], False, value)
 
     def test_survives_a_broken_state(self):
         class Broken(FakeState):

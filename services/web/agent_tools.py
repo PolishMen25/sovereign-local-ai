@@ -140,6 +140,9 @@ ACTION_TOOL_SPECS.append({
     },
 })
 ACTION_TOOL_NAMES = frozenset(spec["function"]["name"] for spec in ACTION_TOOL_SPECS)
+# Fed back to the model when it calls an action that is not offered right now
+# (D-035 switch off, sandbox or workspace missing). Generic: says nothing of why.
+ACTION_REFUSED_RESULT = "Action refusée : les actions ne sont pas disponibles sur cette installation. Réponds sans exécuter ni écrire."
 
 
 class ToolError(Exception):
@@ -264,6 +267,7 @@ def execute_tool(name: str, raw_arguments: Any, *, knowledge: Any, embed_query: 
 ChatFn = Callable[[list[dict[str, Any]], list[dict[str, Any]]], dict[str, Any]]
 ExecFn = Callable[[str, Any], tuple[str, list[dict[str, Any]]]]
 OnTool = Callable[[str, str], None]
+OnActionRefused = Callable[[str], None]
 
 
 def _merge_citations(into: list[dict[str, Any]], seen: set[str], new: list[dict[str, Any]]) -> None:
@@ -284,18 +288,23 @@ def drive(
     seen_provenance: set[str] | None = None,
     max_rounds: int = MAX_TOOL_ROUNDS,
     on_tool: OnTool | None = None,
+    on_action_refused: OnActionRefused | None = None,
 ) -> dict[str, Any]:
     """Advance the tool-calling exchange over ``work`` (mutated in place).
 
     Read-only tools run immediately.  The first *action* tool call stops the loop
     and is returned for human confirmation (nothing is executed); the caller
     resumes by appending the action's tool result to ``work`` and calling drive
-    again.  Returns {status:'final', answer, work, citations} or
+    again.  An action the model calls although it is not in ``action_tools`` is
+    refused with a generic result, never executed nor proposed, and reported to
+    ``on_action_refused`` (its name only).  Returns
+    {status:'final', answer, work, citations} or
     {status:'confirm', call:{id,name,arguments}, work, citations}.
     """
 
     citations = citations if citations is not None else []
     seen = seen_provenance if seen_provenance is not None else set()
+    action_tools = frozenset(action_tools) & ACTION_TOOL_NAMES  # only real actions can pause for confirmation
     offer_actions = bool(action_tools)
     for round_index in range(max_rounds):
         last_round = round_index == max_rounds - 1
@@ -313,6 +322,12 @@ def drive(
             function = call.get("function", {}) if isinstance(call, dict) else {}
             name = str(function.get("name", ""))
             call_id = call.get("id") or f"call_{round_index}_{name}"
+            if name in ACTION_TOOL_NAMES and name not in action_tools:
+                # Not offered (D-035 switch off, or unavailable here): refuse, never run.
+                if on_action_refused is not None:
+                    on_action_refused(name)
+                work.append({"role": "tool", "tool_call_id": call_id, "content": ACTION_REFUSED_RESULT})
+                continue
             if name in action_tools and pending is None:
                 # Stop for confirmation; its tool result is appended on resume.
                 pending = {"id": call_id, "name": name, "arguments": function.get("arguments", "{}")}

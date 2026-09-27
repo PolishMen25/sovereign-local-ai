@@ -32,6 +32,24 @@ son nom, sa taille et son empreinte ; il ne recopie ni contenu indexé ni
 conversation. La restauration est une opération opérateur vérifiée, distincte
 du remplacement de la base en service.
 
+## Actions du chat et déploiement (D-035)
+
+Les actions confirmables du chat (`run_python`, `write_file`) sont coupées par
+défaut : seule la valeur exacte `SOVEREIGN_ACTIONS_ENABLED=1` les active, et la
+variable n'est lue qu'au démarrage (voir `services/web/README.md`). L'unité
+versionnée ne la pose pas : sauf réglage explicite, le déploiement de ce code
+coupe donc les actions, ce qui est le comportement voulu par D-035. Les
+conserver exige une décision distincte ; le cas échéant, poser la variable dans
+un drop-in systemd dédié (`Environment=SOVEREIGN_ACTIONS_ENABLED=1`), exécuter
+`systemctl daemon-reload`, puis seulement redémarrer l'unité sur le nouveau code.
+
+Déployer l'arborescence `services/web` complète, jamais le seul `app.py` : le
+module `services/web/action_switch.py` est nouveau et un `app.py` copié sans lui
+échoue à l'import, ce que `Restart=on-failure` transforme en boucle de
+redémarrage sans service. Après le redémarrage, vérifier dans le journal de
+l'unité la ligne `web config actions_enabled=0` (ou `=1` si une décision
+l'autorise) ; elle ne recopie aucune valeur de configuration.
+
 ## Contrats disponibles
 
 - `GET /healthz` et `GET /v1/setup-status` : état minimal sans secret ;

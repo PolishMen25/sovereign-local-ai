@@ -126,6 +126,7 @@ def snapshot(state: Any, *, state_root: Path | None = None, sandbox_available: b
         "corpus": {"available": bool(corpus.get("available")), "total": len(increments),
                    "validated": sum(1 for item in increments if item.get("status") == "validated")},
         "workspace": {"configured": workspace_dir is not None, "files": workspace_files},
-        "actions": {"sandbox": bool(sandbox_available), "tools_enabled": bool(getattr(state, "tools_enabled", False))},
+        "actions": {"sandbox": bool(sandbox_available), "tools_enabled": bool(getattr(state, "tools_enabled", False)),
+                    "actions_enabled": getattr(state, "actions_enabled", False) is True},
         "resources": resources(state_root),
     }

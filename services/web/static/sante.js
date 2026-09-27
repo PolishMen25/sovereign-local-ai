@@ -67,7 +67,8 @@
     const actions = data.actions || {};
     body.append(row(["Outils de l’assistant", chip(actions.tools_enabled,
       (actions.tools_enabled ? "outils actifs" : "outils désactivés")
-      + " · exécution de code " + (actions.sandbox ? "disponible (bac à sable)" : "indisponible"))]));
+      + (actions.actions_enabled !== true ? " · actions désactivées (exécution de code, écriture de fichier)"
+        : " · exécution de code " + (actions.sandbox ? "disponible (bac à sable)" : "indisponible")))]));
   }
 
   function renderResources(resources) {

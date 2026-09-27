@@ -17,6 +17,8 @@
     generation_failed: "Le moteur local n’a pas terminé sa réponse.",
     quality_gate_failed: "CORE-700M est encore en entraînement : sa sortie a été refusée car elle n’est pas exploitable. Sélectionnez BOOTSTRAP pour obtenir une réponse claire.",
     unknown_profile: "Ce profil d’assistant n’est pas disponible.",
+    actions_disabled: "Les actions (exécution de code, écriture de fichier) sont désactivées sur cette installation. Rien n’a été exécuté.",
+    action_refused: "Cette action n’est pas disponible sur cette installation. Rien n’a été exécuté ni écrit.",
   };
 
   function errorMessage(error) {
@@ -80,7 +82,7 @@
   if (typeof document === "undefined") return;
 
   const q = (id) => document.getElementById(id);
-  const state = {csrf: "", conversation: "", engine: "unavailable", ragMode: "", busy: false, profiles: [], engines: [], lastDocument: null};
+  const state = {csrf: "", conversation: "", engine: "unavailable", ragMode: "", busy: false, profiles: [], engines: [], lastDocument: null, actionsEnabled: false};
 
   function notice(message = "") {
     q("notice").textContent = message;
@@ -90,6 +92,7 @@
   function showAuth(mode) {
     state.csrf = "";
     state.conversation = "";
+    state.actionsEnabled = false;
     q("workspace").hidden = true;
     q("logout").hidden = true;
     q("username").textContent = "";
@@ -393,8 +396,16 @@
       : "Documentation locale : aucune source validée disponible.";
   }
 
+  // D-035: the server says whether chat actions are enabled; only `true` enables them here.
+  function renderActionsStatus() {
+    q("actions-status").textContent = state.actionsEnabled ? "" : "Actions désactivées : l’assistant ne peut ni exécuter de code ni écrire de fichier sur cette installation.";
+    q("actions-status").hidden = state.actionsEnabled;
+  }
+
   async function enterWorkspace(session) {
     state.csrf = session.csrf_token;
+    state.actionsEnabled = session.actions_enabled === true;
+    renderActionsStatus();
     q("setup").hidden = true;
     q("login").hidden = true;
     q("workspace").hidden = false;
@@ -531,6 +542,13 @@
 
   function renderConfirmation(answer, data) {
     answer.article.querySelector(".action-confirm")?.remove();
+    if (!state.actionsEnabled) {  // D-035: never offer to approve an action while actions are disabled
+      const line = document.createElement("p");
+      line.className = "field-help";
+      line.textContent = ERROR_MESSAGES.actions_disabled;
+      answer.article.append(line);
+      return;
+    }
     const card = document.createElement("div");
     card.className = "action-confirm";
     const isWrite = data.tool === "write_file";
