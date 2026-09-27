@@ -31,12 +31,15 @@ def _source_without_sha256(source: dict[str, Any]) -> dict[str, Any]:
 
 
 def _permissive(license_name: Any) -> bool:
+    # CC-BY-4.0 is authorized by D-032 and Etalab-2.0 by D-033. 0BSD and
+    # Unlicense appear in the candidate policy but in no D-xxx entry: they stay
+    # refused here until the owner records a decision (pending, G3 package).
     if not isinstance(license_name, str):
         return False
     normalized = license_name.strip().lower()
     return normalized == "mit" or normalized.startswith("mit (") or normalized in {
         "apache-2.0", "bsd-2-clause", "bsd-3-clause", "cc0-1.0", "cc-by-4.0",
-        "isc", "verified-public-domain"
+        "etalab-2.0", "isc", "verified-public-domain"
     }
 
 
