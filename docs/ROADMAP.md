@@ -175,7 +175,7 @@ Livrables :
 6. **Spécifier la validation sémantique et les schémas de lignée/événements.**
 7. **Définir le protocole du mini-benchmark CPU/NUMA et son format de résultats.**
 8. **Décider corpus, tokenizer et politique du moteur d'embeddings RAG.**
-9. **Définir la grille d'évaluation V1 et les critères d'arrêt.**
+9. **Définir la grille d'évaluation V1 et les critères d'arrêt** ([proposition de grille, non approuvée](model/v1-evaluation-grid.md)).
 
 Chaque ticket doit inclure un critère d'acceptation vérifiable, les informations à expurger et le gate qu'il contribue à ouvrir.
 
