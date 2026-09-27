@@ -1,0 +1,46 @@
+{
+  "schema_version": "embedding-model-lock.v1",
+  "status": "candidate_pending_raw_readback",
+  "purpose": "local_rag_embedding_separate_from_core",
+  "governance": {
+    "decision": "D-028",
+    "adr": "docs/architecture/adr-0007-rag-embedding-reranker-index.md",
+    "adr_status": "proposed",
+    "introduced_by_commit": "d7cc78c",
+    "owner_ratification": "pending_owner_decision"
+  },
+  "model": {
+    "name": "Qwen3-Embedding-0.6B",
+    "quantization": "Q8_0",
+    "embedding_dimensions": 1024,
+    "repository": "pending_raw_readback",
+    "revision": "pending_raw_readback",
+    "filename": "pending_raw_readback",
+    "byte_size": "pending_raw_readback",
+    "sha256": "pending_raw_readback",
+    "license": "pending_raw_readback",
+    "license_claimed_by_commit": "Apache-2.0",
+    "license_evidence_url": "pending_raw_readback",
+    "source_url": "pending_raw_readback"
+  },
+  "runtime": {
+    "name": "llama.cpp",
+    "release_declared_by_unit": "b10537",
+    "device": "cpu",
+    "network_download_at_runtime": false,
+    "offline_flag_required": true,
+    "bind": "loopback",
+    "pooling": "last",
+    "context_size": 8192
+  },
+  "activation_gate": {
+    "raw_readback_sha256_required": true,
+    "runtime_readback_sha256_required": true,
+    "license_readback_required": true,
+    "loopback_and_no_egress_test_required": true,
+    "promotion_record_required": true,
+    "owner_ratification_required": true
+  },
+  "promotion_record": "pending_owner_promotion",
+  "deployment_state": "unverified_no_readback"
+}
